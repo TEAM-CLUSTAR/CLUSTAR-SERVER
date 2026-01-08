@@ -1,4 +1,4 @@
-package org.project.global.api;
+package org.project.global.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.http.HttpStatus;

@@ -1,10 +1,10 @@
-package org.project.global.api;
+package org.project.global.exception.errorcode;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 @Getter
-public enum ErrorCode {
+public enum GlobalErrorCode implements ErrorCode {
     /**
      * 400 BAD_REQUEST
      */
@@ -52,9 +52,24 @@ public enum ErrorCode {
     private final int code;
     private final String msg;
 
-    ErrorCode(HttpStatus status, int code, String msg) {
+    GlobalErrorCode(HttpStatus status, int code, String msg) {
         this.status = status;
         this.code = code;
         this.msg = msg;
+    }
+
+    @Override
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    @Override
+    public int getCode() {
+        return code;
+    }
+
+    @Override
+    public String getMsg() {
+        return msg;
     }
 }

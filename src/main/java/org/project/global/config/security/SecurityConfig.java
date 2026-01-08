@@ -1,4 +1,4 @@
-package org.project.global.config;
+package org.project.global.config.security;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

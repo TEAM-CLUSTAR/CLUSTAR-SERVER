@@ -1,8 +1,7 @@
-package org.project.global.config;
+package org.project.global.config.security;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 

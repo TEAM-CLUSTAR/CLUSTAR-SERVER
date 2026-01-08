@@ -1,4 +1,4 @@
-package org.project.global.config;
+package org.project.global.config.querydsl;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
