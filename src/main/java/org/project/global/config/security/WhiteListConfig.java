@@ -13,7 +13,9 @@ public class WhiteListConfig {
         return List.of(
                 "/v3/api-docs/**",
                 "/swagger-ui/**",
-                "/swagger-ui.html"
+                "/swagger-ui.html",
+                "/actuator/health",
+                "/actuator/health/**"
         );
     }
 }

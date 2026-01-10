@@ -68,7 +68,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
           AWS_REGION: ap-northeast-2
-        with: 
+        with:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_DEV_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
