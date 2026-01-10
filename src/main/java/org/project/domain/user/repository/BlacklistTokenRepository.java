@@ -20,12 +20,6 @@ public class BlacklistTokenRepository {
         redisTemplate.opsForValue().set(key, "logout", Duration.ofSeconds(ttlSeconds));
     }
 
-    // 블랙리스트에 리프레시 토큰 저장
-    public void saveRefreshToken(String jti, long ttlSeconds) {
-        String key = PREFIX + jti;
-        redisTemplate.opsForValue().set(key, "refresh", Duration.ofSeconds(ttlSeconds));
-    }
-
     // 블랙리스트에 존재 여부 확인
     public boolean exists(String jti) {
         String key = PREFIX + jti;
