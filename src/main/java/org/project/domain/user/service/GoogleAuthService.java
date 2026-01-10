@@ -119,7 +119,7 @@ public class GoogleAuthService {
             }
         }
 
-        // 4. 쿠키 삭제
+        // 3. 쿠키 삭제
         CookieUtil.deleteCookie(response, "refreshToken",
                 cookieConfig.getDomain(), cookieConfig.isSecure(), cookieConfig.getSameSite());
     }
