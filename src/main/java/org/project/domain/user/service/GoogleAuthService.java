@@ -9,6 +9,7 @@ import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.dto.response.JwtLoginResponse;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.BlacklistTokenRepository;
+import org.project.domain.user.repository.RefreshTokenRepository;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.security.CookieConfig;
 import org.project.global.exception.domainException.LoginException;
@@ -41,6 +42,7 @@ public class GoogleAuthService {
 
     private final TokenResponseBuilder tokenResponseBuilder;
     private final BlacklistTokenRepository blacklistTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     public ResponseEntity<ApiResponse<Void>> loginOrRegisterWithResponse(String code,
                                                                          HttpServletResponse response) {
@@ -81,25 +83,18 @@ public class GoogleAuthService {
         return JwtLoginResponse.of(user, serverAccessToken, serverRefreshToken);
     }
 
-    /**
-     * 1. 회원의 식별자를 통해 서버에서 리프레시 토큰을 삭제합니다
-     * 2. 액세스 토큰을 찾아서 Redis에 블랙리스트로 추가합니다
-     * 2-1. 이때 남은 액세스 토큰의 만료기간을 TTL로 설정합니다
-     * 3. JWTFilter 에서 블랙리스트에 해당 토큰이 있는지 탐색하고 있다면 그에 맞는 예외를 반환합니다
-     * */
     public void logout(CustomUserDetails userDetails, HttpServletRequest request, HttpServletResponse response) {
         Long id = userDetails.getUser().getId();
 
-        // 1. Refresh Token 쿠키에서 추출
+        // 1. Refresh Token 무효화 (화이트리스트 제거)
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
 
         if (refreshToken != null) {
             try {
                 String refreshJti = jwtUtil.getJti(refreshToken);
-                long ttl = jwtUtil.getRemainingExpiration(refreshToken);
-                blacklistTokenRepository.saveRefreshToken(refreshJti, ttl);
+                refreshTokenRepository.delete(refreshJti);
             } catch (Exception e) {
-                log.warn("리프레시 토큰 블랙리스트 등록 실패 (이미 만료되었을 수 있음): {}", e.getMessage());
+                log.warn("Refresh Token 삭제 실패: {}", e.getMessage());
             }
         }
 
@@ -123,7 +118,7 @@ public class GoogleAuthService {
     }
 
     public ResponseEntity<ApiResponse<Void>> reissueToken(HttpServletRequest request, HttpServletResponse response) {
-        // 1. 쿠키에서 Refresh Token 가져오기
+        // 쿠키에서 Refresh Token 가져오기
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
 
         if (refreshToken == null) {
@@ -131,30 +126,29 @@ public class GoogleAuthService {
         }
 
         try {
-            // 2. Refresh Token 검증 & userId 추출
             Long userId = jwtUtil.validateRefreshToken(refreshToken);
+            String oldJti = jwtUtil.getJti(refreshToken);
 
-            // 3. 기존 Refresh Token의 jti 확인
-            String jti = jwtUtil.getJti(refreshToken);
-
-            // 4. 블랙리스트에 존재하면 → 재사용 공격
-            if (blacklistTokenRepository.exists(jti)) {
+            // 화이트리스트에 없으면 재사용 공격
+            if (!refreshTokenRepository.exists(oldJti)) {
                 throw new LoginException(LoginErrorCode.INVALID_REFRESH_TOKEN);
             }
 
-            // 5. DB에서 유저 확인
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
 
-            // 6. 새로운 Access/Refresh Token 생성
+            // 새 토큰 발급
             String newAccessToken = jwtUtil.generateAccessToken(user.getId());
             String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
+            String newJti = jwtUtil.getJti(newRefreshToken);
 
-            // 7. 기존 Refresh Token을 블랙리스트에 저장 (남은 TTL 만큼)
-            long remainingTtl = jwtUtil.getRemainingExpiration(refreshToken);
-            blacklistTokenRepository.saveRefreshToken(jti, remainingTtl);
+            // 기존 Refresh Token 제거
+            refreshTokenRepository.delete(oldJti);
 
-            // 8. 새 Refresh Token을 쿠키로 저장
+            // 새 Refresh Token 저장 (화이트리스트)
+            long ttl = jwtUtil.getRemainingExpiration(newRefreshToken);
+            refreshTokenRepository.save(newJti, ttl);
+
             return tokenResponseBuilder.buildTokenResponse(
                     newAccessToken,
                     newRefreshToken,
