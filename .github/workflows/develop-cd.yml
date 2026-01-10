@@ -76,11 +76,11 @@ jobs:
           script: |
             cd /home/ubuntu/clustar_infra
             
-            export DEV_DB_URL="$DEV_DB_URL"
-            export DEV_DB_USERNAME="$DEV_DB_USERNAME"
-            export DEV_DB_PASSWORD="$DEV_DB_PASSWORD"
-            export ECR_REPOSITORY="$ECR_REPOSITORY"
-            export IMAGE_TAG="$IMAGE_TAG"
+            echo "DEV_DB_URL=${DEV_DB_URL}" > .env
+            echo "DEV_DB_USERNAME=${DEV_DB_USERNAME}" >> .env
+            echo "DEV_DB_PASSWORD=${DEV_DB_PASSWORD}" >> .env
+            echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> .env
+            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
             
             # 배포 스크립트 실행권한 부여
             sudo chmod +x deploy.sh
@@ -106,59 +106,59 @@ jobs:
             
             echo "✅ 롤백 완료"
 
-  notify-discord:
-    needs: deploy
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-       - name: 배포 결과 디스코드 알림 전송
-         env:
-           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-           STATUS: ${{ needs.deploy.result }}
-           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-           AUTHOR: ${{ github.actor }}
-           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
-         run: |
-           if [ "$STATUS" = "success" ]; then
-             message="✅ 배포 성공"
-             color=3066993      
-           else
-             message="❌ 배포 실패 (자동 롤백 완료)"
-             color=15158332
-           fi
-           
-           payload=$(cat <<EOF
-           {
-             "embeds": [{
-               "title": "🚀 DEV 서버 배포 알림",
-               "description": "**커밋 메시지**: $COMMIT_MESSAGE\n**작성자**: $AUTHOR\n**결과**: ${message}",
-               "color": ${color},
-               "fields": [
-                 {
-                   "name": "🏷️ 이미지 태그",
-                   "value": "\`$IMAGE_TAG\`",
-                   "inline": true
-                 },
-                 {
-                   "name": "🌿 브랜치",
-                   "value": "develop",
-                   "inline": true
-                 },
-                 {
-                   "name": "🔗 커밋 링크",
-                   "value": "[확인하기](https://github.com/${{ github.repository }}/commit/$IMAGE_TAG)"
-                 }
-               ],
-               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-             }]
-           }
-           EOF
-           )
-           
-           curl -H "Content-Type: application/json" \
-              -X POST \
-              -d "$payload" \
-              "$DISCORD_WEBHOOK"
-           
-           echo "📢 디스코드 알림 전송 완료"
+#  notify-discord:
+#    needs: deploy
+#    runs-on: ubuntu-latest
+#    if: always()
+#
+#    steps:
+#       - name: 배포 결과 디스코드 알림 전송
+#         env:
+#           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+#           STATUS: ${{ needs.deploy.result }}
+#           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+#           AUTHOR: ${{ github.actor }}
+#           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+#         run: |
+#           if [ "$STATUS" = "success" ]; then
+#             message="✅ 배포 성공"
+#             color=3066993
+#           else
+#             message="❌ 배포 실패 (자동 롤백 완료)"
+#             color=15158332
+#           fi
+#
+#           payload=$(cat <<EOF
+#           {
+#             "embeds": [{
+#               "title": "🚀 DEV 서버 배포 알림",
+#               "description": "**커밋 메시지**: $COMMIT_MESSAGE\n**작성자**: $AUTHOR\n**결과**: ${message}",
+#               "color": ${color},
+#               "fields": [
+#                 {
+#                   "name": "🏷️ 이미지 태그",
+#                   "value": "\`$IMAGE_TAG\`",
+#                   "inline": true
+#                 },
+#                 {
+#                   "name": "🌿 브랜치",
+#                   "value": "develop",
+#                   "inline": true
+#                 },
+#                 {
+#                   "name": "🔗 커밋 링크",
+#                   "value": "[확인하기](https://github.com/${{ github.repository }}/commit/$IMAGE_TAG)"
+#                 }
+#               ],
+#               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+#             }]
+#           }
+#           EOF
+#           )
+#
+#           curl -H "Content-Type: application/json" \
+#              -X POST \
+#              -d "$payload" \
+#              "$DISCORD_WEBHOOK"
+#
+#           echo "📢 디스코드 알림 전송 완료"
