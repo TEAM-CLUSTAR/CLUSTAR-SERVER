@@ -87,48 +87,48 @@ jobs:
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_name: 테스트 상세 결과
 
-#  notify-discord:
-#    needs: test
-#    runs-on: ubuntu-latest
-#    if: always()
-#
-#    steps:
-#      - name: 디스코드로 알림 전송
-#        env:
-#          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-#          STATUS: ${{ needs.test.result }}
-#          PR_TITLE: ${{ github.event.pull_request.title }}
-#          PR_NUMBER: ${{ github.event.pull_request.number }}
-#          AUTHOR: ${{ github.actor }}
-#        run: |
-#          if [ "$STATUS" = "success" ]; then
-#            message="✅ CI 테스트 통과"
-#            color=3066993
-#          elif [ "$STATUS" = "skipped" ]; then
-#            message="⏭️ CI 스킵됨"
-#            color=8359053
-#          else
-#            message="❌ CI 테스트 실패"
-#            color=15158332
-#          fi
-#
-#          payload=$(cat <<EOF
-#          {
-#            "embeds": [{
-#              "title": "🏗️ DEV-CI 알림",
-#              "description": "**PR #${PR_NUMBER}**: ${PR_TITLE}\n**작성자**: ${AUTHOR}\n**결과**: ${message}",
-#              "color": ${color},
-#              "fields": [{
-#                "name": "🔗 PR 링크",
-#                "value": "[확인하기](https://github.com/${{ github.repository }}/pull/${PR_NUMBER})"
-#              }],
-#              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-#            }]
-#          }
-#          EOF
-#          )
-#
-#          curl -H "Content-Type: application/json" \
-#               -X POST \
-#               -d "$payload" \
-#               "$DISCORD_WEBHOOK"
+  notify-discord:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: 디스코드로 알림 전송
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          STATUS: ${{ needs.test.result }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.actor }}
+        run: |
+          if [ "$STATUS" = "success" ]; then
+            message="✅ CI 테스트 통과"
+            color=3066993
+          elif [ "$STATUS" = "skipped" ]; then
+            message="⏭️ CI 스킵됨"
+            color=8359053
+          else
+            message="❌ CI 테스트 실패"
+            color=15158332
+          fi
+
+          payload=$(cat <<EOF
+          {
+            "embeds": [{
+              "title": "🏗️ DEV-CI 알림",
+              "description": "**PR #${PR_NUMBER}**: ${PR_TITLE}\n**작성자**: ${AUTHOR}\n**결과**: ${message}",
+              "color": ${color},
+              "fields": [{
+                "name": "🔗 PR 링크",
+                "value": "[확인하기](https://github.com/${{ github.repository }}/pull/${PR_NUMBER})"
+              }],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$payload" \
+               "$DISCORD_WEBHOOK"
