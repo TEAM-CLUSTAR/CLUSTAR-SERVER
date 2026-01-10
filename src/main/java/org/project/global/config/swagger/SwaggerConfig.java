@@ -1,5 +1,6 @@
 package org.project.global.config.swagger;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.examples.Example;
@@ -8,6 +9,9 @@ import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.exception.errorcode.ErrorCode;
 import org.springdoc.core.customizers.OperationCustomizer;
@@ -24,6 +28,8 @@ import static java.util.stream.Collectors.groupingBy;
 @Configuration
 public class SwaggerConfig {
 
+    private static final String SECURITY_SCHEME_NAME = "BearerAuth";
+
     @Bean
     public OpenAPI openAPI() {
 
@@ -31,7 +37,16 @@ public class SwaggerConfig {
                 .info(new Info()
                         .title("SOPT cluSTAR")
                         .description("SOPT cluSTAR API 명세서")
-                        .version("1.0.0"));
+                        .version("1.0.0"))
+                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
+                .addServersItem(new Server().url("/"))
+                .components(new Components()
+                        .addSecuritySchemes(SECURITY_SCHEME_NAME,
+                                new SecurityScheme()
+                                        .name("Authorization")
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")));
     }
 
     // == 각 API에 에러 예시 추가 커스터마이저 == //
