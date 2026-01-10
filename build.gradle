@@ -117,8 +117,8 @@ jacocoTestReport{
                     '**/dto/**',
                     '**/entity/**',
                     '**/exception/**',
-                    '**/*Application.class',
-                    '**/Q*.class'
+                    '**/Q*.class',
+                    '**/global/response/**'
             ])
         }))
     }
