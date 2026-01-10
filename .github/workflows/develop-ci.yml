@@ -45,6 +45,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+        # 테스트 실행(H2 DB)
       - name: Run tests with Gradle
         run: ./gradlew clean build -Dspring.profiles.active=test
 
@@ -89,7 +90,7 @@ jobs:
   notify-discord:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ always() && secrets.DISCORD_WEBHOOK != '' }}
+    if: always()
 
     steps:
       - name: 디스코드로 알림 전송
