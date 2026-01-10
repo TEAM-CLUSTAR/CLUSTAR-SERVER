@@ -92,4 +92,67 @@ clean {
 
 test {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+// == Jacoco 설정 == //
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport{
+    dependsOn test
+
+    reports{
+        xml.required = true
+        html.required = true
+        csv.required = true
+    }
+
+    // 커버리지 계산에서 제외할 클래스 지정(논의 필요)
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    '**/config/**',
+                    '**/dto/**',
+                    '**/entity/**',
+                    '**/exception/**',
+                    '**/*Application.class',
+                    '**/Q*.class'
+            ])
+        }))
+    }
+}
+
+// == Jib 설정 == //
+jib{
+    // 베이스 이미지
+    from{
+     image = 'eclipse-temurin:17-jre'
+
+        platforms {
+            platform {
+                architecture = 'amd64'
+                os = 'linux'
+            }
+        }
+
+    }
+
+    to{
+        image = project.findProperty('jibToImage') ?: 'clustar'
+        tags = [project.findProperty('jibTag') ?: 'latest']
+    }
+
+    container{
+        jvmFlags = [
+                '-Xms512m',
+                '-Xmx1024m',
+                '-Duser.timezone=Asia/Seoul'
+        ]
+
+        ports = ['8080']
+
+        creationTime = 'USE_CURRENT_TIMESTAMP'
+    }
 }
