@@ -67,14 +67,18 @@ jobs:
           DEV_DB_PASSWORD: ${{ secrets.DEV_DB_PASSWORD }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          AWS_REGION: ap-northeast-2
         with:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_DEV_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           # GitHub의 시크릿 값들을 EC2 쉘 환경변수로 넘겨주기 (러너 메모리 -> EC2로 복사)
-          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG
+          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION
           script: |
             cd /home/ubuntu/clustar_infra
+            
+            aws ecr get-login-password --region ${AWS_REGION} | \
+            sudo docker login --username AWS --password-stdin ${ECR_REPOSITORY%%/*}
             
             echo "DEV_DB_URL=${DEV_DB_URL}" > .env
             echo "DEV_DB_USERNAME=${DEV_DB_USERNAME}" >> .env
