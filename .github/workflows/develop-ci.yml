@@ -31,7 +31,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Cache Gradle packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -50,6 +50,13 @@ jobs:
 
       - name: Jacoco 커버리지 리포트 생성
         run: ./gradlew jacocoTestReport
+
+      - name: Jacoco HTML 리포트 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-html-report
+          path: ${{ github.workspace }}/build/reports/jacoco/test/html/
 
       - name: Jacoco 커버리지 PR에 표시
         id: jacoco
@@ -82,7 +89,7 @@ jobs:
   notify-discord:
     needs: test
     runs-on: ubuntu-latest
-    if: always()
+    if: ${{ always() && secrets.DISCORD_WEBHOOK != '' }}
 
     steps:
       - name: 디스코드로 알림 전송
