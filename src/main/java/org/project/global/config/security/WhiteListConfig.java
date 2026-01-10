@@ -11,6 +11,9 @@ public class WhiteListConfig {
     // 스웨거 관련 인가 설정
     public static final List<String> swaggerWhitelist() {
         return List.of(
+                "/oauth/google/**",  // 구글 로그인
+                "/oauth/reissue",  // 토큰 재발급
+                "/access",  // 테스트용 엑세스 토큰
                 "/v3/api-docs/**",
                 "/swagger-ui/**",
                 "/swagger-ui.html"

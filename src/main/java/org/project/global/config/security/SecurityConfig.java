@@ -47,8 +47,11 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000", // 웹 로컬
-                "https://dev.projectname.com"
+                "http://localhost:8080",
+                "http://localhost:5173", // 웹 로컬
+                "https://dev.clustar.cloud",
+                "https://www.clustar.cloud",
+                "https://clustar.vercel.app/"
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Collections.singletonList("*"));
