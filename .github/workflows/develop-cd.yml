@@ -66,12 +66,16 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
           AWS_REGION: ap-northeast-2
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
         with:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_DEV_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           # GitHub의 시크릿 값들을 EC2 쉘 환경변수로 넘겨주기 (러너 메모리 -> EC2로 복사)
-          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION
+          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI
           script: |
             cd /home/ubuntu/clustar_infra
             
@@ -83,6 +87,10 @@ jobs:
             echo "DEV_DB_PASSWORD=${DEV_DB_PASSWORD}" >> .env
             echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> .env
             echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
+            echo "JWT_SECRET_KEY=${JWT_SECRET_KEY}" >> .env
+            echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" >> .env
+            echo "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" >> .env
+            echo "GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" >> .env
             
             # 배포 스크립트 실행권한 부여
             sudo chmod +x deploy.sh
