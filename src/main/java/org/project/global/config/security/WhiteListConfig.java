@@ -16,7 +16,9 @@ public class WhiteListConfig {
                 "/access",  // 테스트용 엑세스 토큰
                 "/v3/api-docs/**",
                 "/swagger-ui/**",
-                "/swagger-ui.html"
+                "/swagger-ui.html",
+                "/actuator/health",
+                "/actuator/health/**"
         );
     }
 }
