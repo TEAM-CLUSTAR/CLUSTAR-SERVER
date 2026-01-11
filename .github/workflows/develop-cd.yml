@@ -111,7 +111,7 @@ jobs:
             echo "✅ 롤백 완료"
 
   notify-discord:
-    needs: deploy
+    needs: [build-and-push, deploy]
     runs-on: ubuntu-latest
     if: always()
 
