@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 @Getter
 @Component
-@RequiredArgsConstructor
 public class CookieConfig {
 
     @Value("${app.cookie.domain:}")
