@@ -18,7 +18,7 @@ public class User extends BaseEntity {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "profile_image_url", nullable = false)
+    @Column(name = "profile_image_url", nullable = true)
     private String profileImageUrl;
 
     @Column(name = "name", nullable = false)
