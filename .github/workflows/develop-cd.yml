@@ -1,7 +1,7 @@
 name: develop-cd
 on:
   pull_request:
-    types: [closed, synchronize]
+    types: [closed]
     branches: [develop]
     paths:
       - 'src/**'
@@ -11,7 +11,7 @@ jobs:
   # 빌드 및 ECR 이미지 푸시
   build-and-push:
     runs-on: ubuntu-latest
-    # if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true
     # 이 Job에서 만든 값을 다른 Job에서 쓸 수 있도록 설정
     outputs:
       image-tag: ${{ steps.set-tag.outputs.tag }}
