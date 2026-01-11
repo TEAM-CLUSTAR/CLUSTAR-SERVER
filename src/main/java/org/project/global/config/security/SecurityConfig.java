@@ -43,10 +43,15 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // 🔥 CORS 보일러플레이트 적용
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // JWT기반 인증이기에
+                // CSRF, HTTP Basic 인증, Spring Security 기본 로그인/로그아웃 기능 끔
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+
+                // JWT 이기에 세션도 비활성화
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -56,18 +61,6 @@ public class SecurityConfig {
         http.authorizeHttpRequests((auth)->auth
                 .requestMatchers(WhiteListConfig.swaggerWhitelist().toArray(new String[0])).permitAll()
                 .anyRequest().authenticated());
-
-        // JWT기반 인증이기에
-        // CSRF, HTTP Basic 인증, Spring Security 기본 로그인/로그아웃 기능 끔
-        http.csrf(AbstractHttpConfigurer::disable);
-        http.httpBasic(AbstractHttpConfigurer::disable);
-        http.formLogin(AbstractHttpConfigurer::disable);
-        http.logout(AbstractHttpConfigurer::disable);
-
-        // JWT 이기에 세션도 비활성화
-        http
-                .sessionManagement((session) -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         // CORS 로그 확인 필터
         http.addFilterBefore(new CorsLoggingFilter(), UsernamePasswordAuthenticationFilter.class);
