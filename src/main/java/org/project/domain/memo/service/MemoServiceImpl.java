@@ -1,6 +1,8 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.label.entity.Label;
+import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
@@ -24,6 +26,7 @@ public class MemoServiceImpl implements MemoService {
 
     private final MemoRepository memoRepository;
     private final UserRepository userRepository;
+    private final LabelRepository labelRepository;
 
     @Transactional
     public MemoResponse createMemo(Long userId, MemoCreateRequest request) {
@@ -32,6 +35,25 @@ public class MemoServiceImpl implements MemoService {
                 .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
 
         Memo memo = Memo.createMemo(request.title(), request.content(), user);
+
+        if (request.labelNames() != null && !request.labelNames().isEmpty()) {
+            List<String> uniqueLabelNames = request.labelNames().stream()
+                    .distinct()
+                    .toList();
+
+            for (int i = 0; i < uniqueLabelNames.size(); i++) {
+                String labelName = uniqueLabelNames.get(i);
+
+                // 해당 유저의 라벨 찾기 (없으면 생성)
+                Label label = labelRepository.findByNameAndUser(labelName, user)
+                        .orElseGet(() -> labelRepository.save(
+                                Label.create(labelName, user)
+                        ));
+
+                // i가 우선순위임 (0, 1, 2, ...)
+                memo.addLabel(label, i);
+            }
+        }
 
         Memo savedMemo = memoRepository.save(memo);
 

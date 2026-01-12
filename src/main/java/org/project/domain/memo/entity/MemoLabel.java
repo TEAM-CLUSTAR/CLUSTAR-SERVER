@@ -28,10 +28,14 @@ public class MemoLabel {
     @JoinColumn(name = "label_id", nullable = false)
     private Label label;
 
-    public static MemoLabel create(Memo memo, Label label) {
+    @Column(name = "label_priority", nullable = false)
+    private Integer labelPriority;
+
+    public static MemoLabel create(Memo memo, Label label, Integer labelPriority) {
         return MemoLabel.builder()
                 .memo(memo)
                 .label(label)
+                .labelPriority(labelPriority)
                 .build();
     }
 }
