@@ -5,6 +5,9 @@ import lombok.*;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @Builder
@@ -41,6 +44,9 @@ public class Memo extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MemoLabel> memoLabels = new ArrayList<>();
 
 
     // 일반 메모 생성

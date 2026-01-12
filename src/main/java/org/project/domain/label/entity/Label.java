@@ -2,7 +2,11 @@ package org.project.domain.label.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.memo.entity.MemoLabel;
 import org.project.domain.user.entity.User;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -23,4 +27,7 @@ public class Label {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @OneToMany(mappedBy = "label", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MemoLabel> memoLabels = new ArrayList<>();
 }
