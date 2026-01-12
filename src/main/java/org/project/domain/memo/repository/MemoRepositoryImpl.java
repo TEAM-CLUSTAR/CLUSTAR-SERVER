@@ -41,6 +41,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                         labelIn(labelIds),
                         cursorCondition(cursorCreatedAt, cursorMemoId)
                 )
+                .groupBy(memo.id)
                 .orderBy(
                         memo.createdAt.desc(),
                         memo.id.desc()
