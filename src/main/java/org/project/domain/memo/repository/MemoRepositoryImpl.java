@@ -49,6 +49,10 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .limit(pageable.getPageSize())
                 .fetch();
 
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
         // 조회된 id로 실제 메모 페치조인하여 N+1 해결
         return queryFactory
                 .selectDistinct(memo)
