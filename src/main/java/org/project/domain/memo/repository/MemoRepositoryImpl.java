@@ -30,11 +30,12 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         QMemoLabel memoLabel = QMemoLabel.memoLabel;
         QLabel label = QLabel.label;
 
-        return queryFactory
-                .selectDistinct(memo)
+        // 전체조회가 아닌 필요한 만큼 조회
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
-                .leftJoin(memoLabel.label, label).fetchJoin()
+                .leftJoin(memo.memoLabels, memoLabel)
+                .leftJoin(memoLabel.label, label)
                 .where(
                         memo.user.id.eq(userId),
                         labelIn(labelIds),
@@ -45,6 +46,19 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                         memo.id.desc()
                 )
                 .limit(pageable.getPageSize())
+                .fetch();
+
+        // 조회된 id로 실제 메모 페치조인하여 N+1 해결
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
+                .leftJoin(memoLabel.label, label).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(
+                        memo.createdAt.desc(),
+                        memo.id.desc()
+                )
                 .fetch();
     }
 
