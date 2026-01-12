@@ -2,7 +2,6 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
