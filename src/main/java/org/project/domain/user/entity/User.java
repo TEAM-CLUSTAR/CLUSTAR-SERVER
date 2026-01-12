@@ -2,7 +2,11 @@ package org.project.domain.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.memo.entity.Memo;
 import org.project.global.entity.BaseEntity;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -13,6 +17,7 @@ import org.project.global.entity.BaseEntity;
 public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
     private Long id;
 
     @Column(name = "email", nullable = false, unique = true)
@@ -26,6 +31,10 @@ public class User extends BaseEntity {
 
     @Column(name = "provider_name", nullable = false)
     private String providerName;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Memo> memos = new ArrayList<>();
 
 
     /**
