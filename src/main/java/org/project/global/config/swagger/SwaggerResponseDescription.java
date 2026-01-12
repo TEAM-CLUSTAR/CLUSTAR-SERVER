@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.project.domain.user.errorcode.UserErrorCode;
 import org.project.global.exception.errorcode.ErrorCode;
 import org.project.global.exception.errorcode.GlobalErrorCode;
+import org.project.global.exception.errorcode.MemoErrorCode;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -14,6 +15,11 @@ public enum SwaggerResponseDescription {
 
     GET_USER(new LinkedHashSet<>(Set.of(
             UserErrorCode.USER_NOT_FOUND
+    ))),
+
+    CREATE_MEMO(new LinkedHashSet<>(Set.of(
+            UserErrorCode.USER_NOT_FOUND,
+            MemoErrorCode.MEMO_NOT_FOUND
     )));
 
     private final Set<ErrorCode> errorCodeList;
