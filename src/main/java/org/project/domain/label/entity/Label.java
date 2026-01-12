@@ -29,6 +29,7 @@ public class Label {
     private User user;
 
     @OneToMany(mappedBy = "label", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<MemoLabel> memoLabels = new ArrayList<>();
 
     public static Label create(String name, User user) {

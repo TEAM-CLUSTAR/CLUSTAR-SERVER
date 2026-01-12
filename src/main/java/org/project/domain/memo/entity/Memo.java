@@ -46,6 +46,7 @@ public class Memo extends BaseEntity {
     private User user;
 
     @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<MemoLabel> memoLabels = new ArrayList<>();
 
 
