@@ -32,7 +32,8 @@ public class User extends BaseEntity {
     @Column(name = "provider_name", nullable = false)
     private String providerName;
 
-    @OneToMany(mappedBy = "user")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Memo> memos = new ArrayList<>();
 
 
