@@ -18,8 +18,7 @@ public enum SwaggerResponseDescription {
     ))),
 
     CREATE_MEMO(new LinkedHashSet<>(Set.of(
-            UserErrorCode.USER_NOT_FOUND,
-            MemoErrorCode.MEMO_NOT_FOUND
+            UserErrorCode.USER_NOT_FOUND
     )));
 
     private final Set<ErrorCode> errorCodeList;
