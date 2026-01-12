@@ -69,6 +69,7 @@ public class GoogleOAuthController {
         return ResponseEntity.ok(ApiResponse.ok("로그아웃이 정상적으로 처리되었습니다"));
     }
 
+
     @Operation(summary = "Access Token 재발급 API",
             description = "Refresh Token을 이용하여 새로운 Access Token을 발급합니다.\n" +
                     "Refresh Token은 Cookie에서 자동으로 읽어옵니다.")
