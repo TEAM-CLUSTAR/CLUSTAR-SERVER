@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -52,13 +53,21 @@ public class MemoController {
     @GetMapping
     public ResponseEntity<ApiResponse<MemoListDashboardResponse>> getMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) List<Long> labelIds
+            @RequestParam(required = false) List<Long> labelIds,
+            @RequestParam(required = false) LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorMemoId,
+            @RequestParam(defaultValue = "20") int size
     ) {
-
-        Long userId = userDetails.getUserId();
-
-        MemoListDashboardResponse response = memoService.getMemos(userId, labelIds);
-
-        return ResponseEntity.ok(ApiResponse.ok(response));
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        memoService.getMemos(
+                                userDetails.getUserId(),
+                                labelIds,
+                                cursorCreatedAt,
+                                cursorMemoId,
+                                size
+                        )
+                )
+        );
     }
 }

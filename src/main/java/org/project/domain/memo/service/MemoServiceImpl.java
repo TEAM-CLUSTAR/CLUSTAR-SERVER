@@ -10,9 +10,11 @@ import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.UserErrorCode;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -37,17 +39,21 @@ public class MemoServiceImpl implements MemoService {
     }
 
     @Override
-    public MemoListDashboardResponse getMemos(Long userId, List<Long> labelIds) {
+    public MemoListDashboardResponse getMemos(
+            Long userId,
+            List<Long> labelIds,
+            LocalDateTime cursorCreatedAt,
+            Long cursorMemoId,
+            int size
+    ) {
 
-        List<Memo> memos;
-
-        if (labelIds == null || labelIds.isEmpty()) {
-            // 라벨 필터 없음 → 전체 조회
-            memos = memoRepository.findAllByUserId(userId);
-        } else {
-            // 라벨 필터 있음 → 해당 라벨 포함 메모 조회
-            memos = memoRepository.findAllByUserIdAndLabelIds(userId, labelIds);
-        }
+        List<Memo> memos = memoRepository.findMemos(
+                userId,
+                labelIds,
+                cursorCreatedAt,
+                cursorMemoId,
+                PageRequest.of(0, size)
+        );
 
         return MemoListDashboardResponse.from(memos);
     }
