@@ -37,8 +37,12 @@ public class MemoServiceImpl implements MemoService {
         Memo memo = Memo.createMemo(request.title(), request.content(), user);
 
         if (request.labelNames() != null && !request.labelNames().isEmpty()) {
-            for (int i = 0; i < request.labelNames().size(); i++) {
-                String labelName = request.labelNames().get(i);
+            List<String> uniqueLabelNames = request.labelNames().stream()
+                    .distinct()
+                    .toList();
+
+            for (int i = 0; i < uniqueLabelNames.size(); i++) {
+                String labelName = uniqueLabelNames.get(i);
 
                 // 해당 유저의 라벨 찾기 (없으면 생성)
                 Label label = labelRepository.findByNameAndUser(labelName, user)
