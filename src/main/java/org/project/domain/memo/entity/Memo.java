@@ -2,6 +2,7 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
@@ -43,4 +44,27 @@ public class Memo extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+
+    // 일반 메모 생성
+    public static Memo createMemo(String title, String content, User user) {
+        Memo memo = Memo.builder()
+                .title(title)
+                .content(content)
+                .user(user)
+                .build();
+
+        user.getMemos().add(memo);
+
+        return memo;
+    }
+
+    // 이미지 포함 메모 생성
+    public static Memo createMemoWithImage(String title, String content, String imageUrl, User user) {
+        return Memo.builder()
+                .title(title)
+                .content(content)
+                .imageUrl(imageUrl)
+                .user(user)
+                .build();
+    }
 }
