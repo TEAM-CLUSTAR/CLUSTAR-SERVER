@@ -2,8 +2,13 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.label.entity.Label;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -42,6 +47,11 @@ public class Memo extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("labelPriority ASC")
+    @Builder.Default
+    private List<MemoLabel> memoLabels = new ArrayList<>();
+
 
     // 일반 메모 생성
     public static Memo createMemo(String title, String content, User user) {
@@ -65,4 +75,16 @@ public class Memo extends BaseEntity {
                 .user(user)
                 .build();
     }
+
+    public List<Label> getLabels() {
+        return memoLabels.stream()
+                .map(MemoLabel::getLabel)
+                .toList();
+    }
+
+    public void addLabel(Label label,Integer labelPriority) {
+        MemoLabel memoLabel = MemoLabel.create(this, label, labelPriority);
+        this.memoLabels.add(memoLabel);
+    }
+
 }
