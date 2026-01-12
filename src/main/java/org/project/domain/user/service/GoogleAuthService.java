@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.domain.label.entity.Label;
+import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.dto.response.JwtLoginResponse;
 import org.project.domain.user.entity.User;
@@ -43,6 +45,7 @@ public class GoogleAuthService {
     private final TokenResponseBuilder tokenResponseBuilder;
     private final BlacklistTokenRepository blacklistTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final LabelRepository labelRepository;
 
     public ResponseEntity<ApiResponse<Void>> loginOrRegisterWithResponse(String code,
                                                                          HttpServletResponse response) {
@@ -64,6 +67,7 @@ public class GoogleAuthService {
 
         // 2. DB에 유저 존재 여부 확인
         User user;
+        boolean isNewUser = false;
 
         Optional<User> optionalUser = userRepository.findByEmail(profile.email());
 
@@ -73,6 +77,12 @@ public class GoogleAuthService {
             user = userRepository.save(
                     User.createSocialUser(profile.email(), profile.name(), profile.picture(), "google")
             );
+            isNewUser = true;
+        }
+
+        if (isNewUser) {
+            labelRepository.saveAll(Label.createDefaultLabels(user));
+            log.info("기본 라벨 생성 완료 - userId: {}", user.getId());
         }
 
         // 3. JWT 토큰 생성
@@ -85,7 +95,7 @@ public class GoogleAuthService {
 
         refreshTokenRepository.save(refreshJti, refreshTtl);
 
-        log.info("🔑 JWT 발급 완료 - userId: {}", user.getId());
+        log.info("JWT 발급 완료 - userId: {}", user.getId());
 
         return JwtLoginResponse.of(user, serverAccessToken, serverRefreshToken);
     }
