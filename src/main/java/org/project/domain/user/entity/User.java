@@ -2,6 +2,7 @@ package org.project.domain.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.label.entity.Label;
 import org.project.domain.memo.entity.Memo;
 import org.project.global.entity.BaseEntity;
 
@@ -35,6 +36,10 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Memo> memos = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Label> labels = new ArrayList<>();
 
 
     /**
