@@ -64,6 +64,12 @@ management:
   endpoint:
     health:
       show-details: always # 헬스 체크 상세 내용을 로그로 보기 위해
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
   health:
     redis:
       enabled: false # Redis가 없어도 전체 앱은 UP 상태로 유지

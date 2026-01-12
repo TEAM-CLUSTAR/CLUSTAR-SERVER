@@ -70,6 +70,9 @@ dependencies {
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+
+    // monitoring
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 }
 
 def querydslDir = "src/main/generated/querydsl"
