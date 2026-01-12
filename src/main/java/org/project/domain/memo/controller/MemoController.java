@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
@@ -15,14 +16,13 @@ import org.project.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/memo")
+@RequestMapping("/api/v1/memo")
 @Tag(name = "메모", description = "메모 작성, 검색 등 API")
 public class MemoController {
 
@@ -41,5 +41,24 @@ public class MemoController {
                 .body(ApiResponse.created(response));
     }
 
+    @Operation(
+            summary = "메모 전체 조회",
+            description = """
+                    메모를 전체 조회합니다.
+                    labelIds가 전달되면 해당 라벨이 포함된 메모만 조회합니다.
+                    labelIds가 비어있으면 라벨과 관계없이 전체 조회합니다.
+                    """
+    )
+    @GetMapping
+    public ResponseEntity<ApiResponse<MemoListDashboardResponse>> getMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) List<Long> labelIds
+    ) {
 
+        Long userId = userDetails.getUserId();
+
+        MemoListDashboardResponse response = memoService.getMemos(userId, labelIds);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
 }
