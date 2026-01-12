@@ -30,4 +30,24 @@ public class Label {
 
     @OneToMany(mappedBy = "label", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemoLabel> memoLabels = new ArrayList<>();
+
+    public static Label create(String name, User user) {
+        return Label.builder()
+                .name(name)
+                .user(user)
+                .build();
+    }
+
+    /**
+     * 기본 라벨 목록 생성
+     * - 최초 회원가입 시 사용
+     */
+    public static List<Label> createDefaultLabels(User user) {
+        return List.of(
+                create("SOPT", user),
+                create("학교", user),
+                create("책", user),
+                create("졸업프로젝트", user)
+        );
+    }
 }
