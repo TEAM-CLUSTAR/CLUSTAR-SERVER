@@ -4,13 +4,16 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
+import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.UserException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ public class MemoServiceImpl implements MemoService {
     private final LabelRepository labelRepository;
 
     @Transactional
+    @Override
     public MemoResponse createMemo(Long userId, MemoCreateRequest request) {
 
         User user = userRepository.findById(userId)
@@ -78,5 +82,19 @@ public class MemoServiceImpl implements MemoService {
         );
 
         return MemoListDashboardResponse.from(memos);
+    }
+
+    @Override
+    public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
+
+        Memo memo = memoRepository.findById(memoId)
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+
+        // 권한 체크 (본인의 메모인지 확인)
+        if (!memo.getUser().getId().equals(userId)) {
+            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
+        }
+
+        return MemoDetailResponse.from(memo);
     }
 }
