@@ -32,9 +32,10 @@ public class S3Util {
      *
      * @param file 업로드할 파일
      * @param folder S3 폴더 경로 (예: "memo-image", "memo-file")
-     * @return S3 Key (예: "memo-image/uuid_filename.jpg")
+     * @param userId 사용자 ID
+     * @return S3 Key (예: "memo-image/1/uuid_filename.jpg")
      */
-    public String uploadFile(MultipartFile file, String folder) {
+    public String uploadFile(MultipartFile file, String folder, Long userId) {
         if (file == null || file.isEmpty()) {
             throw new S3CustomException(S3ErrorCode.FILE_EMPTY);
         }
@@ -44,7 +45,7 @@ public class S3Util {
             String originalFilename = file.getOriginalFilename();
             String uuid = UUID.randomUUID().toString();
             String fileName = uuid + "_" + originalFilename;
-            String key = folder + "/" + fileName;
+            String key = folder + "/" + userId + "/" + fileName;
 
             // S3에 업로드
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -94,7 +95,7 @@ public class S3Util {
                     .build();
 
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                    .signatureDuration(Duration.ofHours(1))  // 1시간 유효
+                    .signatureDuration(Duration.ofHours(24))  //
                     .getObjectRequest(getObjectRequest)
                     .build();
 
