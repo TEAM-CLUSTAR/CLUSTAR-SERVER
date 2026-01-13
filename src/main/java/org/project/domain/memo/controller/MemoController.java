@@ -6,10 +6,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
+import org.project.domain.user.entity.User;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
@@ -32,7 +34,10 @@ public class MemoController {
     @Operation(summary = "메모 작성", description = "일반 메모를 작성합니다.")
     @PostMapping
     @BusinessExceptionDescription(SwaggerResponseDescription.CREATE_MEMO)
-    public ResponseEntity<ApiResponse<MemoResponse>> createMemo(@AuthenticationPrincipal CustomUserDetails userDetails, @Valid @RequestBody MemoCreateRequest request) {
+    public ResponseEntity<ApiResponse<MemoResponse>> createMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MemoCreateRequest request
+    ) {
 
         Long userId = userDetails.getUserId();
 
@@ -69,5 +74,20 @@ public class MemoController {
                         )
                 )
         );
+    }
+
+    @GetMapping("/{memoId}")
+    public ResponseEntity<ApiResponse<MemoDetailResponse>> getOneDetailMemo
+            (@AuthenticationPrincipal CustomUserDetails userDetails,
+             @PathVariable Long memoId
+            ) {
+
+        Long userId = userDetails.getUserId();
+
+        MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.ok(response));
+
     }
 }
