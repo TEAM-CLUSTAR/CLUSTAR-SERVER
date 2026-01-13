@@ -5,7 +5,8 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum MemoErrorCode implements ErrorCode {
-    MEMO_NOT_FOUND(HttpStatus.NOT_FOUND,404,"해당 메모를 찾을 수 없습니다.");
+    MEMO_NOT_FOUND(HttpStatus.NOT_FOUND,404,"해당 메모를 찾을 수 없습니다."),
+    FORBIDDEN_MEMO(HttpStatus.FORBIDDEN, 403, "해당 메모에 접근할 권한이 없습니다.");
 
     private final HttpStatus status;
     private final int code;

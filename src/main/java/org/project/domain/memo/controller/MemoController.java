@@ -6,10 +6,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
+import org.project.domain.user.entity.User;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
@@ -32,7 +34,10 @@ public class MemoController {
     @Operation(summary = "메모 작성", description = "일반 메모를 작성합니다.")
     @PostMapping
     @BusinessExceptionDescription(SwaggerResponseDescription.CREATE_MEMO)
-    public ResponseEntity<ApiResponse<MemoResponse>> createMemo(@AuthenticationPrincipal CustomUserDetails userDetails, @Valid @RequestBody MemoCreateRequest request) {
+    public ResponseEntity<ApiResponse<MemoResponse>> createMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MemoCreateRequest request
+    ) {
 
         Long userId = userDetails.getUserId();
 
@@ -69,5 +74,39 @@ public class MemoController {
                         )
                 )
         );
+    }
+
+    @GetMapping("/{memoId}")
+    @Operation(summary = "메모 상세조회(모달창)", description = """
+                    하나의 메모를 상세조회 합니다.
+                    AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
+                    AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
+                    라벨은 리스트의 앞부터 우선순위가 높은 순서 입니다.
+                    """)
+    public ResponseEntity<ApiResponse<MemoDetailResponse>> getOneDetailMemo
+            (@AuthenticationPrincipal CustomUserDetails userDetails,
+             @PathVariable Long memoId
+            ) {
+
+        Long userId = userDetails.getUserId();
+
+        MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.ok(response));
+
+    }
+
+    @DeleteMapping("/{memoId}")
+    @Operation(summary = "메모 삭제", description = "특정 메모를 삭제합니다.")
+    public ResponseEntity<ApiResponse<Void>> deleteMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId
+    ) {
+        Long userId = userDetails.getUserId();
+
+        memoService.deleteMemo(userId, memoId);
+
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 }
