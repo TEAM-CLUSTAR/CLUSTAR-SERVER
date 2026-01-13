@@ -76,7 +76,5 @@ management:
 
 cloud:
   aws:
-    region:
-      static: ap-northeast-2
     s3:
       bucket: clustar-bucket-01
