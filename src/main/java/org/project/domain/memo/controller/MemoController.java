@@ -90,4 +90,17 @@ public class MemoController {
                 .body(ApiResponse.ok(response));
 
     }
+
+    @DeleteMapping("/{memoId}")
+    @Operation(summary = "메모 삭제", description = "특정 메모를 삭제합니다.")
+    public ResponseEntity<ApiResponse<Void>> deleteMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId
+    ) {
+        Long userId = userDetails.getUserId();
+
+        memoService.deleteMemo(userId, memoId);
+
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

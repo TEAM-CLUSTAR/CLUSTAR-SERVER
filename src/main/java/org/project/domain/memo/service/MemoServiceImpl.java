@@ -90,11 +90,26 @@ public class MemoServiceImpl implements MemoService {
         Memo memo = memoRepository.findById(memoId)
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
-        // 권한 체크 (본인의 메모인지 확인)
+        // 본인 메모인지 확인
         if (!memo.getUser().getId().equals(userId)) {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
         return MemoDetailResponse.from(memo);
+    }
+
+    @Override
+    @Transactional
+    public void deleteMemo(Long userId, Long memoId) {
+
+        Memo memo = memoRepository.findById(memoId)
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+
+        // 본인 메모인지 확인
+        if (!memo.getUser().getId().equals(userId)) {
+            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
+        }
+
+        memoRepository.delete(memo);
     }
 }

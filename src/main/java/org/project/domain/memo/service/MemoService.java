@@ -21,4 +21,6 @@ public interface MemoService {
     );
 
     MemoDetailResponse getOneMemoDetail(Long userId, Long memoId);
+
+    void deleteMemo(Long userId, Long memoId);
 }
