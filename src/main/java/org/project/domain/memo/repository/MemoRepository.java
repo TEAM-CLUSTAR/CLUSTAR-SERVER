@@ -10,7 +10,4 @@ import java.util.Optional;
 public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepositoryCustom {
     @Query("SELECT m FROM Memo m WHERE m.id = :memoId AND m.isDeleted = false")
     Optional<Memo> findByIdAndNotDeleted(@Param("memoId") Long memoId);
-
-    @Query("SELECT m FROM Memo m WHERE m.user.id = :userId AND m.isDeleted = false")
-    Optional<Memo> findByUserIdAndNotDeleted(@Param("userId") Long userId);
 }
