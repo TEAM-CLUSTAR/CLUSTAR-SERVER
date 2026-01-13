@@ -11,29 +11,49 @@ public record MemoListDashboardResponse(
         List<MemoDashboardResponse> memos
 ) {
 
-    public static MemoListDashboardResponse from(List<Memo> memos) {
-        return new MemoListDashboardResponse(
-                memos.stream()
-                        .map(MemoDashboardResponse::from)
-                        .toList()
-        );
+    public static MemoListDashboardResponse from(List<MemoDashboardResponse> memos) {
+        return new MemoListDashboardResponse(memos);
     }
 
+    /**
+     * 대시보드용 메모 응답
+     */
     public record MemoDashboardResponse(
             Long memoId,
             String title,
             String content,
+
+            // 대표 이미지 (priority 가장 낮은 1개, presigned URL)
+            String representativeImageUrl,
+
+            // 이미지 / 파일 개수
+            int imageCount,
+            int fileCount,
+
             Boolean isPinned,
             Boolean isAiGenerated,
             LocalDateTime createdAt,
+
             List<LabelResponse> labels
     ) {
 
-        public static MemoDashboardResponse from(Memo memo) {
+        /**
+         * 엔티티 → DTO 변환
+         * (presigned URL, count 값은 Service에서 계산 후 주입)
+         */
+        public static MemoDashboardResponse of(
+                Memo memo,
+                String representativeImageUrl,
+                int imageCount,
+                int fileCount
+        ) {
             return new MemoDashboardResponse(
                     memo.getId(),
                     memo.getTitle(),
                     memo.getContent(),
+                    representativeImageUrl,
+                    imageCount,
+                    fileCount,
                     memo.getIsPinned(),
                     memo.getIsAiGenerated(),
                     memo.getCreatedAt(),
@@ -45,6 +65,9 @@ public record MemoListDashboardResponse(
         }
     }
 
+    /**
+     * 라벨 응답
+     */
     public record LabelResponse(
             Long labelId,
             String name
