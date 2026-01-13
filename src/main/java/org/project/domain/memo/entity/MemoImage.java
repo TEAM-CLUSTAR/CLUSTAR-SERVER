@@ -20,8 +20,8 @@ public class MemoImage {
     @JoinColumn(name = "memo_id", nullable = false)
     private Memo memo;
 
-    @Column(name = "image_url", nullable = false, length = 500)
-    private String imageUrl;
+    @Column(name = "image_S3_key", nullable = false, length = 500)
+    private String imageS3Key;
 
     @Column(name = "image_bytes")
     private Long imageBytes;

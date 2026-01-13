@@ -73,6 +73,11 @@ dependencies {
 
     // monitoring
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // S3
+    implementation platform("software.amazon.awssdk:bom:2.31.68")
+
+    implementation "software.amazon.awssdk:s3"
 }
 
 def querydslDir = "src/main/generated/querydsl"

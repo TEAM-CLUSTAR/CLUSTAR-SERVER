@@ -59,3 +59,8 @@ app:
     domain: ".clustar.cloud"
     same-site: None
     secure: true
+
+cloud:
+  aws:
+    s3:
+      bucket: clustar-bucket-01
