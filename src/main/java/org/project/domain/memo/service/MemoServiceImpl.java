@@ -4,14 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
+import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
-import org.project.domain.memo.repository.MemoFileRepository;
-import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
@@ -22,7 +22,6 @@ import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
-import org.project.global.util.S3PresignedUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
 import org.springframework.data.domain.PageRequest;
@@ -47,13 +46,40 @@ public class MemoServiceImpl implements MemoService {
 
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
-
-    private final S3PresignedUtil s3PresignedUtil;
-    private final S3KeyUtil s3KeyUtil;
-
-    private final MemoImageRepository memoImageRepository;
-    private final MemoFileRepository memoFileRepository;
     private final MemoLabelRepository memoLabelRepository;
+
+    private final S3KeyUtil s3KeyUtil;
+    private final S3Util s3Util;
+
+    public MemoPresignedUrlResponse issuePresignedUrls(
+            Long userId,
+            MemoPresignedUrlRequest request
+    ) {
+
+        List<MemoPresignedUrlResponse.PresignedUrlResponse> imageUrls =
+                request.images().stream()
+                        .map(r -> s3Util.createPresignedPutUrl(
+                                userId,
+                                "memo-image",
+                                r.extension(),
+                                r.bytes(),
+                                r.priority()
+                        ))
+                        .toList();
+
+        List<MemoPresignedUrlResponse.PresignedUrlResponse> fileUrls =
+                request.files().stream()
+                        .map(r -> s3Util.createPresignedPutUrl(
+                                userId,
+                                "memo-file",
+                                r.extension(),
+                                r.bytes(),
+                                r.priority()
+                        ))
+                        .toList();
+
+        return new MemoPresignedUrlResponse(imageUrls, fileUrls);
+    }
 
     @Transactional
     @Override
@@ -194,7 +220,7 @@ public class MemoServiceImpl implements MemoService {
                             // 대표 이미지 (priority ASC)
                             String representativeImageUrl = memoImages.stream()
                                     .min(Comparator.comparingInt(MemoImage::getImagePriority))
-                                    .map(img -> s3PresignedUtil.generateGetUrl(img.getImageS3Key()))
+                                    .map(img -> s3Util.generatePresignedUrl(img.getImageS3Key()))
                                     .orElse(null);
 
                             return MemoListDashboardResponse.MemoDashboardResponse.of(
@@ -266,86 +292,4 @@ public class MemoServiceImpl implements MemoService {
 
         memo.delete();
     }
-
-    // == 메모 생성을 위한 임시 테스트 메서드들이므로 추후 삭제 == //
-    @Transactional
-    public MemoResponse createMemoWithFiles(
-            Long userId,
-            String title,
-            String content,
-            List<String> labelNames,
-            List<MultipartFile> images,
-            List<MultipartFile> files
-    ) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
-
-        // 메모 생성
-        Memo memo = Memo.createMemo(title, content, user);
-
-        // 라벨 추가
-        if (labelNames != null && !labelNames.isEmpty()) {
-            List<String> uniqueLabelNames = labelNames.stream()
-                    .distinct()
-                    .toList();
-
-            for (int i = 0; i < uniqueLabelNames.size(); i++) {
-                String labelName = uniqueLabelNames.get(i);
-                Label label = labelRepository.findByNameAndUser(labelName, user)
-                        .orElseGet(() -> labelRepository.save(
-                                Label.create(labelName, user)
-                        ));
-                memo.addLabel(label, i);
-            }
-        }
-
-        Memo savedMemo = memoRepository.save(memo);
-
-        // 이미지 업로드
-        if (images != null && !images.isEmpty()) {
-            for (int i = 0; i < images.size(); i++) {
-                MultipartFile image = images.get(i);
-                if (!image.isEmpty()) {
-                    String imageKey = s3Util.uploadFile(image, "memo-image", userId);
-                    String extension = getFileExtension(image.getOriginalFilename());
-
-                    savedMemo.addImage(
-                            imageKey,
-                            image.getSize(),
-                            extension,
-                            i
-                    );
-                }
-            }
-        }
-
-        // 파일 업로드
-        if (files != null && !files.isEmpty()) {
-            for (int i = 0; i < files.size(); i++) {
-                MultipartFile file = files.get(i);
-                if (!file.isEmpty()) {
-                    String fileKey = s3Util.uploadFile(file, "memo-file", userId);
-                    String extension = getFileExtension(file.getOriginalFilename());
-
-                    savedMemo.addFile(
-                            fileKey,
-                            file.getSize(),
-                            extension,
-                            i
-                    );
-                }
-            }
-        }
-
-        return MemoResponse.from(savedMemo);
-    }
-
-    // 추가: 확장자 추출 헬퍼 메서드
-    private String getFileExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return "";
-        }
-        return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
-    }
-
 }

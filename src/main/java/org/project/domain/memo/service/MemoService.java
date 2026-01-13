@@ -1,14 +1,21 @@
 package org.project.domain.memo.service;
 
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
+import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface MemoService {
+
+    MemoPresignedUrlResponse issuePresignedUrls(
+            Long userId,
+            MemoPresignedUrlRequest request
+    );
 
     MemoResponse createMemo(Long userId, MemoCreateRequest request);
 

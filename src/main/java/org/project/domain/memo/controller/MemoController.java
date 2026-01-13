@@ -11,7 +11,6 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
-import org.project.domain.memo.service.MemoS3Service;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.annotation.BusinessExceptionDescription;
@@ -32,7 +31,6 @@ import java.util.List;
 public class MemoController {
 
     private final MemoService memoService;
-    private final MemoS3Service memoS3Service;
 
     @Operation(
             summary = "메모 이미지/파일 presigned URL 발급",
@@ -50,7 +48,7 @@ public class MemoController {
         Long userId = userDetails.getUserId();
 
         MemoPresignedUrlResponse response =
-                memoS3Service.issuePresignedUrls(userId, request);
+                memoService.issuePresignedUrls(userId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

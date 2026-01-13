@@ -2,6 +2,7 @@ package org.project.global.util;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.global.exception.domainException.S3CustomException;
 import org.project.global.exception.errorcode.S3ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,10 +10,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -142,5 +147,65 @@ public class S3Util {
             log.error("파일 삭제 중 예상치 못한 에러 - Key: {}", key, e);
             throw new S3CustomException(S3ErrorCode.FILE_DELETE_FAILED);
         }
+    }
+
+    /**
+     * presigned PUT URL 생성
+     */
+    public MemoPresignedUrlResponse.PresignedUrlResponse createPresignedPutUrl(
+            Long userId,
+            String prefix,
+            String extension,
+            Long bytes,
+            Integer priority
+    ) {
+
+        String s3Key = String.format(
+                "%s/%d/%s.%s",
+                prefix,
+                userId,
+                UUID.randomUUID(),
+                extension
+        );
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(s3Key)
+                .contentType(resolveContentType(extension))
+                .build();
+
+        PutObjectPresignRequest presignRequest =
+                PutObjectPresignRequest.builder()
+                        .signatureDuration(Duration.ofMinutes(10)) // 유효시간 10분
+                        .putObjectRequest(putObjectRequest)
+                        .build();
+
+        String presignedUrl =
+                s3Presigner.presignPutObject(presignRequest)
+                        .url()
+                        .toString();
+
+        return new MemoPresignedUrlResponse.PresignedUrlResponse(
+                s3Key,
+                presignedUrl,
+                bytes,
+                extension,
+                priority
+        );
+    }
+
+    /**
+     * 확장자 → Content-Type 매핑
+     */
+    private String resolveContentType(String extension) {
+        return switch (extension.toLowerCase()) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "pdf" -> "application/pdf";
+            case "txt" -> "text/plain";
+            default -> "application/octet-stream";
+        };
     }
 }
