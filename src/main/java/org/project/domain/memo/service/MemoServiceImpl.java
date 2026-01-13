@@ -8,6 +8,10 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.entity.Memo;
+import org.project.domain.memo.entity.MemoFile;
+import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.repository.MemoFileRepository;
+import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
@@ -31,35 +35,81 @@ public class MemoServiceImpl implements MemoService {
     private final UserRepository userRepository;
     private final LabelRepository labelRepository;
 
+    private final MemoImageRepository memoImageRepository;
+    private final MemoFileRepository memoFileRepository;
+
     @Transactional
     @Override
     public MemoResponse createMemo(Long userId, MemoCreateRequest request) {
 
+        // 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
 
-        Memo memo = Memo.createMemo(request.title(), request.content(), user);
+        // 메모 생성
+        Memo memo = Memo.createMemo(
+                request.title(),
+                request.content(),
+                user
+        );
 
+        // 라벨 처리 (중복 제거 + 우선순위)
         if (request.labelNames() != null && !request.labelNames().isEmpty()) {
+
             List<String> uniqueLabelNames = request.labelNames().stream()
                     .distinct()
                     .toList();
 
-            for (int i = 0; i < uniqueLabelNames.size(); i++) {
-                String labelName = uniqueLabelNames.get(i);
+            for (int priority = 0; priority < uniqueLabelNames.size(); priority++) {
+                String labelName = uniqueLabelNames.get(priority);
 
-                // 해당 유저의 라벨 찾기 (없으면 생성)
                 Label label = labelRepository.findByNameAndUser(labelName, user)
-                        .orElseGet(() -> labelRepository.save(
-                                Label.create(labelName, user)
-                        ));
+                        .orElseGet(() ->
+                                labelRepository.save(
+                                        Label.create(labelName, user)
+                                )
+                        );
 
-                // i가 우선순위임 (0, 1, 2, ...)
-                memo.addLabel(label, i);
+                memo.addLabel(label, priority);
             }
         }
 
+        // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
+
+        // 이미지 메타데이터 저장 (optional)
+        if (request.images() != null && !request.images().isEmpty()) {
+
+            List<MemoImage> images = request.images().stream()
+                    .map(r -> MemoImage.builder()
+                            .memo(savedMemo)
+                            .imageS3Key(r.s3Key())
+                            .imageBytes(r.bytes())
+                            .imageExtension(r.extension())
+                            .imagePriority(r.priority())
+                            .build()
+                    )
+                    .toList();
+
+            memoImageRepository.saveAll(images);
+        }
+
+        // 파일 메타데이터 저장 (optional)
+        if (request.files() != null && !request.files().isEmpty()) {
+
+            List<MemoFile> files = request.files().stream()
+                    .map(r -> MemoFile.builder()
+                            .memo(savedMemo)
+                            .fileS3Key(r.s3Key())
+                            .fileBytes(r.bytes())
+                            .fileExtension(r.extension())
+                            .filePriority(r.priority())
+                            .build()
+                    )
+                    .toList();
+
+            memoFileRepository.saveAll(files);
+        }
 
         return MemoResponse.from(savedMemo);
     }
