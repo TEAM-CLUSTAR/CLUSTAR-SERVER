@@ -55,6 +55,16 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private Boolean isDeleted = false;
 
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.PERSIST)
+    @OrderBy("imagePriority ASC")
+    @Builder.Default
+    private List<MemoImage> memoImages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.PERSIST)
+    @OrderBy("filePriority ASC")
+    @Builder.Default
+    private List<MemoFile> memoFiles = new ArrayList<>();
+
 
     // 일반 메모 생성
     public static Memo createMemo(String title, String content, User user) {
