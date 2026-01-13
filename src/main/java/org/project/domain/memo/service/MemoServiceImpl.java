@@ -12,6 +12,9 @@ import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
+import org.project.domain.memo.repository.MemoFileRepository;
+import org.project.domain.memo.repository.MemoImageRepository;
+import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
@@ -47,6 +50,10 @@ public class MemoServiceImpl implements MemoService {
 
     private final S3PresignedUtil s3PresignedUtil;
     private final S3KeyUtil s3KeyUtil;
+
+    private final MemoImageRepository memoImageRepository;
+    private final MemoFileRepository memoFileRepository;
+    private final MemoLabelRepository memoLabelRepository;
 
     @Transactional
     @Override
@@ -243,6 +250,7 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
+        // S3 파일들 삭제
         memo.getMemoImages().forEach(memoImage -> {
             s3Util.deleteFile(memoImage.getImageS3Key());
         });
@@ -250,6 +258,11 @@ public class MemoServiceImpl implements MemoService {
         memo.getMemoFiles().forEach(memoFile -> {
             s3Util.deleteFile(memoFile.getFileS3Key());
         });
+
+        // 연관 엔티티들 hard delete
+        memoImageRepository.deleteByMemo(memo);
+        memoFileRepository.deleteByMemo(memo);
+        memoLabelRepository.deleteByMemo(memo);
 
         memo.delete();
     }
