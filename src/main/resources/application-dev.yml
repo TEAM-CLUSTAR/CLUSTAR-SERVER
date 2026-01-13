@@ -73,3 +73,10 @@ management:
   health:
     redis:
       enabled: false # Redis가 없어도 전체 앱은 UP 상태로 유지
+
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    s3:
+      bucket: clustar-bucket-01
