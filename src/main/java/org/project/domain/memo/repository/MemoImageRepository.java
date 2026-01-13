@@ -1,6 +1,6 @@
 package org.project.domain.memo.repository;
 
-import io.lettuce.core.dynamic.annotation.Param;
+import org.springframework.data.repository.query.Param;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoImage;
 import org.springframework.data.jpa.repository.JpaRepository;

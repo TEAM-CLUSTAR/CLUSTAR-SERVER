@@ -31,7 +31,7 @@ public class S3Config {
                     .build();
         }
 
-        // local 환경 (credentials이 없으므로 EC2의 IAM 역할로)
+        // local 환경 명시적 credentials 사용
         return S3Client.builder()
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(

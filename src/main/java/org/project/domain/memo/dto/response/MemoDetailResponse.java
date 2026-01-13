@@ -1,12 +1,9 @@
 package org.project.domain.memo.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.apache.tomcat.jni.FileInfo;
 import org.project.domain.label.entity.Label;
 import org.project.domain.memo.entity.Memo;
 
-import java.awt.*;
-import java.security.DigestException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
