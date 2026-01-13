@@ -1,0 +1,14 @@
+package org.project.domain.memo.repository;
+
+import io.lettuce.core.dynamic.annotation.Param;
+import org.project.domain.memo.entity.Memo;
+import org.project.domain.memo.entity.MemoFile;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+public interface MemoFileRepository extends JpaRepository<MemoFile, Long> {
+    @Modifying
+    @Query("DELETE FROM MemoFile mf WHERE mf.memo = :memo")
+    void deleteByMemo(@Param("memo") Memo memo);
+}
