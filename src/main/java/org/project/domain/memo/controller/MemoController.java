@@ -56,7 +56,14 @@ public class MemoController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
-    @Operation(summary = "메모 작성", description = "일반 메모를 작성합니다.")
+    @Operation(
+            summary = "메모 작성",
+            description = """
+                메모를 작성합니다.
+                이미지/파일은 presigned URL을 통해 S3에 업로드 완료 후
+                s3Key 정보를 함께 전달해야 합니다.
+                """
+    )
     @PostMapping
     @BusinessExceptionDescription(SwaggerResponseDescription.CREATE_MEMO)
     public ResponseEntity<ApiResponse<MemoResponse>> createMemo(
