@@ -79,7 +79,7 @@ public class S3Util {
     }
 
     /**
-     * Presigned GET URL 생성 (1시간 유효)
+     * Presigned GET URL 생성 (24시간 유효)
      * @param key S3 Key
      * @return Presigned URL (key가 null이면 null 반환)
      */
