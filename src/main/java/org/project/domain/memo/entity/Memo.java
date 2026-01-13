@@ -55,12 +55,12 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private Boolean isDeleted = false;
 
-    @OneToMany(mappedBy = "memo")
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("imagePriority ASC")
     @Builder.Default
     private List<MemoImage> memoImages = new ArrayList<>();
 
-    @OneToMany(mappedBy = "memo")
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("filePriority ASC")
     @Builder.Default
     private List<MemoFile> memoFiles = new ArrayList<>();
