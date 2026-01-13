@@ -11,10 +11,8 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
-import org.project.domain.memo.service.MemoS3Service;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
-import org.project.domain.user.entity.User;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
@@ -33,7 +31,6 @@ import java.util.List;
 public class MemoController {
 
     private final MemoService memoService;
-    private final MemoS3Service memoS3Service;
 
     @Operation(
             summary = "메모 이미지/파일 presigned URL 발급",
@@ -51,7 +48,7 @@ public class MemoController {
         Long userId = userDetails.getUserId();
 
         MemoPresignedUrlResponse response =
-                memoS3Service.issuePresignedUrls(userId, request);
+                memoService.issuePresignedUrls(userId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -120,11 +117,11 @@ public class MemoController {
 
     @GetMapping("/{memoId}")
     @Operation(summary = "메모 상세조회(모달창)", description = """
-                    하나의 메모를 상세조회 합니다.
-                    AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
-                    AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
-                    라벨은 리스트의 앞부터 우선순위가 높은 순서 입니다.
-                    """)
+            하나의 메모를 상세조회 합니다.
+            AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
+            AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
+            라벨은 리스트의 앞부터 우선순위가 높은 순서 입니다.
+            """)
     public ResponseEntity<ApiResponse<MemoDetailResponse>> getOneDetailMemo
             (@AuthenticationPrincipal CustomUserDetails userDetails,
              @PathVariable Long memoId
@@ -151,4 +148,5 @@ public class MemoController {
 
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
+
 }

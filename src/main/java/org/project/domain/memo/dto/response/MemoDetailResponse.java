@@ -4,8 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.label.entity.Label;
 import org.project.domain.memo.entity.Memo;
 
-import java.awt.*;
-import java.security.DigestException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,8 +20,11 @@ public record MemoDetailResponse(
         @Schema(description = "메모 내용", example = "발박수 치며 날아 간다.")
         String content,
 
-        @Schema(description = "이미지 링크", example = "https://example.com/image.jpg")
-        String imageUrl,
+        @Schema(description = "이미지 URL 목록 (Presigned URLs)", example = "[\"https://s3.amazonaws.com/...\", \"https://s3.amazonaws.com/...\"]")
+        List<String> imageUrls,
+
+        @Schema(description = "첨부 파일 정보 목록")
+        List<FileInfo> files,
 
         @Schema(description = "메모에 딸린 라벨들", example = "[\"SOPT\", \"졸업프로젝트\", \"교양\", \"레퍼런스\"]")
         List<String> labelList,
@@ -38,13 +39,34 @@ public record MemoDetailResponse(
         List<Long> sourceList
 ) {
 
-    public static MemoDetailResponse from(Memo memo) {
+    @Schema(description = "첨부 파일 정보")
+    public record FileInfo(
+            @Schema(description = "파일 ID", example = "1")
+            Long fileId,
+
+            @Schema(description = "파일 다운로드 URL (Presigned URL)", example = "https://s3.amazonaws.com/...")
+            String fileUrl,
+
+            @Schema(description = "파일 확장자", example = "pdf")
+            String fileExtension,
+
+            @Schema(description = "파일 크기 (bytes)", example = "1048576")
+            Long fileBytes
+    ) {}
+
+
+    public static MemoDetailResponse from(
+            Memo memo,
+            List<String> imageUrls,
+            List<FileInfo> files
+    ) {
 
         return new MemoDetailResponse(
                 memo.getId(),
                 memo.getTitle(),
                 memo.getContent(),
-                memo.getImageUrl(),
+                imageUrls,
+                files,
                 memo.getLabels().stream()
                         .map(Label::getName)
                         .toList(),

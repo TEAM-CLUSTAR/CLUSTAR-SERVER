@@ -4,14 +4,17 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
+import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
+import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
@@ -19,11 +22,12 @@ import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
-import org.project.global.util.S3PresignedUtil;
 import org.project.global.util.S3KeyUtil;
+import org.project.global.util.S3Util;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -42,9 +46,40 @@ public class MemoServiceImpl implements MemoService {
 
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
+    private final MemoLabelRepository memoLabelRepository;
 
-    private final S3PresignedUtil s3PresignedUtil;
     private final S3KeyUtil s3KeyUtil;
+    private final S3Util s3Util;
+
+    public MemoPresignedUrlResponse issuePresignedUrls(
+            Long userId,
+            MemoPresignedUrlRequest request
+    ) {
+
+        List<MemoPresignedUrlResponse.PresignedUrlResponse> imageUrls =
+                request.images().stream()
+                        .map(r -> s3Util.createPresignedPutUrl(
+                                userId,
+                                "memo-image",
+                                r.extension(),
+                                r.bytes(),
+                                r.priority()
+                        ))
+                        .toList();
+
+        List<MemoPresignedUrlResponse.PresignedUrlResponse> fileUrls =
+                request.files().stream()
+                        .map(r -> s3Util.createPresignedPutUrl(
+                                userId,
+                                "memo-file",
+                                r.extension(),
+                                r.bytes(),
+                                r.priority()
+                        ))
+                        .toList();
+
+        return new MemoPresignedUrlResponse(imageUrls, fileUrls);
+    }
 
     @Transactional
     @Override
@@ -185,7 +220,7 @@ public class MemoServiceImpl implements MemoService {
                             // 대표 이미지 (priority ASC)
                             String representativeImageUrl = memoImages.stream()
                                     .min(Comparator.comparingInt(MemoImage::getImagePriority))
-                                    .map(img -> s3PresignedUtil.generateGetUrl(img.getImageS3Key()))
+                                    .map(img -> s3Util.generatePresignedUrl(img.getImageS3Key()))
                                     .orElse(null);
 
                             return MemoListDashboardResponse.MemoDashboardResponse.of(
@@ -211,7 +246,22 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
-        return MemoDetailResponse.from(memo);
+        List<String> imageUrls = memo.getMemoImages().stream()
+                .map(memoImage -> s3Util.generatePresignedUrl(memoImage.getImageS3Key()))
+                .filter(url -> url != null)
+                .toList();
+
+        List<MemoDetailResponse.FileInfo> files = memo.getMemoFiles().stream()
+                .map(memoFile -> new MemoDetailResponse.FileInfo(
+                        memoFile.getId(),
+                        s3Util.generatePresignedUrl(memoFile.getFileS3Key()),
+                        memoFile.getFileExtension(),
+                        memoFile.getFileBytes()
+                ))
+                .filter(file -> file.fileUrl() != null)
+                .toList();
+
+        return MemoDetailResponse.from(memo, imageUrls, files);
     }
 
     @Override
@@ -225,6 +275,20 @@ public class MemoServiceImpl implements MemoService {
         if (!memo.getUser().getId().equals(userId)) {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
+
+        // S3 파일들 삭제
+        memo.getMemoImages().forEach(memoImage -> {
+            s3Util.deleteFile(memoImage.getImageS3Key());
+        });
+
+        memo.getMemoFiles().forEach(memoFile -> {
+            s3Util.deleteFile(memoFile.getFileS3Key());
+        });
+
+        // 연관 엔티티들 hard delete
+        memoImageRepository.deleteByMemo(memo);
+        memoFileRepository.deleteByMemo(memo);
+        memoLabelRepository.deleteByMemo(memo);
 
         memo.delete();
     }

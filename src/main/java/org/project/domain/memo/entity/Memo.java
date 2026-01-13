@@ -28,9 +28,6 @@ public class Memo extends BaseEntity {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "image_url", nullable = true)
-    private String imageUrl;
-
     @Column(name = "is_pinned", nullable = false)
     @Builder.Default
     private Boolean isPinned = false;
@@ -55,12 +52,12 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private Boolean isDeleted = false;
 
-    @OneToMany(mappedBy = "memo")
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("imagePriority ASC")
     @Builder.Default
     private List<MemoImage> memoImages = new ArrayList<>();
 
-    @OneToMany(mappedBy = "memo")
+    @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("filePriority ASC")
     @Builder.Default
     private List<MemoFile> memoFiles = new ArrayList<>();
@@ -79,15 +76,6 @@ public class Memo extends BaseEntity {
         return memo;
     }
 
-    // 이미지 포함 메모 생성
-    public static Memo createMemoWithImage(String title, String content, String imageUrl, User user) {
-        return Memo.builder()
-                .title(title)
-                .content(content)
-                .imageUrl(imageUrl)
-                .user(user)
-                .build();
-    }
 
     public List<Label> getLabels() {
         return memoLabels.stream()
@@ -103,4 +91,31 @@ public class Memo extends BaseEntity {
     public void delete() {
         this.isDeleted = true;
     }
+
+    // 이미지 추가
+    public void addImage(String imageS3Key, Long imageBytes, String imageExtension, Integer imagePriority) {
+        MemoImage memoImage = MemoImage.builder()
+                .memo(this)
+                .imageS3Key(imageS3Key)
+                .imageBytes(imageBytes)
+                .imageExtension(imageExtension)
+                .imagePriority(imagePriority)
+                .build();
+
+        this.memoImages.add(memoImage);
+    }
+
+    // 파일 추가
+    public void addFile(String fileS3Key, Long fileBytes, String fileExtension, Integer filePriority) {
+        MemoFile memoFile = MemoFile.builder()
+                .memo(this)
+                .fileS3Key(fileS3Key)
+                .fileBytes(fileBytes)
+                .fileExtension(fileExtension)
+                .filePriority(filePriority)
+                .build();
+
+        this.memoFiles.add(memoFile);
+    }
+
 }
