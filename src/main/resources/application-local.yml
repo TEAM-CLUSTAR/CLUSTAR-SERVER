@@ -62,10 +62,5 @@ app:
 
 cloud:
   aws:
-    credentials:
-      access-key: ${AWS_ACCESS_KEY_ID}
-      secret-key: ${AWS_SECRET_ACCESS_KEY}
-    region:
-      static: ap-northeast-2
     s3:
       bucket: clustar-bucket-01
