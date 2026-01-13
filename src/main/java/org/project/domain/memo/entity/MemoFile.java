@@ -20,8 +20,8 @@ public class MemoFile {
     @JoinColumn(name = "memo_id", nullable = false)
     private Memo memo;
 
-    @Column(name = "file_url", nullable = false, length = 500)
-    private String fileUrl;
+    @Column(name = "file_S3_key", nullable = false, length = 500)
+    private String fileS3Key;
 
     @Column(name = "file_bytes")
     private Long fileBytes;
