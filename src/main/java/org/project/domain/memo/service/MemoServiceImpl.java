@@ -87,7 +87,7 @@ public class MemoServiceImpl implements MemoService {
     @Override
     public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
 
-        Memo memo = memoRepository.findById(memoId)
+        Memo memo = memoRepository.findByIdAndNotDeleted(memoId)
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
         // 본인 메모인지 확인
@@ -102,7 +102,7 @@ public class MemoServiceImpl implements MemoService {
     @Transactional
     public void deleteMemo(Long userId, Long memoId) {
 
-        Memo memo = memoRepository.findById(memoId)
+        Memo memo = memoRepository.findByIdAndNotDeleted(memoId)
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
         // 본인 메모인지 확인
@@ -110,6 +110,6 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
-        memoRepository.delete(memo);
+        memo.delete();
     }
 }

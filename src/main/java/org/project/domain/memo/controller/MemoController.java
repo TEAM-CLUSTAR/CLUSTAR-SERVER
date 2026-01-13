@@ -101,6 +101,6 @@ public class MemoController {
 
         memoService.deleteMemo(userId, memoId);
 
-        return ResponseEntity.ok(ApiResponse.success(null));
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 }

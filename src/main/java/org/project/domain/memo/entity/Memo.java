@@ -51,6 +51,10 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private List<MemoLabel> memoLabels = new ArrayList<>();
 
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
 
     // 일반 메모 생성
     public static Memo createMemo(String title, String content, User user) {
@@ -84,5 +88,9 @@ public class Memo extends BaseEntity {
     public void addLabel(Label label,Integer labelPriority) {
         MemoLabel memoLabel = MemoLabel.create(this, label, labelPriority);
         this.memoLabels.add(memoLabel);
+    }
+
+    public void delete() {
+        this.isDeleted = true;
     }
 }

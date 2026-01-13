@@ -38,6 +38,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .leftJoin(memoLabel.label, label)
                 .where(
                         memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
                         labelIn(labelIds),
                         cursorCondition(cursorCreatedAt, cursorMemoId)
                 )
