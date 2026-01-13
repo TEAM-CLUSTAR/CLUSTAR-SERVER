@@ -12,7 +12,7 @@ public interface MemoService {
 
     MemoResponse createMemo(Long userId, MemoCreateRequest request);
 
-    MemoListDashboardResponse getMemos(
+    MemoListDashboardResponse getMemosWithMedia(
             Long userId,
             List<Long> labelIds,
             LocalDateTime cursorCreatedAt,

@@ -19,12 +19,16 @@ import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
+import org.project.global.util.S3PresignedUtil;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,8 @@ public class MemoServiceImpl implements MemoService {
 
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
+
+    private final S3PresignedUtil s3PresignedUtil;
 
     @Transactional
     @Override
@@ -114,8 +120,9 @@ public class MemoServiceImpl implements MemoService {
         return MemoResponse.from(savedMemo);
     }
 
+    @Transactional(readOnly = true)
     @Override
-    public MemoListDashboardResponse getMemos(
+    public MemoListDashboardResponse getMemosWithMedia(
             Long userId,
             List<Long> labelIds,
             LocalDateTime cursorCreatedAt,
@@ -123,6 +130,7 @@ public class MemoServiceImpl implements MemoService {
             int size
     ) {
 
+        // 메모 조회 (기존 로직 재사용)
         List<Memo> memos = memoRepository.findMemos(
                 userId,
                 labelIds,
@@ -131,7 +139,57 @@ public class MemoServiceImpl implements MemoService {
                 PageRequest.of(0, size)
         );
 
-        return MemoListDashboardResponse.from(memos);
+        if (memos.isEmpty()) {
+            return MemoListDashboardResponse.from(List.of());
+        }
+
+        // memoId 목록 추출
+        List<Long> memoIds = memos.stream()
+                .map(Memo::getId)
+                .toList();
+
+        // 이미지 / 파일 조회
+        List<MemoImage> images = memoImageRepository.findByMemoIdIn(memoIds);
+        List<MemoFile> files = memoFileRepository.findByMemoIdIn(memoIds);
+
+        // memoId 기준 그룹핑
+        Map<Long, List<MemoImage>> imageMap = images.stream()
+                .collect(Collectors.groupingBy(
+                        image -> image.getMemo().getId()
+                ));
+
+        Map<Long, List<MemoFile>> fileMap = files.stream()
+                .collect(Collectors.groupingBy(
+                        file -> file.getMemo().getId()
+                ));
+
+        // 응답 조립
+        List<MemoListDashboardResponse.MemoDashboardResponse> responses =
+                memos.stream()
+                        .map(memo -> {
+
+                            List<MemoImage> memoImages =
+                                    imageMap.getOrDefault(memo.getId(), List.of());
+
+                            List<MemoFile> memoFiles =
+                                    fileMap.getOrDefault(memo.getId(), List.of());
+
+                            // 대표 이미지 (priority ASC)
+                            String representativeImageUrl = memoImages.stream()
+                                    .min(Comparator.comparingInt(MemoImage::getImagePriority))
+                                    .map(img -> s3PresignedUtil.generateGetUrl(img.getImageS3Key()))
+                                    .orElse(null);
+
+                            return MemoListDashboardResponse.MemoDashboardResponse.of(
+                                    memo,
+                                    representativeImageUrl,
+                                    memoImages.size(),
+                                    memoFiles.size()
+                            );
+                        })
+                        .toList();
+
+        return MemoListDashboardResponse.from(responses);
     }
 
     @Override

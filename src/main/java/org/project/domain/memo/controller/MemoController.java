@@ -82,30 +82,40 @@ public class MemoController {
     @Operation(
             summary = "메모 전체 조회",
             description = """
-                    메모를 전체 조회합니다.
-                    labelIds가 전달되면 해당 라벨이 포함된 메모만 조회합니다.
-                    labelIds가 비어있으면 라벨과 관계없이 전체 조회합니다.
-                    """
+                메모를 전체 조회합니다.
+                - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
+                - 커서 기반 페이지네이션을 지원합니다.
+                - 각 메모는 대표 이미지 1개(presigned URL)와
+                  이미지/파일 개수 정보를 포함합니다.
+                """
     )
     @GetMapping
     public ResponseEntity<ApiResponse<MemoListDashboardResponse>> getMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) List<Long> labelIds,
-            @RequestParam(required = false) LocalDateTime cursorCreatedAt,
-            @RequestParam(required = false) Long cursorMemoId,
-            @RequestParam(defaultValue = "20") int size
+
+            @RequestParam(required = false)
+            List<Long> labelIds,
+
+            @RequestParam(required = false)
+            LocalDateTime cursorCreatedAt,
+
+            @RequestParam(required = false)
+            Long cursorMemoId,
+
+            @RequestParam(defaultValue = "20")
+            int size
     ) {
-        return ResponseEntity.ok(
-                ApiResponse.ok(
-                        memoService.getMemos(
-                                userDetails.getUserId(),
-                                labelIds,
-                                cursorCreatedAt,
-                                cursorMemoId,
-                                size
-                        )
-                )
-        );
+
+        MemoListDashboardResponse response =
+                memoService.getMemosWithMedia(
+                        userDetails.getUserId(),
+                        labelIds,
+                        cursorCreatedAt,
+                        cursorMemoId,
+                        size
+                );
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping("/{memoId}")
