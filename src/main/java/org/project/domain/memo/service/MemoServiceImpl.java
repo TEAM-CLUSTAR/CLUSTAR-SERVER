@@ -20,6 +20,7 @@ import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
 import org.project.global.util.S3PresignedUtil;
+import org.project.global.util.S3KeyUtil;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ public class MemoServiceImpl implements MemoService {
     private final MemoFileRepository memoFileRepository;
 
     private final S3PresignedUtil s3PresignedUtil;
+    private final S3KeyUtil s3KeyUtil;
 
     @Transactional
     @Override
@@ -87,14 +89,17 @@ public class MemoServiceImpl implements MemoService {
         if (request.images() != null && !request.images().isEmpty()) {
 
             List<MemoImage> images = request.images().stream()
-                    .map(r -> MemoImage.builder()
-                            .memo(savedMemo)
-                            .imageS3Key(r.s3Key())
-                            .imageBytes(r.bytes())
-                            .imageExtension(r.extension())
-                            .imagePriority(r.priority())
-                            .build()
-                    )
+                    .map(r -> {
+                        s3KeyUtil.validateS3KeyOwner(userId, r.s3Key());
+
+                        return MemoImage.builder()
+                                .memo(savedMemo)
+                                .imageS3Key(r.s3Key())
+                                .imageBytes(r.bytes())
+                                .imageExtension(r.extension())
+                                .imagePriority(r.priority())
+                                .build();
+                    })
                     .toList();
 
             memoImageRepository.saveAll(images);
@@ -104,14 +109,17 @@ public class MemoServiceImpl implements MemoService {
         if (request.files() != null && !request.files().isEmpty()) {
 
             List<MemoFile> files = request.files().stream()
-                    .map(r -> MemoFile.builder()
-                            .memo(savedMemo)
-                            .fileS3Key(r.s3Key())
-                            .fileBytes(r.bytes())
-                            .fileExtension(r.extension())
-                            .filePriority(r.priority())
-                            .build()
-                    )
+                    .map(r -> {
+                        s3KeyUtil.validateS3KeyOwner(userId, r.s3Key());
+
+                        return MemoFile.builder()
+                                .memo(savedMemo)
+                                .fileS3Key(r.s3Key())
+                                .fileBytes(r.bytes())
+                                .fileExtension(r.extension())
+                                .filePriority(r.priority())
+                                .build();
+                    })
                     .toList();
 
             memoFileRepository.saveAll(files);
