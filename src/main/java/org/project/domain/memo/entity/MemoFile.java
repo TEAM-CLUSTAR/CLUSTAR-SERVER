@@ -23,6 +23,9 @@ public class MemoFile {
     @Column(name = "file_S3_key", nullable = false, length = 500)
     private String fileS3Key;
 
+    @Column(name = "file_name")
+    private String fileName;
+
     @Column(name = "file_bytes")
     private Long fileBytes;
 
