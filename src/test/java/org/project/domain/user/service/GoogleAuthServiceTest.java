@@ -468,5 +468,33 @@ class GoogleAuthServiceTest {
                         .hasMessageContaining(LoginErrorCode.REFRESH_TOKEN_NOT_FOUND.getMsg());
             }
         }
+
+        @Test
+        @DisplayName("화이트리스트에 없으면 INVALID_REFRESH_TOKEN")
+        void refresh_token_not_in_whitelist() {
+            String refreshToken = "refresh-token";
+
+            try (MockedStatic<CookieUtil> cookieUtil = mockStatic(CookieUtil.class)) {
+
+                cookieUtil.when(() ->
+                        CookieUtil.getRefreshTokenFromCookie(request)
+                ).thenReturn(refreshToken);
+
+                when(jwtUtil.validateRefreshToken(refreshToken))
+                        .thenReturn(1L);
+
+                when(jwtUtil.getJti(refreshToken))
+                        .thenReturn("jti");
+
+                when(refreshTokenRepository.exists("jti"))
+                        .thenReturn(false);
+
+                assertThatThrownBy(() ->
+                        googleAuthService.reissueToken(request, response)
+                )
+                        .isInstanceOf(LoginException.class)
+                        .hasMessageContaining(LoginErrorCode.INVALID_REFRESH_TOKEN.getMsg());
+            }
+        }
     }
 }
