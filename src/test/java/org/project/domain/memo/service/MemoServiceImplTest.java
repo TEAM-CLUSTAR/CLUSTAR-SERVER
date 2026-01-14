@@ -58,6 +58,7 @@ class MemoServiceImplTest {
     private final Long memoId = 100L;
 
     @Nested
+    @DisplayName("메모 상세조회(모달창) 테스트")
     class getOneMemoDetail{
         @DisplayName("메모 모달창을 상세 조회할 수 있어야 한다.")
         @Test
@@ -94,6 +95,7 @@ class MemoServiceImplTest {
     }
 
     @Nested
+    @DisplayName("메모 삭제 테스트")
     class deleteMemo{
 
         @DisplayName("메모 삭제 시 DB 데이터가 삭제되고 삭제 이벤트가 발행되어야 한다.")
