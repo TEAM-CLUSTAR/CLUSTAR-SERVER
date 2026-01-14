@@ -20,7 +20,9 @@ import org.project.domain.user.repository.RefreshTokenRepository;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.security.CookieConfig;
 import org.project.global.exception.domainException.LoginException;
+import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.LoginErrorCode;
+import org.project.global.exception.errorcode.UserErrorCode;
 import org.project.global.response.ApiResponse;
 import org.project.global.security.client.GoogleClient;
 import org.project.global.security.client.dto.GoogleAccountProfileResponse;
@@ -494,6 +496,37 @@ class GoogleAuthServiceTest {
                 )
                         .isInstanceOf(LoginException.class)
                         .hasMessageContaining(LoginErrorCode.INVALID_REFRESH_TOKEN.getMsg());
+            }
+        }
+
+        @Test
+        @DisplayName("User가 존재하지 않으면 예외 발생")
+        void user_not_found() {
+            String refreshToken = "refresh-token";
+
+            try (MockedStatic<CookieUtil> cookieUtil = mockStatic(CookieUtil.class)) {
+
+                cookieUtil.when(() ->
+                        CookieUtil.getRefreshTokenFromCookie(request)
+                ).thenReturn(refreshToken);
+
+                when(jwtUtil.validateRefreshToken(refreshToken))
+                        .thenReturn(1L);
+
+                when(jwtUtil.getJti(refreshToken))
+                        .thenReturn("jti");
+
+                when(refreshTokenRepository.exists("jti"))
+                        .thenReturn(true);
+
+                when(userRepository.findById(1L))
+                        .thenReturn(Optional.empty());
+
+                assertThatThrownBy(() ->
+                        googleAuthService.reissueToken(request, response)
+                )
+                        .isInstanceOf(UserException.class)
+                        .hasMessageContaining(UserErrorCode.NOT_FOUND_USER.getMsg());
             }
         }
     }
