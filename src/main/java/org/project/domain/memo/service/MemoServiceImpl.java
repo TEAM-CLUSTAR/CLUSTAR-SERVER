@@ -90,8 +90,7 @@ public class MemoServiceImpl implements MemoService {
     public MemoResponse createMemo(Long userId, MemoCreateRequest request) {
 
         // 사용자 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
+        User user = getUserOrThrow(userId);
 
         // 메모 생성
         Memo memo = Memo.createMemo(
@@ -101,70 +100,16 @@ public class MemoServiceImpl implements MemoService {
         );
 
         // 라벨 처리 (중복 제거 + 우선순위)
-        if (request.labelNames() != null && !request.labelNames().isEmpty()) {
-
-            List<String> uniqueLabelNames = request.labelNames().stream()
-                    .distinct()
-                    .toList();
-
-            for (int priority = 0; priority < uniqueLabelNames.size(); priority++) {
-                String labelName = uniqueLabelNames.get(priority);
-
-                Label label = labelRepository.findByNameAndUser(labelName, user)
-                        .orElseGet(() ->
-                                labelRepository.save(
-                                        Label.create(labelName, user)
-                                )
-                        );
-
-                memo.addLabel(label, priority);
-            }
-        }
+        attachLabels(memo, request.labelNames(), user);
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
 
         // 이미지 메타데이터 저장 (optional)
-        if (request.images() != null && !request.images().isEmpty()) {
-
-            List<MemoImage> images = request.images().stream()
-                    .map(r -> {
-                        s3KeyUtil.validateS3KeyOwner(userId, r.s3Key());
-
-                        return MemoImage.builder()
-                                .memo(savedMemo)
-                                .imageS3Key(r.s3Key())
-                                .imageName(r.imageName())
-                                .imageBytes(r.bytes())
-                                .imageExtension(r.extension())
-                                .imagePriority(r.priority())
-                                .build();
-                    })
-                    .toList();
-
-            memoImageRepository.saveAll(images);
-        }
+        saveMemoImages(savedMemo, request.images(), userId);
 
         // 파일 메타데이터 저장 (optional)
-        if (request.files() != null && !request.files().isEmpty()) {
-
-            List<MemoFile> files = request.files().stream()
-                    .map(r -> {
-                        s3KeyUtil.validateS3KeyOwner(userId, r.s3Key());
-
-                        return MemoFile.builder()
-                                .memo(savedMemo)
-                                .fileS3Key(r.s3Key())
-                                .fileName(r.fileName())
-                                .fileBytes(r.bytes())
-                                .fileExtension(r.extension())
-                                .filePriority(r.priority())
-                                .build();
-                    })
-                    .toList();
-
-            memoFileRepository.saveAll(files);
-        }
+        saveMemoFiles(savedMemo, request.files(), userId);
 
         return MemoResponse.from(savedMemo);
     }
@@ -215,68 +160,24 @@ public class MemoServiceImpl implements MemoService {
         // 응답 조립
         List<MemoListDashboardResponse.MemoDashboardResponse> responses =
                 memos.stream()
-                        .map(memo -> {
-
-                            List<MemoImage> memoImages =
-                                    imageMap.getOrDefault(memo.getId(), List.of());
-
-                            List<MemoFile> memoFiles =
-                                    fileMap.getOrDefault(memo.getId(), List.of());
-
-                            // 대표 이미지 (priority ASC)
-                            String representativeImageUrl = memoImages.stream()
-                                    .min(Comparator.comparingInt(MemoImage::getImagePriority))
-                                    .map(img -> s3Util.generatePresignedUrl(img.getImageS3Key()))
-                                    .orElse(null);
-
-                            return MemoListDashboardResponse.MemoDashboardResponse.of(
-                                    memo,
-                                    representativeImageUrl,
-                                    memoImages.size(),
-                                    memoFiles.size()
-                            );
-                        })
+                        .map(memo -> mapToDashboardResponse(memo, imageMap, fileMap))
                         .toList();
 
         return MemoListDashboardResponse.from(responses);
+
     }
 
     @Override
     public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
 
-        Memo memo = memoRepository.findByIdAndNotDeleted(memoId)
-                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+        Memo memo = getMemoOrThrow(memoId);
 
-        // 본인 메모인지 확인
-        if (!memo.getUser().getId().equals(userId)) {
-            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
-        }
+        // 본인 메모가 아니면 예외
+        checkMyMemo(memo, userId);
 
-        // 이미지 정보 매핑
-        List<MemoDetailResponse.ImageInfo> images =
-                memo.getMemoImages().stream()
-                        .map(image -> new MemoDetailResponse.ImageInfo(
-                                image.getId(),
-                                s3Util.generatePresignedUrl(image.getImageS3Key()),
-                                image.getImageName(),
-                                image.getImageExtension(),
-                                FileSizeUtil.format(image.getImageBytes())
-                        ))
-                        .filter(img -> img.imageUrl() != null)
-                        .toList();
-
-        // 파일 정보 매핑
-        List<MemoDetailResponse.FileInfo> files =
-                memo.getMemoFiles().stream()
-                        .map(file -> new MemoDetailResponse.FileInfo(
-                                file.getId(),
-                                s3Util.generatePresignedUrl(file.getFileS3Key()),
-                                file.getFileName(),
-                                file.getFileExtension(),
-                                FileSizeUtil.format(file.getFileBytes())
-                        ))
-                        .filter(f -> f.fileUrl() != null)
-                        .toList();
+        // 이미지, 파일정보 매핑
+        List<MemoDetailResponse.ImageInfo> images = mapToImageInfos(memo.getMemoImages());
+        List<MemoDetailResponse.FileInfo> files = mapToFileInfos(memo.getMemoFiles());
 
         return MemoDetailResponse.from(memo, images, files);
     }
@@ -285,22 +186,18 @@ public class MemoServiceImpl implements MemoService {
     @Transactional
     public void deleteMemo(Long userId, Long memoId) {
 
-        Memo memo = memoRepository.findByIdAndNotDeleted(memoId)
-                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+        Memo memo = getMemoOrThrow(memoId);
 
-        // 본인 메모인지 확인
-        if (!memo.getUser().getId().equals(userId)) {
-            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
-        }
+        // 본인 메모가 아니면 예외
+        checkMyMemo(memo, userId);
 
         // 삭제할 S3 키 수집
         List<String> imageKeys = memo.getMemoImages().stream()
-                        .map(MemoImage::getImageS3Key)
-                                .toList();
-
+                .map(MemoImage::getImageS3Key)
+                .toList();
         List<String> fileKeys = memo.getMemoFiles().stream()
-                        .map(MemoFile::getFileS3Key)
-                                .toList();
+                .map(MemoFile::getFileS3Key)
+                .toList();
 
         // DB 삭제 hard/soft delete
         memoImageRepository.deleteByMemo(memo);
@@ -312,4 +209,151 @@ public class MemoServiceImpl implements MemoService {
         eventPublisher.publishEvent(new MemoDeletedEvent(memoId, imageKeys, fileKeys));
     }
 
+
+    // == 내부 헬퍼 메서드들== //
+
+    // 메모 검증
+    private void checkMyMemo(Memo memo, Long userId) {
+        if (!memo.getUser().getId().equals(userId)) {
+            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
+        }
+    }
+
+    // User 찾기
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
+    }
+
+    // Memo 찾기
+    private Memo getMemoOrThrow(Long memoId) {
+        return memoRepository.findByIdAndNotDeleted(memoId)
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+    }
+
+    // 라벨 처리 (중복 제거 + 우선순위)
+    private void attachLabels(Memo memo, List<String> labelNames, User user) {
+        if (labelNames == null || labelNames.isEmpty()) {
+            return;
+        }
+
+        List<String> uniqueLabelNames = labelNames.stream()
+                .distinct()
+                .toList();
+
+        for (int priority = 0; priority < uniqueLabelNames.size(); priority++) {
+            String labelName = uniqueLabelNames.get(priority);
+            Label label = findOrCreateLabel(labelName, user);
+            memo.addLabel(label, priority);
+        }
+    }
+
+    private Label findOrCreateLabel(String labelName, User user) {
+        return labelRepository.findByNameAndUser(labelName, user)
+                .orElseGet(() -> labelRepository.save(
+                        Label.create(labelName, user)
+                ));
+    }
+
+    private void saveMemoImages(Memo memo, List<MemoCreateRequest.ImageRequest> images, Long userId) {
+        if (images == null || images.isEmpty()) {
+            return;
+        }
+
+        List<MemoImage> memoImages = images.stream()
+                .map(r -> createMemoImage(memo, r, userId))
+                .toList();
+
+        memoImageRepository.saveAll(memoImages);
+    }
+
+    private MemoImage createMemoImage(Memo memo, MemoCreateRequest.ImageRequest request, Long userId) {
+        s3KeyUtil.validateS3KeyOwner(userId, request.s3Key());
+
+        return MemoImage.builder()
+                .memo(memo)
+                .imageS3Key(request.s3Key())
+                .imageName(request.imageName())
+                .imageBytes(request.bytes())
+                .imageExtension(request.extension())
+                .imagePriority(request.priority())
+                .build();
+    }
+
+    private void saveMemoFiles(Memo memo, List<MemoCreateRequest.FileRequest> files, Long userId) {
+        if (files == null || files.isEmpty()) {
+            return;
+        }
+
+        List<MemoFile> memoFiles = files.stream()
+                .map(r -> createMemoFile(memo, r, userId))
+                .toList();
+
+        memoFileRepository.saveAll(memoFiles);
+    }
+
+    private MemoFile createMemoFile(Memo memo, MemoCreateRequest.FileRequest request, Long userId) {
+        s3KeyUtil.validateS3KeyOwner(userId, request.s3Key());
+
+        return MemoFile.builder()
+                .memo(memo)
+                .fileS3Key(request.s3Key())
+                .fileName(request.fileName())
+                .fileBytes(request.bytes())
+                .fileExtension(request.extension())
+                .filePriority(request.priority())
+                .build();
+    }
+
+
+    private MemoListDashboardResponse.MemoDashboardResponse mapToDashboardResponse(
+            Memo memo,
+            Map<Long, List<MemoImage>> imageMap,
+            Map<Long, List<MemoFile>> fileMap
+    ) {
+        List<MemoImage> memoImages = imageMap.getOrDefault(memo.getId(), List.of());
+        List<MemoFile> memoFiles = fileMap.getOrDefault(memo.getId(), List.of());
+
+        String representativeImageUrl = findRepresentativeImage(memoImages);
+
+        return MemoListDashboardResponse.MemoDashboardResponse.of(
+                memo,
+                representativeImageUrl,
+                memoImages.size(),
+                memoFiles.size()
+        );
+    }
+
+    private String findRepresentativeImage(List<MemoImage> images) {
+        return images.stream()
+                .min(Comparator.comparingInt(MemoImage::getImagePriority))
+                .map(img -> s3Util.generatePresignedUrl(img.getImageS3Key()))
+                .orElse(null);
+    }
+
+    private List<MemoDetailResponse.ImageInfo> mapToImageInfos(List<MemoImage> memoImages) {
+        return memoImages.stream()
+                .map(image -> new MemoDetailResponse.ImageInfo(
+                        image.getId(),
+                        s3Util.generatePresignedUrl(image.getImageS3Key()),
+                        image.getImageName(),
+                        image.getImageExtension(),
+                        FileSizeUtil.format(image.getImageBytes())
+                ))
+                .filter(img -> img.imageUrl() != null)
+                .toList();
+    }
+
+    private List<MemoDetailResponse.FileInfo> mapToFileInfos(List<MemoFile> memoFiles) {
+        return memoFiles.stream()
+                .map(file -> new MemoDetailResponse.FileInfo(
+                        file.getId(),
+                        s3Util.generatePresignedUrl(file.getFileS3Key()),
+                        file.getFileName(),
+                        file.getFileExtension(),
+                        FileSizeUtil.format(file.getFileBytes())
+                ))
+                .filter(f -> f.fileUrl() != null)
+                .toList();
+    }
 }
