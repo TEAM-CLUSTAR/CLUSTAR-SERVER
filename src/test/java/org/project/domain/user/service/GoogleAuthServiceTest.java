@@ -43,7 +43,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GoogleAuthService 테스트")
 class GoogleAuthServiceTest {
-    
+
 
     @InjectMocks
     private GoogleAuthService googleAuthService;
