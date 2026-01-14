@@ -8,7 +8,7 @@ public final class FileSizeUtil {
     private static final double MB = KB * 1024;
     private static final double GB = MB * 1024;
 
-    private static final DecimalFormat FORMAT = new DecimalFormat("0.00");
+    private static final String FORMAT_PATTERN = "0.00";
 
     private FileSizeUtil() {
     }
@@ -18,18 +18,20 @@ public final class FileSizeUtil {
             return "0.00KB";
         }
 
+        DecimalFormat format = new DecimalFormat(FORMAT_PATTERN);
+
         if (bytes >= GB) {
-            return FORMAT.format(bytes / GB) + "GB";
+            return format.format(bytes / GB) + "GB";
         }
 
         if (bytes >= MB) {
-            return FORMAT.format(bytes / MB) + "MB";
+            return format.format(bytes / MB) + "MB";
         }
 
         if (bytes >= KB) {
-            return FORMAT.format(bytes / KB) + "KB";
+            return format.format(bytes / KB) + "KB";
         }
 
-        return FORMAT.format(bytes) + "B";
+        return format.format(bytes) + "B";
     }
 }
