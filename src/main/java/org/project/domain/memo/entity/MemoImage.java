@@ -23,6 +23,9 @@ public class MemoImage {
     @Column(name = "image_S3_key", nullable = false, length = 500)
     private String imageS3Key;
 
+    @Column(name = "image_name")
+    private String imageName;
+
     @Column(name = "image_bytes")
     private Long imageBytes;
 
