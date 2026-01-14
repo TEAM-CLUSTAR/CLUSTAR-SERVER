@@ -4,27 +4,62 @@ spring:
 
   config:
     activate:
-      on-profile: test  # 테스트
+      on-profile: test
 
   datasource:
-    url: ${TEST_DB_URL}
-    username: ${TEST_DB_USERNAME}
-    password: ${TEST_DB_PASSWORD}
-#    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:test;MODE=PostgreSQL
+    username: sa
+    password:
 
   jpa:
     hibernate:
       ddl-auto: create-drop
+    show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-        format_sql: false
-    show-sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   h2:
     console:
       enabled: false
 
-  web:
-    resources:
-      add-mappings: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            redirect-uri: http://localhost/login/oauth2/code/google
+            authorization-grant-type: authorization_code
+            scope:
+              - profile
+              - email
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+jwt:
+  secret-key: test-secret-key-test-secret-key-test-secret-key
+  expire-length: 3600000 # 60분
+  refresh-expire-length: 3600000 # 1시간
+  header: Authorization
+
+app:
+  cookie:
+    domain: ".clustar.cloud"
+    same-site: None
+    secure: true
+
+cloud:
+  aws:
+    s3:
+      bucket: test-bucket
