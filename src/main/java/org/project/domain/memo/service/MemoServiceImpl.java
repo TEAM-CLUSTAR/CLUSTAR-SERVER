@@ -280,11 +280,6 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
-        // S3 파일들 삭제
-        memo.getMemoImages().forEach(memoImage -> {
-            s3Util.deleteFile(memoImage.getImageS3Key());
-        });
-
         // 삭제할 S3 키 수집
         List<String> imageKeys = memo.getMemoImages().stream()
                         .map(MemoImage::getImageS3Key)
