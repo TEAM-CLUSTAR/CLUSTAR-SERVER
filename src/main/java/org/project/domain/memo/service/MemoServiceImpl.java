@@ -12,6 +12,7 @@ import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
@@ -25,6 +26,7 @@ import org.project.global.exception.errorcode.UserErrorCode;
 import org.project.global.util.FileSizeUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,8 @@ public class MemoServiceImpl implements MemoService {
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     public MemoPresignedUrlResponse issuePresignedUrls(
             Long userId,
@@ -289,20 +293,23 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
-        // S3 파일들 삭제
-        memo.getMemoImages().forEach(memoImage -> {
-            s3Util.deleteFile(memoImage.getImageS3Key());
-        });
+        // 삭제할 S3 키 수집
+        List<String> imageKeys = memo.getMemoImages().stream()
+                        .map(MemoImage::getImageS3Key)
+                                .toList();
 
-        memo.getMemoFiles().forEach(memoFile -> {
-            s3Util.deleteFile(memoFile.getFileS3Key());
-        });
+        List<String> fileKeys = memo.getMemoFiles().stream()
+                        .map(MemoFile::getFileS3Key)
+                                .toList();
 
-        // 연관 엔티티들 hard delete
+        // DB 삭제 hard/soft delete
         memoImageRepository.deleteByMemo(memo);
         memoFileRepository.deleteByMemo(memo);
         memoLabelRepository.deleteByMemo(memo);
-
         memo.delete();
+
+        // 이벤트 발행(트랜잭션 커밋 후 실행됨)
+        eventPublisher.publishEvent(new MemoDeletedEvent(memoId, imageKeys, fileKeys));
     }
+
 }
