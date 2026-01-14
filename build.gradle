@@ -76,7 +76,6 @@ dependencies {
 
     // S3
     implementation platform("software.amazon.awssdk:bom:2.31.68")
-
     implementation "software.amazon.awssdk:s3"
 
     // test h2
