@@ -22,6 +22,7 @@ import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
+import org.project.global.util.FileSizeUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
 import org.springframework.data.domain.PageRequest;
@@ -255,7 +256,7 @@ public class MemoServiceImpl implements MemoService {
                                 s3Util.generatePresignedUrl(image.getImageS3Key()),
                                 image.getImageName(),
                                 image.getImageExtension(),
-                                image.getImageBytes()
+                                FileSizeUtil.format(image.getImageBytes())
                         ))
                         .filter(img -> img.imageUrl() != null)
                         .toList();
@@ -268,7 +269,7 @@ public class MemoServiceImpl implements MemoService {
                                 s3Util.generatePresignedUrl(file.getFileS3Key()),
                                 file.getFileName(),
                                 file.getFileExtension(),
-                                file.getFileBytes()
+                                FileSizeUtil.format(file.getFileBytes())
                         ))
                         .filter(f -> f.fileUrl() != null)
                         .toList();

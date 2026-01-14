@@ -54,8 +54,8 @@ public record MemoDetailResponse(
             @Schema(description = "이미지 확장자", example = "png")
             String imageExtension,
 
-            @Schema(description = "이미지 크기(bytes)", example = "245678")
-            Long imageBytes
+            @Schema(description = "이미지 크기", example = "0.24MB")
+            String imageSize
     ) {}
 
     @Schema(description = "첨부 파일 정보")
@@ -73,8 +73,8 @@ public record MemoDetailResponse(
             @Schema(description = "파일 확장자", example = "pdf")
             String fileExtension,
 
-            @Schema(description = "파일 크기 (bytes)", example = "1048576")
-            Long fileBytes
+            @Schema(description = "파일 크기", example = "1.00GB")
+            String fileSize
     ) {}
 
     // 정적 팩터리 메서드
