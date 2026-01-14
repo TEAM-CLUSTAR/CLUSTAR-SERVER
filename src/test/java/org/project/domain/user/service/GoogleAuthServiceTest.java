@@ -19,6 +19,8 @@ import org.project.domain.user.repository.BlacklistTokenRepository;
 import org.project.domain.user.repository.RefreshTokenRepository;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.security.CookieConfig;
+import org.project.global.exception.domainException.LoginException;
+import org.project.global.exception.errorcode.LoginErrorCode;
 import org.project.global.response.ApiResponse;
 import org.project.global.security.client.GoogleClient;
 import org.project.global.security.client.dto.GoogleAccountProfileResponse;
@@ -447,6 +449,23 @@ class GoogleAuthServiceTest {
 
                 verify(refreshTokenRepository).delete(oldJti);
                 verify(refreshTokenRepository).save(newJti, 3600L);
+            }
+        }
+
+        @Test
+        @DisplayName("Refresh Token이 없으면 예외 발생")
+        void refresh_token_not_found() {
+            try (MockedStatic<CookieUtil> cookieUtil = mockStatic(CookieUtil.class)) {
+
+                cookieUtil.when(() ->
+                        CookieUtil.getRefreshTokenFromCookie(request)
+                ).thenReturn(null);
+
+                assertThatThrownBy(() ->
+                        googleAuthService.reissueToken(request, response)
+                )
+                        .isInstanceOf(LoginException.class)
+                        .hasMessageContaining(LoginErrorCode.REFRESH_TOKEN_NOT_FOUND.getMsg());
             }
         }
     }
