@@ -27,7 +27,6 @@ import org.project.global.util.S3Util;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -248,22 +247,33 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
         }
 
-        List<String> imageUrls = memo.getMemoImages().stream()
-                .map(memoImage -> s3Util.generatePresignedUrl(memoImage.getImageS3Key()))
-                .filter(url -> url != null)
-                .toList();
+        // 이미지 정보 매핑
+        List<MemoDetailResponse.ImageInfo> images =
+                memo.getMemoImages().stream()
+                        .map(image -> new MemoDetailResponse.ImageInfo(
+                                image.getId(),
+                                s3Util.generatePresignedUrl(image.getImageS3Key()),
+                                image.getImageName(),
+                                image.getImageExtension(),
+                                image.getImageBytes()
+                        ))
+                        .filter(img -> img.imageUrl() != null)
+                        .toList();
 
-        List<MemoDetailResponse.FileInfo> files = memo.getMemoFiles().stream()
-                .map(memoFile -> new MemoDetailResponse.FileInfo(
-                        memoFile.getId(),
-                        s3Util.generatePresignedUrl(memoFile.getFileS3Key()),
-                        memoFile.getFileExtension(),
-                        memoFile.getFileBytes()
-                ))
-                .filter(file -> file.fileUrl() != null)
-                .toList();
+        // 파일 정보 매핑
+        List<MemoDetailResponse.FileInfo> files =
+                memo.getMemoFiles().stream()
+                        .map(file -> new MemoDetailResponse.FileInfo(
+                                file.getId(),
+                                s3Util.generatePresignedUrl(file.getFileS3Key()),
+                                file.getFileName(),
+                                file.getFileExtension(),
+                                file.getFileBytes()
+                        ))
+                        .filter(f -> f.fileUrl() != null)
+                        .toList();
 
-        return MemoDetailResponse.from(memo, imageUrls, files);
+        return MemoDetailResponse.from(memo, images, files);
     }
 
     @Override
