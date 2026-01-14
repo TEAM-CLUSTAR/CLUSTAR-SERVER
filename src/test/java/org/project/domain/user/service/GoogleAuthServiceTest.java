@@ -1,5 +1,6 @@
 package org.project.domain.user.service;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -527,6 +528,28 @@ class GoogleAuthServiceTest {
                 )
                         .isInstanceOf(UserException.class)
                         .hasMessageContaining(UserErrorCode.NOT_FOUND_USER.getMsg());
+            }
+        }
+
+        @Test
+        @DisplayName("JWT 검증 실패 시 INVALID_REFRESH_TOKEN")
+        void jwt_validation_failed() {
+            String refreshToken = "refresh-token";
+
+            try (MockedStatic<CookieUtil> cookieUtil = mockStatic(CookieUtil.class)) {
+
+                cookieUtil.when(() ->
+                        CookieUtil.getRefreshTokenFromCookie(request)
+                ).thenReturn(refreshToken);
+
+                when(jwtUtil.validateRefreshToken(refreshToken))
+                        .thenThrow(new JwtException("invalid"));
+
+                assertThatThrownBy(() ->
+                        googleAuthService.reissueToken(request, response)
+                )
+                        .isInstanceOf(LoginException.class)
+                        .hasMessageContaining(LoginErrorCode.INVALID_REFRESH_TOKEN.getMsg());
             }
         }
     }
