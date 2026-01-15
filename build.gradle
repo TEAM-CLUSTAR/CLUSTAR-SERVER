@@ -1,7 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.4'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.4.0'
+    id 'io.spring.dependency-management' version '1.1.6'
     id 'jacoco' // Jacoco
     id 'com.google.cloud.tools.jib' version '3.4.0' // Jib
 }
@@ -17,7 +17,19 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url "https://repo.spring.io/milestone" }
 }
+
+ext {
+    set('springAiVersion', "1.1.0-M3")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
 
 dependencies {
     // WEB
@@ -80,7 +92,15 @@ dependencies {
 
     // test h2
     testImplementation 'com.h2database:h2'
+
+    // Gemini API Key (Google GenAI)
+    implementation "org.springframework.ai:spring-ai-starter-model-google-genai"
+
+    // pgvector
+    implementation "org.springframework.ai:spring-ai-starter-vector-store-pgvector"
+
 }
+
 
 def querydslDir = "src/main/generated/querydsl"
 

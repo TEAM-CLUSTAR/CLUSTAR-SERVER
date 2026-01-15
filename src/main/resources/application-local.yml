@@ -21,6 +21,27 @@ spring:
         format_sql: true
     show-sql: true
 
+  ai:
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY}
+        project-id: ${GOOGLE_AI_PROJECT_ID}
+
+        chat:
+          enabled: true
+          options:
+            model: gemini-1.5-flash
+            temperature: 0.7
+
+        embedding:
+          enabled: true
+          options:
+            model: text-embedding-004
+
+    vectorstore:
+      pgvector:
+        dimensions: 768 # 주석 해제 권장
+
   web:
     resources:
       add-mappings: false
