@@ -1,18 +1,14 @@
 package org.project.domain.memo.repository;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
+import org.project.global.config.querydsl.QuerydslTestConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -23,20 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("MemoRepository 테스트")
-@Import(MemoRepositoryTest.QuerydslTestConfig.class)
+@Import(QuerydslTestConfig.class)
 class MemoRepositoryTest {
-
-    @TestConfiguration
-    static class QuerydslTestConfig {
-
-        @PersistenceContext
-        private EntityManager em;
-
-        @Bean
-        public JPAQueryFactory jpaQueryFactory() {
-            return new JPAQueryFactory(em);
-        }
-    }
 
     @Autowired
     private MemoRepository memoRepository;
