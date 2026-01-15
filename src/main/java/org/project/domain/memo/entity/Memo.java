@@ -1,5 +1,6 @@
 package org.project.domain.memo.entity;
 
+import com.pgvector.PGvector;
 import jakarta.persistence.*;
 import lombok.*;
 import org.project.domain.label.entity.Label;
@@ -61,6 +62,9 @@ public class Memo extends BaseEntity {
     @OrderBy("filePriority ASC")
     @Builder.Default
     private List<MemoFile> memoFiles = new ArrayList<>();
+
+    @Column(name = "embedding", columnDefinition = "vector(768)")
+    private PGvector embedding;
 
 
     // 일반 메모 생성
