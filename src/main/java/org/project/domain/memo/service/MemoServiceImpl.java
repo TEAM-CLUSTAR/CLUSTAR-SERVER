@@ -14,6 +14,7 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.event.MemoDeletedEvent;
+import org.project.domain.memo.event.MemoFileCreatedEvent;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
@@ -299,6 +300,10 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         memoFileRepository.saveAll(memoFiles);
+
+        eventPublisher.publishEvent(
+                new MemoFileCreatedEvent(memoFiles)
+        );
     }
 
     private MemoFile createMemoFile(Memo memo, MemoCreateRequest.FileRequest request, Long userId) {
