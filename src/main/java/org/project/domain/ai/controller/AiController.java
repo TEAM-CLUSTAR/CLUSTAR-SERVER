@@ -1,29 +1,29 @@
 package org.project.domain.ai.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.service.AiServiceImpl;
-import org.springframework.web.bind.annotation.*;
+import org.project.domain.ai.dto.request.MemoAiRequest;
+import org.project.domain.ai.dto.response.MemoAiResponse;
+import org.project.domain.ai.service.AiService;
+import org.project.global.response.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/ai")
+@RequestMapping("/api/v1/ai")
 public class AiController {
 
-    private final AiServiceImpl aiService;
+    private final AiService aiService;
 
-    @PostMapping("/insight")
-    public String insight(@RequestBody String memoText) {
-        String prompt = """
-        다음은 사용자가 선택한 메모들이다.
-
-        %s
-
-        1. 공통 주제
-        2. 반복되는 문제
-        3. 실행 가능한 인사이트 3가지
-        형식으로 정리해줘.
-        """.formatted(memoText);
-
-        return aiService.generateInsight(prompt);
+    @PostMapping("/memos")
+    public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
+            @RequestBody @Valid MemoAiRequest request
+    ) {
+        MemoAiResponse response = aiService.generateMemoAi(request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }
