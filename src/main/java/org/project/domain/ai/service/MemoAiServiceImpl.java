@@ -18,7 +18,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class AiServiceImpl implements AiService {
+public class MemoAiServiceImpl implements MemoAiService {
 
     private final ChatClient chatClient;
     private final MemoAiStrategyFactory strategyFactory;
