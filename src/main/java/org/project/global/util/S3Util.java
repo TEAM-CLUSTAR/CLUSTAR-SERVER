@@ -8,12 +8,10 @@ import org.project.global.exception.errorcode.S3ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -142,6 +140,29 @@ public class S3Util {
                 extension,
                 priority
         );
+    }
+
+    /**
+     * S3 객체 다운로드 (이미지/파일 공용)
+     */
+    public byte[] download(String s3Key) {
+
+        try {
+            GetObjectRequest request = GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(s3Key)
+                    .build();
+
+            ResponseBytes<GetObjectResponse> objectBytes =
+                    s3Client.getObjectAsBytes(request);
+
+            return objectBytes.asByteArray();
+
+        } catch (NoSuchKeyException e) {
+            throw new IllegalArgumentException("S3에 존재하지 않는 key입니다: " + s3Key, e);
+        } catch (S3Exception e) {
+            throw new IllegalStateException("S3 다운로드 실패: " + s3Key, e);
+        }
     }
 
     /**
