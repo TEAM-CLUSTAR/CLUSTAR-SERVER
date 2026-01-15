@@ -88,7 +88,7 @@ class MemoControllerTest {
         }
 
         @Test
-        @DisplayName("이미지와 파일 모두 포함된 경우 성공")
+        @DisplayName("이미지와 파일 모두 포함된 경우 성공해야 한다.")
         @WithMockCustomUser(userId = 2L)
         void issuePresignedUrls_WithImagesAndFiles_Success() throws Exception {
             // given
@@ -111,17 +111,252 @@ class MemoControllerTest {
 
             // when & then
             mockMvc.perform(post("/api/v1/memo/presigned-urls")
-                            .with(securityContext(SecurityContextHolder.getContext()))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
-                    .andDo(print())
+                    .andDo(print()) // 테스트 실행 시 콘솔 창에 요청 & 응답 상세 출력
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.images[0].s3Key").value("img-key"))
                     .andExpect(jsonPath("$.data.files[0].s3Key").value("file-key"));
 
             verify(memoService).issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class));
         }
-        
+
+        @Test
+        @DisplayName("이미지만 있는 경우도 성공해야 한다.")
+        @WithMockCustomUser(userId = 2L)
+        void issuePresignedUrls_OnlyImages_Success() throws Exception {
+            // given
+            Long userId = 2L;
+
+            MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
+                    List.of(
+                            new MemoPresignedUrlRequest.UploadRequest("png", 2048L, 1)
+                    ),
+                    Collections.emptyList()  // 파일 없음
+            );
+
+            MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
+                    List.of(
+                            new MemoPresignedUrlResponse.PresignedUrlResponse(
+                                    "img-key", "http://s3/img", 2048L, "png", 1)
+                    ),
+                    Collections.emptyList()
+            );
+
+            when(memoService.issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.images").isArray())
+                    .andExpect(jsonPath("$.data.images.length()").value(1))
+                    .andExpect(jsonPath("$.data.images[0].s3Key").value("img-key"))
+                    .andExpect(jsonPath("$.data.files").isArray())
+                    .andExpect(jsonPath("$.data.files.length()").value(0));
+
+            verify(memoService, times(1))
+                    .issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class));
+        }
+
+        @Test
+        @DisplayName("파일만 있는 경우도 성공해야 한다.")
+        @WithMockCustomUser(userId = 2L)
+        void issuePresignedUrls_OnlyFiles_Success() throws Exception {
+            // given
+            Long userId = 2L;
+
+            MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
+                    Collections.emptyList(),  // 이미지 없음
+                    List.of(
+                            new MemoPresignedUrlRequest.UploadRequest("pdf", 5120L, 1)
+                    )
+            );
+
+            MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
+                    Collections.emptyList(),
+                    List.of(
+                            new MemoPresignedUrlResponse.PresignedUrlResponse(
+                                    "file-key", "http://s3/file", 5120L, "pdf", 1)
+                    )
+            );
+
+            when(memoService.issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.images").isArray())
+                    .andExpect(jsonPath("$.data.images.length()").value(0))
+                    .andExpect(jsonPath("$.data.files").isArray())
+                    .andExpect(jsonPath("$.data.files.length()").value(1))
+                    .andExpect(jsonPath("$.data.files[0].s3Key").value("file-key"));
+
+            verify(memoService, times(1))
+                    .issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class));
+        }
+
+        @Test
+        @DisplayName("images가 null인 경우 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void issuePresignedUrls_ImagesNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "images": null,
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // @NotNull 검증 실패
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("files가 null인 경우 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void issuePresignedUrls_FilesNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "images": [],
+                        "files": null
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("extension가 null인 경우 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void issuePresignedUrls_ExtensionNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "images": [
+                            {
+                                "extension": null,
+                                "bytes": 1024,
+                                "priority": 1
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("bytes가 null인 경우 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void issuePresignedUrls_BytesNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "images": [
+                            {
+                                "extension": "jpg",
+                                "bytes": null,
+                                "priority": 1
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("priority가 null인 경우 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void issuePresignedUrls_PriorityNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "images": [
+                            {
+                                "extension": "jpg",
+                                "bytes": 1024,
+                                "priority": null ,
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("SecurityContext에 없는 인증되지 않은 사용자는 presigendUrl 요청에 실패되어야 한다.")
+        void issuePresignedUrls_Unauthorized_Fail() throws Exception {
+            // given
+            MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("jpg", 1024L, 1)),
+                    Collections.emptyList()
+            );
+
+            // when & then
+            // @WithMockCustomUser를 사용하지 않으면 SecurityContext가 비어있음
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().is5xxServerError());  // NPE 발생
+
+            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
+        }
 
         }
+
+        @Nested
+        @DisplayName("메모 생성 테스트")
+        class CreateMemoTests{
+        
+        }
+
 }
