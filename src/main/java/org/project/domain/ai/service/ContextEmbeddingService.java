@@ -4,7 +4,7 @@ import java.util.List;
 
 public interface ContextEmbeddingService {
 
-    List<Double> generateEmbedding(String text);
+    float[] generateEmbedding(String text);
 
     void saveMemoEmbedding(Long memoId, String memoText);
 }

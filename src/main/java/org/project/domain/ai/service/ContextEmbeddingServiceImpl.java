@@ -24,9 +24,8 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
     /**
      * 단일 텍스트 → embedding 벡터 생성
      */
-    public List<Double> generateEmbedding(String text) {
-        EmbeddingResponse response = embeddingModel.embed(text);
-        return response.getResult().getOutput();
+    public float[] generateEmbedding(String text) {
+        return embeddingModel.embed(text);
     }
 
     /**
@@ -43,14 +42,14 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
         );
 
         // 현재는 chunk 1개 (추후 청킹 확장 가능)
-        List<Double> vector = generateEmbedding(memoText);
+        float[] vector = generateEmbedding(memoText);
 
         ContextEmbedding embedding = ContextEmbedding.builder()
                 .contextType(ContextType.MEMO)
                 .contextId(memoId)
                 .chunkIndex(0)
                 .sourcePreview(preview(memoText))
-                .embedding(toFloatArray(vector))
+                .embedding(vector)
                 .model(MODEL_NAME)
                 .build();
 
