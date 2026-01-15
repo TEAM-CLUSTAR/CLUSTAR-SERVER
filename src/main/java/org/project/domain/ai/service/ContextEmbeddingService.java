@@ -7,4 +7,6 @@ public interface ContextEmbeddingService {
     float[] generateEmbedding(String text);
 
     void saveMemoEmbedding(Long memoId, String memoText);
+
+    void saveImageEmbedding(Long imageId, String imageDescription);
 }

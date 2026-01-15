@@ -5,11 +5,8 @@ import org.project.domain.ai.entity.ContextEmbedding;
 import org.project.domain.ai.entity.ContextType;
 import org.project.domain.ai.repository.ContextEmbeddingRepository;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -56,18 +53,38 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
         embeddingRepository.save(embedding);
     }
 
+    /**
+     * 이미지 설명 embedding 저장
+     * (이미지 업로드 / 수정 시 호출)
+     */
+    @Transactional
+    public void saveImageEmbedding(Long imageId, String imageDescription) {
+
+        // 수정 시 기존 embedding 제거
+        embeddingRepository.deleteByContextTypeAndContextId(
+                ContextType.MEMO_IMAGE,
+                imageId
+        );
+
+        // 현재는 chunk 1개 (추후 청킹 확장 가능)
+        float[] vector = generateEmbedding(imageDescription);
+
+        ContextEmbedding embedding = ContextEmbedding.builder()
+                .contextType(ContextType.MEMO_IMAGE)
+                .contextId(imageId)
+                .chunkIndex(0)
+                .sourcePreview(preview(imageDescription))
+                .embedding(vector)
+                .model(MODEL_NAME)
+                .build();
+
+        embeddingRepository.save(embedding);
+    }
+
     private String preview(String text) {
         if (text == null) return null;
         return text.length() <= PREVIEW_LENGTH
                 ? text
                 : text.substring(0, PREVIEW_LENGTH);
-    }
-
-    private float[] toFloatArray(List<Double> vector) {
-        float[] result = new float[vector.size()];
-        for (int i = 0; i < vector.size(); i++) {
-            result[i] = vector.get(i).floatValue();
-        }
-        return result;
     }
 }
