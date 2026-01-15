@@ -87,7 +87,41 @@ class MemoControllerTest {
             }
         }
 
+        @Test
+        @DisplayName("이미지와 파일 모두 포함된 경우 성공")
+        @WithMockCustomUser(userId = 2L)
+        void issuePresignedUrls_WithImagesAndFiles_Success() throws Exception {
+            // given
+            Long userId = 2L;
 
+            // 요청 데이터 생성
+            MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("jpg", 1024L, 1)),
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("pdf", 2048L, 1))
+            );
+
+            // 예상 응답 데이터 생성
+            MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
+                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("img-key", "http://s3/img", 1024L, "jpg", 1)),
+                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("file-key", "http://s3/file", 2048L, "pdf", 1))
+            );
+
+            when(memoService.issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo/presigned-urls")
+                            .with(securityContext(SecurityContextHolder.getContext()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.images[0].s3Key").value("img-key"))
+                    .andExpect(jsonPath("$.data.files[0].s3Key").value("file-key"));
+
+            verify(memoService).issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class));
+        }
+        
 
         }
 }
