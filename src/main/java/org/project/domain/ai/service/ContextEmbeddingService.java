@@ -9,4 +9,6 @@ public interface ContextEmbeddingService {
     void saveMemoEmbedding(Long memoId, String memoText);
 
     void saveImageEmbedding(Long imageId, String imageDescription);
+
+    void saveFileEmbedding(Long fileId, String content);
 }

@@ -4,9 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.entity.ContextEmbedding;
 import org.project.domain.ai.entity.ContextType;
 import org.project.domain.ai.repository.ContextEmbeddingRepository;
+import org.project.global.util.embedding.TextChunker;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +20,8 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     private final EmbeddingModel embeddingModel;
     private final ContextEmbeddingRepository embeddingRepository;
+
+    private final TextChunker textChunker;
 
     /**
      * 단일 텍스트 → embedding 벡터 생성
@@ -38,19 +43,24 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                 memoId
         );
 
-        // 현재는 chunk 1개 (추후 청킹 확장 가능)
-        float[] vector = generateEmbedding(memoText);
+        List<String> chunks = textChunker.chunk(memoText);
 
-        ContextEmbedding embedding = ContextEmbedding.builder()
-                .contextType(ContextType.MEMO)
-                .contextId(memoId)
-                .chunkIndex(0)
-                .sourcePreview(preview(memoText))
-                .embedding(vector)
-                .model(MODEL_NAME)
-                .build();
+        int index = 0;
+        for (String chunk : chunks) {
 
-        embeddingRepository.save(embedding);
+            float[] vector = generateEmbedding(chunk);
+
+            ContextEmbedding embedding = ContextEmbedding.builder()
+                    .contextType(ContextType.MEMO)
+                    .contextId(memoId)
+                    .chunkIndex(index++)
+                    .sourcePreview(preview(chunk))
+                    .embedding(vector)
+                    .model(MODEL_NAME)
+                    .build();
+
+            embeddingRepository.save(embedding);
+        }
     }
 
     /**
@@ -66,19 +76,53 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                 imageId
         );
 
-        // 현재는 chunk 1개 (추후 청킹 확장 가능)
-        float[] vector = generateEmbedding(imageDescription);
+        List<String> chunks = textChunker.chunk(imageDescription);
 
-        ContextEmbedding embedding = ContextEmbedding.builder()
-                .contextType(ContextType.MEMO_IMAGE)
-                .contextId(imageId)
-                .chunkIndex(0)
-                .sourcePreview(preview(imageDescription))
-                .embedding(vector)
-                .model(MODEL_NAME)
-                .build();
+        int index = 0;
+        for (String chunk : chunks) {
 
-        embeddingRepository.save(embedding);
+            float[] vector = generateEmbedding(chunk);
+
+            ContextEmbedding embedding = ContextEmbedding.builder()
+                    .contextType(ContextType.MEMO_IMAGE)
+                    .contextId(imageId)
+                    .chunkIndex(index++)
+                    .sourcePreview(preview(chunk))
+                    .embedding(vector)
+                    .model(MODEL_NAME)
+                    .build();
+
+            embeddingRepository.save(embedding);
+        }
+    }
+
+    @Override
+    public void saveFileEmbedding(Long fileId, String content) {
+
+        // 수정 시 기존 embedding 제거
+        embeddingRepository.deleteByContextTypeAndContextId(
+                ContextType.MEMO_FILE,
+                fileId
+        );
+
+        List<String> chunks = textChunker.chunk(content);
+
+        int index = 0;
+        for (String chunk : chunks) {
+
+            float[] vector = embeddingModel.embed(chunk);
+
+            ContextEmbedding embedding = ContextEmbedding.builder()
+                    .contextType(ContextType.MEMO_FILE)
+                    .contextId(fileId)
+                    .chunkIndex(index++)
+                    .sourcePreview(preview(chunk))
+                    .embedding(vector)
+                    .model(MODEL_NAME)
+                    .build();
+
+            embeddingRepository.save(embedding);
+        }
     }
 
     private String preview(String text) {
