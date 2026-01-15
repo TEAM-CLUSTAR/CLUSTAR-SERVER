@@ -2,6 +2,8 @@ package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
 import org.project.global.util.S3Util;
+import org.project.global.util.memoMedia.DocxTextExtractor;
+import org.project.global.util.memoMedia.PdfTextExtractor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -9,14 +11,18 @@ import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MemoImageAiServiceImpl implements MemoImageAiService {
+public class MemoMediaAiServiceImpl implements MemoMediaAiService {
 
     private final ChatClient chatClient;
     private final S3Util s3Util;
+
+    private final PdfTextExtractor pdfTextExtractor;
+    private final DocxTextExtractor docxTextExtractor;
 
     @Override
     public String generateImageDescription(String s3Key) {
@@ -44,6 +50,26 @@ public class MemoImageAiServiceImpl implements MemoImageAiService {
                 .prompt(prompt)
                 .call()
                 .content();
+    }
+
+    @Override
+    public String extractText(String s3Key) {
+
+        byte[] fileBytes = s3Util.download(s3Key);
+
+        if (s3Key.endsWith(".pdf")) {
+            return pdfTextExtractor.extract(fileBytes);
+        }
+
+        if (s3Key.endsWith(".docx")) {
+            return docxTextExtractor.extract(fileBytes);
+        }
+
+        if (s3Key.endsWith(".txt")) {
+            return new String(fileBytes, StandardCharsets.UTF_8);
+        }
+
+        throw new IllegalArgumentException("지원하지 않는 파일 형식입니다. s3Key=" + s3Key);
     }
 }
 
