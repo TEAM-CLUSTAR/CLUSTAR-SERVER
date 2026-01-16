@@ -1,4 +1,4 @@
-package org.project.domain.ai.strategy;
+package org.project.domain.ai.dto;
 
 public enum MemoAiOptions {
     MERGE,
