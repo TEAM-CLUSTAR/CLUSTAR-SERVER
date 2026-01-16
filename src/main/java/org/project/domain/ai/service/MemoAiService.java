@@ -5,5 +5,5 @@ import org.project.domain.ai.dto.response.MemoAiResponse;
 
 public interface MemoAiService {
 
-    MemoAiResponse generateMemoAi(MemoAiRequest request);
+    MemoAiResponse generateMemoAi(Long userId, MemoAiRequest request);
 }

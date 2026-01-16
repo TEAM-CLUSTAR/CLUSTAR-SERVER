@@ -9,6 +9,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -38,7 +39,7 @@ public class MemoMediaAiServiceImpl implements MemoMediaAiService {
                 """)
                 .media(List.of(
                         Media.builder()
-                                .mimeType(MimeTypeUtils.IMAGE_JPEG)
+                                .mimeType(resolveMimeType(s3Key))
                                 .data(imageBytes)
                                 .build()
                 ))
@@ -56,20 +57,33 @@ public class MemoMediaAiServiceImpl implements MemoMediaAiService {
     public String extractText(String s3Key) {
 
         byte[] fileBytes = s3Util.download(s3Key);
+        String lowerKey = s3Key.toLowerCase();
 
-        if (s3Key.endsWith(".pdf")) {
+        if (lowerKey.endsWith(".pdf")) {
             return pdfTextExtractor.extract(fileBytes);
         }
 
-        if (s3Key.endsWith(".docx")) {
+        if (lowerKey.endsWith(".docx")) {
             return docxTextExtractor.extract(fileBytes);
         }
 
-        if (s3Key.endsWith(".txt")) {
+        if (lowerKey.endsWith(".txt")) {
             return new String(fileBytes, StandardCharsets.UTF_8);
         }
 
         throw new IllegalArgumentException("지원하지 않는 파일 형식입니다. s3Key=" + s3Key);
     }
+
+
+    /**
+     * 헬퍼 메서드
+     */
+    private MimeType resolveMimeType(String s3Key) {
+        String lowerKey = s3Key.toLowerCase();
+            if (lowerKey.endsWith(".png")) return MimeTypeUtils.IMAGE_PNG;
+            if (lowerKey.endsWith(".gif")) return MimeTypeUtils.IMAGE_GIF;
+            if (lowerKey.endsWith(".webp")) return MimeType.valueOf("image/webp");
+            return MimeTypeUtils.IMAGE_JPEG;
+        }
 }
 
