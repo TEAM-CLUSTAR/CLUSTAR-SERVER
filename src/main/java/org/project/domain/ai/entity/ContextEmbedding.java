@@ -44,6 +44,9 @@ public class ContextEmbedding extends BaseEntity {
     @Column(name = "context_id", nullable = false)
     private Long contextId;
 
+    @Column(name = "memo_id", nullable = false)
+    private Long memoId;
+
     /**
      * 청킹 순서 (0부터 시작)
      */

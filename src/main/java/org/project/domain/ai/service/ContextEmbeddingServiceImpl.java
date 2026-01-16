@@ -16,7 +16,7 @@ import java.util.List;
 public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     private static final String MODEL_NAME = "text-embedding-004";
-    private static final int PREVIEW_LENGTH = 300;
+    private static final int PREVIEW_LENGTH = 100;
 
     private final EmbeddingModel embeddingModel;
     private final ContextEmbeddingRepository embeddingRepository;
@@ -55,6 +55,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO)
                     .contextId(memoId)
+                    .memoId(memoId)
                     .chunkIndex(index++)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
@@ -71,7 +72,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
      */
     @Override
     @Transactional
-    public void saveImageEmbedding(Long imageId, String imageDescription) {
+    public void saveImageEmbedding(Long memoId, Long imageId, String imageDescription) {
 
         // 수정 시 기존 embedding 제거
         embeddingRepository.deleteByContextTypeAndContextId(
@@ -89,6 +90,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO_IMAGE)
                     .contextId(imageId)
+                    .memoId(memoId)
                     .chunkIndex(index++)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
@@ -101,7 +103,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     @Override
     @Transactional
-    public void saveFileEmbedding(Long fileId, String content) {
+    public void saveFileEmbedding(Long memoId, Long fileId, String content) {
 
         // 수정 시 기존 embedding 제거
         embeddingRepository.deleteByContextTypeAndContextId(
@@ -119,6 +121,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO_FILE)
                     .contextId(fileId)
+                    .memoId(memoId)
                     .chunkIndex(index++)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
