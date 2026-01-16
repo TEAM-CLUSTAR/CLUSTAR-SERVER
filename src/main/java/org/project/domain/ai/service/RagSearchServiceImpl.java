@@ -1,0 +1,39 @@
+package org.project.domain.ai.service;
+
+import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.dto.ContextEmbeddingWithScore;
+import org.project.domain.ai.entity.ContextEmbedding;
+import org.project.domain.ai.repository.ContextEmbeddingRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class RagSearchServiceImpl implements RagSearchService {
+
+    private static final double SIMILARITY_THRESHOLD = 0.75;
+
+    private final ContextEmbeddingRepository embeddingRepository;
+
+    public List<ContextEmbedding> searchRelevantChunks(
+            List<Long> memoIds,
+            float[] queryEmbedding,
+            int topK
+    ) {
+
+        List<ContextEmbeddingWithScore> results =
+                embeddingRepository.searchByMemoIds(
+                        memoIds,
+                        queryEmbedding,
+                        topK * 2 // 여유분
+                );
+
+        return results.stream()
+                .filter(r -> r.similarity() >= SIMILARITY_THRESHOLD)
+                .limit(topK)
+                .map(ContextEmbeddingWithScore::embedding)
+                .toList();
+    }
+}
+
