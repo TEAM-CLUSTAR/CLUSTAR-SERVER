@@ -14,6 +14,7 @@ public record RagMemoCreateRequest(
         @NotNull
         MemoAiOptions option,
         @NotEmpty
-        List<Long> memoIds
+        List<Long> memoIds,
+        RagPromptConfigRequest promptConfig
 ) {
 }
