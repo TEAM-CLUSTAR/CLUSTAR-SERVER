@@ -29,6 +29,7 @@ public class MemoFileEmbeddingListener {
                     );
 
             contextEmbeddingService.saveFileEmbedding(
+                    event.memo().getId(),
                     file.getId(),
                     content
             );

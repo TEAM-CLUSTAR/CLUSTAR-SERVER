@@ -28,6 +28,7 @@ public class MemoImageEmbeddingListener {
                     );
 
             contextEmbeddingService.saveImageEmbedding(
+                    event.memo().getId(),
                     image.getId(),
                     description
             );

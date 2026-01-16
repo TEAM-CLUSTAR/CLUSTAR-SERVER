@@ -273,7 +273,7 @@ public class MemoServiceImpl implements MemoService {
         memoImageRepository.saveAll(memoImages);
 
         eventPublisher.publishEvent(
-                new MemoImageCreatedEvent(memoImages)
+                new MemoImageCreatedEvent(memo, memoImages)
         );
     }
 
@@ -302,7 +302,7 @@ public class MemoServiceImpl implements MemoService {
         memoFileRepository.saveAll(memoFiles);
 
         eventPublisher.publishEvent(
-                new MemoFileCreatedEvent(memoFiles)
+                new MemoFileCreatedEvent(memo, memoFiles)
         );
     }
 
