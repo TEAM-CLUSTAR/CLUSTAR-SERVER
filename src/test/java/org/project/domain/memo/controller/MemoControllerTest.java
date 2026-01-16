@@ -51,42 +51,44 @@ class MemoControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // 커스텀 어노테이션 -> 테스트 전 authntication 객체를 자동 설정하기 위해
+    @Retention(RetentionPolicy.RUNTIME)
+    @WithSecurityContext(factory = WithMockCustomUserSecurityContextFactory.class)
+    @interface WithMockCustomUser {
+        long userId() default 1L;
+    }
+
+    static class WithMockCustomUserSecurityContextFactory implements WithSecurityContextFactory<WithMockCustomUser> {
+        @Override
+        public SecurityContext createSecurityContext(WithMockCustomUser annotation) {
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+
+            // User 엔티티 생성
+            User user = User.builder()
+                    .id(annotation.userId())
+                    .email("test@example.com")
+                    .name("테스트유저")
+                    .providerName("google")
+                    .profileImageUrl(null)
+                    .build();
+
+            CustomUserDetails userDetails = new CustomUserDetails(user);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+            context.setAuthentication(authentication);
+            return context;
+        }
+    }
+
+
     @Nested
     @DisplayName("Presigned URL 발급 테스트")
     class IssuePresignedUrlsTest {
 
-        // 커스텀 어노테이션 -> 테스트 전 authntication 객체를 자동 설정하기 위해
-        @Retention(RetentionPolicy.RUNTIME)
-        @WithSecurityContext(factory = WithMockCustomUserSecurityContextFactory.class)
-        @interface WithMockCustomUser {
-            long userId() default 1L;
-        }
-
-        static class WithMockCustomUserSecurityContextFactory implements WithSecurityContextFactory<WithMockCustomUser> {
-            @Override
-            public SecurityContext createSecurityContext(WithMockCustomUser annotation) {
-                SecurityContext context = SecurityContextHolder.createEmptyContext();
-                
-                // User 엔티티 생성
-                User user = User.builder()
-                        .id(annotation.userId())
-                        .email("test@example.com")
-                        .name("테스트유저")
-                        .providerName("google")
-                        .profileImageUrl(null)
-                        .build();
-                
-                CustomUserDetails userDetails = new CustomUserDetails(user);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-                context.setAuthentication(authentication);
-                return context;
-            }
-        }
 
         @Test
         @DisplayName("이미지와 파일 모두 포함된 경우 성공해야 한다.")
@@ -356,7 +358,7 @@ class MemoControllerTest {
 
         @Nested
         @DisplayName("메모 생성 테스트")
-        @IssuePresignedUrlsTest.WithMockCustomUser(userId = 1L)
+        @WithMockCustomUser(userId = 1L)
         class CreateMemoTests{
 
         @DisplayName("이미지/파일/라벨 없이 메모만 작성하는 것이 성공해야한다.")
@@ -397,6 +399,201 @@ class MemoControllerTest {
                     .createMemo(eq(userId), any(MemoCreateRequest.class));
         }
 
+            @Test
+            @DisplayName("라벨과 함께 메모를 작성하는 것이 성공해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_WithLabels_Success() throws Exception {
+                // given
+                Long userId = 1L;
+
+                MemoCreateRequest request = new MemoCreateRequest(
+                        "SOPT 세미나",
+                        "7차 세미나 내용은 ~가 중요~.",
+                        List.of("SOPT", "교양", "레퍼런스"),  // 라벨 3개
+                        List.of(),  // 이미지 없음
+                        List.of()   // 파일 없음
+                );
+
+                MemoResponse expectedResponse = new MemoResponse(
+                        101L,
+                        "SOPT 세미나",
+                        LocalDateTime.now()
+                );
+
+                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                        .thenReturn(expectedResponse);
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andDo(print())
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.code").value(201))
+                        .andExpect(jsonPath("$.data.memoId").value(101L))
+                        .andExpect(jsonPath("$.data.title").value("SOPT 세미나"))
+                        .andExpect(jsonPath("$.data.createdAt").exists());
+
+                verify(memoService, times(1))
+                        .createMemo(eq(userId), any(MemoCreateRequest.class));
+            }
+
+            @Test
+            @DisplayName("이미지와 함께 메모를 작성하는 것이 성공해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_WithImages_Success() throws Exception {
+                // given
+                Long userId = 1L;
+
+                MemoCreateRequest.ImageRequest image1 = new MemoCreateRequest.ImageRequest(
+                        "memo-image/1/53238404-f89d-4728-9dc0-efb2a3c7787b.png",
+                        "seminar_slide.png",
+                        245678L,
+                        "png",
+                        1
+                );
+
+                MemoCreateRequest.ImageRequest image2 = new MemoCreateRequest.ImageRequest(
+                        "memo-image/1/another-uuid.jpg",
+                        "photo.jpg",
+                        532198L,
+                        "jpg",
+                        2
+                );
+
+                MemoCreateRequest request = new MemoCreateRequest(
+                        "이미지가 포함된 메모",
+                        "세미나 사진들입니다.",
+                        List.of(),                   // 라벨 없음
+                        List.of(image1, image2),     // 이미지 2개
+                        List.of()                    // 파일 없음
+                );
+
+                MemoResponse expectedResponse = new MemoResponse(
+                        102L,
+                        "이미지가 포함된 메모",
+                        LocalDateTime.now()
+                );
+
+                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                        .thenReturn(expectedResponse);
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andDo(print())
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.code").value(201))
+                        .andExpect(jsonPath("$.data.memoId").value(102L))
+                        .andExpect(jsonPath("$.data.title").value("이미지가 포함된 메모"))
+                        .andExpect(jsonPath("$.data.createdAt").exists());
+
+                verify(memoService, times(1))
+                        .createMemo(eq(userId), any(MemoCreateRequest.class));
+            }
+
+            @Test
+            @DisplayName("파일과 함께 메모를 작성하는 것이 성공해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_WithFiles_Success() throws Exception {
+                // given
+                Long userId = 1L;
+
+                MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
+                        "memo-file/1/780fd26c-8ab7-4762-b148-b9c8c071795b.pdf",
+                        "SOPT_7th_seminar.pdf",
+                        1048576L,
+                        "pdf",
+                        1
+                );
+
+                MemoCreateRequest request = new MemoCreateRequest(
+                        "파일이 포함된 메모",
+                        "세미나 자료입니다.",
+                        List.of(),          // 라벨 없음
+                        List.of(),          // 이미지 없음
+                        List.of(file)       // 파일 1개
+                );
+
+                MemoResponse expectedResponse = new MemoResponse(
+                        103L,
+                        "파일이 포함된 메모",
+                        LocalDateTime.now()
+                );
+
+                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                        .thenReturn(expectedResponse);
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andDo(print())
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.code").value(201))
+                        .andExpect(jsonPath("$.data.memoId").value(103L))
+                        .andExpect(jsonPath("$.data.title").value("파일이 포함된 메모"))
+                        .andExpect(jsonPath("$.data.createdAt").exists());
+
+                verify(memoService, times(1))
+                        .createMemo(eq(userId), any(MemoCreateRequest.class));
+            }
+
+            @Test
+            @DisplayName("라벨, 이미지, 파일이 모두 포함된 메모를 작성하는 것이 성공해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_WithAll_Success() throws Exception {
+                // given
+                Long userId = 1L;
+
+                MemoCreateRequest.ImageRequest image = new MemoCreateRequest.ImageRequest(
+                        "memo-image/1/uuid-image.png",
+                        "slide.png",
+                        245678L,
+                        "png",
+                        1
+                );
+
+                MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
+                        "memo-file/1/uuid-file.pdf",
+                        "document.pdf",
+                        1048576L,
+                        "pdf",
+                        1
+                );
+
+                MemoCreateRequest request = new MemoCreateRequest(
+                        "완전한 메모",
+                        "모든 것이 포함된 메모입니다.",
+                        List.of("SOPT", "교양"),    // 라벨 2개
+                        List.of(image),             // 이미지 1개
+                        List.of(file)               // 파일 1개
+                );
+
+                MemoResponse expectedResponse = new MemoResponse(
+                        104L,
+                        "완전한 메모",
+                        LocalDateTime.now()
+                );
+
+                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                        .thenReturn(expectedResponse);
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andDo(print())
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.code").value(201))
+                        .andExpect(jsonPath("$.data.memoId").value(104L))
+                        .andExpect(jsonPath("$.data.title").value("완전한 메모"))
+                        .andExpect(jsonPath("$.data.createdAt").exists());
+
+                verify(memoService, times(1))
+                        .createMemo(eq(userId), any(MemoCreateRequest.class));
+            }
         }
 
 }
