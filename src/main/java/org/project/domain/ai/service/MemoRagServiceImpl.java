@@ -2,8 +2,10 @@ package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.request.RagMemoCreateRequest;
+import org.project.domain.ai.dto.request.RagPromptConfigRequest;
 import org.project.domain.ai.dto.response.RagContextChunkResponse;
 import org.project.domain.ai.dto.response.RagMemoCreateResponse;
+import org.project.domain.ai.dto.response.RagPromptConfigResponse;
 import org.project.domain.ai.strategy.MemoAiOptions;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
@@ -17,6 +19,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,11 +39,13 @@ public class MemoRagServiceImpl implements MemoRagService {
     private final MemoRepository memoRepository;
     private final UserRepository userRepository;
     private final ContextEmbeddingService embeddingService;
+    private final PromptConfigService promptConfigService;
 
     @Override
     @Transactional
     public RagMemoCreateResponse createRagMemo(Long userId, RagMemoCreateRequest request) {
         int topK = request.topK() != null ? request.topK() : DEFAULT_TOP_K;
+        RagPromptConfigResponse storedConfig = promptConfigService.get(request.option());
 
         // 1) 질의 텍스트 → 유사 컨텍스트 검색
         List<RagContextChunkResponse> contexts = searchService.searchTopK(
@@ -60,10 +65,19 @@ public class MemoRagServiceImpl implements MemoRagService {
                 .reduce((a, b) -> a + "\n\n---\n\n" + b)
                 .orElse("");
 
+        AppliedPrompt appliedPrompt = resolveAppliedPrompt(
+                request.option(),
+                request.promptConfig(),
+                storedConfig
+        );
+
         RagGeneratedMemo result = generateMemoFromContext(
                 request.userPrompt(),
                 contextText,
-                request.option()
+                request.option(),
+                request.promptConfig(),
+                storedConfig,
+                appliedPrompt
         );
 
         // 3) 새 메모 저장 (AI 생성 플래그 포함)
@@ -77,7 +91,14 @@ public class MemoRagServiceImpl implements MemoRagService {
         // 4) 새 메모도 임베딩 저장
         embeddingService.saveMemoEmbedding(userId, savedMemo.getId(), savedMemo.getContent());
 
-        return RagMemoCreateResponse.of(savedMemo.getId(), savedMemo.getTitle(), savedMemo.getContent(), contexts.size());
+        return RagMemoCreateResponse.of(
+                savedMemo.getId(),
+                savedMemo.getTitle(),
+                savedMemo.getContent(),
+                contexts.size(),
+                appliedPrompt.systemPrompt(),
+                appliedPrompt.temperature()
+        );
     }
 
     private String resolveTitle(String title) {
@@ -91,9 +112,12 @@ public class MemoRagServiceImpl implements MemoRagService {
     private RagGeneratedMemo generateMemoFromContext(
             String userPrompt,
             String contextText,
-            MemoAiOptions option
+            MemoAiOptions option,
+            RagPromptConfigRequest promptConfig,
+            RagPromptConfigResponse storedConfig,
+            AppliedPrompt appliedPrompt
     ) {
-        String system = buildSystemPrompt(option);
+        String system = appliedPrompt.systemPrompt();
 
         String user = """
                 사용자 요청:
@@ -110,11 +134,41 @@ public class MemoRagServiceImpl implements MemoRagService {
                 )
         );
 
-        String raw = chatClient.prompt(prompt).call().content();
+        ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt(prompt);
+        GoogleGenAiChatOptions options = buildChatOptions(appliedPrompt);
+        if (options != null) {
+            requestSpec = requestSpec.options(options);
+        }
+
+        String raw = requestSpec.call().content();
         return parseGeneratedMemo(raw);
     }
 
-    private String buildSystemPrompt(MemoAiOptions option) {
+    private AppliedPrompt resolveAppliedPrompt(
+            MemoAiOptions option,
+            RagPromptConfigRequest promptConfig,
+            RagPromptConfigResponse storedConfig
+    ) {
+        if (promptConfig != null && promptConfig.systemPrompt() != null && !promptConfig.systemPrompt().isBlank()) {
+            return new AppliedPrompt(promptConfig.systemPrompt(), promptConfig.temperature());
+        }
+        if (storedConfig != null && storedConfig.systemPrompt() != null && !storedConfig.systemPrompt().isBlank()) {
+            return new AppliedPrompt(storedConfig.systemPrompt(), storedConfig.temperature());
+        }
+        return new AppliedPrompt(buildDefaultSystemPrompt(option), null);
+    }
+
+    private GoogleGenAiChatOptions buildChatOptions(AppliedPrompt appliedPrompt) {
+        if (appliedPrompt.temperature() == null) {
+            return null;
+        }
+
+        return GoogleGenAiChatOptions.builder()
+                .temperature(appliedPrompt.temperature())
+                .build();
+    }
+
+    private String buildDefaultSystemPrompt(MemoAiOptions option) {
         String behavior = switch (option) {
             case SUMMARY -> """
                     - 핵심 내용만 간결하게 요약한다
@@ -161,6 +215,9 @@ public class MemoRagServiceImpl implements MemoRagService {
         String title = trimmed.substring(0, newlineIndex).trim();
         String content = trimmed.substring(newlineIndex + 1).trim();
         return new RagGeneratedMemo(title, content);
+    }
+
+    private record AppliedPrompt(String systemPrompt, Double temperature) {
     }
 
     private record RagGeneratedMemo(String title, String content) {
