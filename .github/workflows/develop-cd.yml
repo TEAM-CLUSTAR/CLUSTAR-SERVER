@@ -70,12 +70,13 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
         with:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_DEV_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           # GitHub의 시크릿 값들을 EC2 쉘 환경변수로 넘겨주기 (러너 메모리 -> EC2로 복사)
-          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI
+          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,GOOGLE_AI_API_KEY
           script: |
             cd /home/ubuntu/clustar_infra
             
@@ -91,6 +92,7 @@ jobs:
             echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" >> .env
             echo "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" >> .env
             echo "GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" >> .env
+            echo "GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}" >> .env
             
             # 배포 스크립트 실행권한 부여
             sudo chmod +x deploy.sh
