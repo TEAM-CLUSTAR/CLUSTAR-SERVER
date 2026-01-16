@@ -25,9 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// 새로운 테스트 클래스 - 필터 활성화
 @WebMvcTest(MemoController.class)
-@AutoConfigureMockMvc(addFilters = true)  // ← 필터 활성화!
+@AutoConfigureMockMvc(addFilters = true) 
 @DisplayName("메모 컨트롤러 인증 테스트")
 class MemoControllerAuthTest {
 
