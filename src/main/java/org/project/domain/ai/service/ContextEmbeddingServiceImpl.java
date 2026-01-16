@@ -26,6 +26,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
     /**
      * 단일 텍스트 → embedding 벡터 생성
      */
+    @Override
     public float[] generateEmbedding(String text) {
         return embeddingModel.embed(text);
     }
@@ -34,6 +35,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
      * 메모 embedding 저장
      * (memo 생성 / 수정 시 호출)
      */
+    @Override
     @Transactional
     public void saveMemoEmbedding(Long memoId, String memoText) {
 
@@ -67,6 +69,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
      * 이미지 설명 embedding 저장
      * (이미지 업로드 / 수정 시 호출)
      */
+    @Override
     @Transactional
     public void saveImageEmbedding(Long imageId, String imageDescription) {
 
@@ -97,6 +100,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
     }
 
     @Override
+    @Transactional
     public void saveFileEmbedding(Long fileId, String content) {
 
         // 수정 시 기존 embedding 제거
