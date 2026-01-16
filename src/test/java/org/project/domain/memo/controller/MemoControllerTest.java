@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.service.MemoService;
@@ -24,6 +25,7 @@ import org.springframework.security.test.context.support.WithSecurityContext;
 import org.springframework.security.test.context.support.WithSecurityContextFactory;
 import org.springframework.test.web.servlet.MockMvc;
 
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.time.LocalDateTime;
@@ -34,6 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(MemoController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -777,5 +780,224 @@ class MemoControllerTest {
             }
 
         }
+
+    @Nested
+    @DisplayName("메모 목록 조회 테스트")
+    class GetMemosTest {
+
+        @Test
+        @DisplayName("파라미터 없을 시 기본(첫) 메모 목록 조회 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getMemos_Default_Success() throws Exception {
+            // given
+            Long userId = 1L;
+
+            MemoListDashboardResponse.MemoDashboardResponse memo1 =
+                    new MemoListDashboardResponse.MemoDashboardResponse(
+                            1L,
+                            "메모 제목 1",
+                            "메모 내용 1",
+                            "http://s3/image1.jpg",  // 대표 이미지
+                            2,  // 이미지 개수
+                            1,  // 파일 개수
+                            false,  // isPinned
+                            false,  // isAiGenerated
+                            LocalDateTime.now(),
+                            List.of(
+                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT"),
+                                    new MemoListDashboardResponse.LabelResponse(2L, "교양")
+                            )
+                    );
+
+            MemoListDashboardResponse.MemoDashboardResponse memo2 =
+                    new MemoListDashboardResponse.MemoDashboardResponse(
+                            2L,
+                            "메모 제목 2",
+                            "메모 내용 2",
+                            null,  // 이미지 없음
+                            0,
+                            0,
+                            true,  // isPinned
+                            false,
+                            LocalDateTime.now(),
+                            List.of()  // 라벨 없음
+                    );
+
+            MemoListDashboardResponse expectedResponse =
+                    new MemoListDashboardResponse(List.of(memo1, memo2));
+
+            when(memoService.getMemosWithMedia(
+                    eq(userId),
+                    eq(null),  // labelIds
+                    eq(null),  // cursorCreatedAt
+                    eq(null),  // cursorMemoId
+                    eq(20)     // default size
+            )).thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.memos").isArray())
+                    .andExpect(jsonPath("$.data.memos.length()").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].memoId").value(1L))
+                    .andExpect(jsonPath("$.data.memos[0].title").value("메모 제목 1"))
+                    .andExpect(jsonPath("$.data.memos[0].imageCount").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].fileCount").value(1))
+                    .andExpect(jsonPath("$.data.memos[0].isPinned").value(false))
+                    .andExpect(jsonPath("$.data.memos[0].labels.length()").value(2))
+                    .andExpect(jsonPath("$.data.memos[1].memoId").value(2L))
+                    .andExpect(jsonPath("$.data.memos[1].isPinned").value(true));
+
+            verify(memoService, times(1))
+                    .getMemosWithMedia(eq(userId), eq(null), eq(null), eq(null), eq(20));
+        }
+
+        @Test
+        @DisplayName("단일 라벨로 필터링하여 조회가 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getMemos_WithLabelFilter_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            List<Long> labelIds = List.of(1L);
+
+            MemoListDashboardResponse.MemoDashboardResponse memo =
+                    new MemoListDashboardResponse.MemoDashboardResponse(
+                            1L,
+                            "SOPT 관련 메모",
+                            "내용",
+                            null,
+                            0,
+                            0,
+                            false,
+                            false,
+                            LocalDateTime.now(),
+                            List.of(
+                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT")
+                            )
+                    );
+
+            MemoListDashboardResponse expectedResponse =
+                    new MemoListDashboardResponse(List.of(memo));
+
+            when(memoService.getMemosWithMedia(
+                    eq(userId),
+                    eq(labelIds),
+                    eq(null),
+                    eq(null),
+                    eq(20)
+            )).thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo")
+                            .param("labelIds", "1")  // List<Long> 파라미터
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memos.length()").value(1))
+                    .andExpect(jsonPath("$.data.memos[0].labels[0].labelId").value(1L))
+                    .andExpect(jsonPath("$.data.memos[0].labels[0].name").value("SOPT"));
+
+            verify(memoService, times(1))
+                    .getMemosWithMedia(eq(userId), eq(labelIds), eq(null), eq(null), eq(20));
+        }
+
+        @Test
+        @DisplayName("무한 스크롤에 따라 커서 페이지네이션 조회가 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getMemos_WithCursor_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            LocalDateTime cursorCreatedAt = LocalDateTime.of(2026, 1, 15, 12, 0);
+            Long cursorMemoId = 10L;
+            int size = 10;
+
+            MemoListDashboardResponse expectedResponse =
+                    new MemoListDashboardResponse(List.of());
+
+            when(memoService.getMemosWithMedia(
+                    eq(userId),
+                    eq(null),
+                    eq(cursorCreatedAt),
+                    eq(cursorMemoId),
+                    eq(size)
+            )).thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo")
+                            .param("cursorCreatedAt", "2026-01-15T12:00:00")
+                            .param("cursorMemoId", "10")
+                            .param("size", "10")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memos").isArray());
+
+            verify(memoService, times(1))
+                    .getMemosWithMedia(eq(userId), eq(null), any(LocalDateTime.class), eq(cursorMemoId), eq(size));
+        }
+
+        @Test
+        @DisplayName("size 파라미터 지정하여 조회에 성공하여야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getMemos_WithCustomSize_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            int customSize = 5;
+
+            MemoListDashboardResponse expectedResponse =
+                    new MemoListDashboardResponse(List.of());
+
+            when(memoService.getMemosWithMedia(
+                    eq(userId),
+                    eq(null),
+                    eq(null),
+                    eq(null),
+                    eq(customSize)
+            )).thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo")
+                            .param("size", "5")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk());
+
+            verify(memoService, times(1))
+                    .getMemosWithMedia(eq(userId), eq(null), eq(null), eq(null), eq(customSize));
+        }
+
+        @Test
+        @DisplayName("메모 목록이 더 이상 없을 때 빈 목록 반환에 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getMemos_EmptyList_Success() throws Exception {
+            // given
+            Long userId = 1L;
+
+            MemoListDashboardResponse expectedResponse =
+                    new MemoListDashboardResponse(List.of());  // 빈 리스트
+
+            when(memoService.getMemosWithMedia(
+                    eq(userId),
+                    eq(null),
+                    eq(null),
+                    eq(null),
+                    eq(20)
+            )).thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memos").isArray())
+                    .andExpect(jsonPath("$.data.memos.length()").value(0));
+
+            verify(memoService, times(1))
+                    .getMemosWithMedia(eq(userId), eq(null), eq(null), eq(null), eq(20));
+        }
+    }
 
 }
