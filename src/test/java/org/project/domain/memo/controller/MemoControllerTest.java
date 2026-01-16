@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
@@ -32,11 +33,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(MemoController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -1000,4 +1000,161 @@ class MemoControllerTest {
         }
     }
 
-}
+    @Nested
+    @DisplayName("메모 상세 조회 테스트")
+    class GetOneDetailMemoTest {
+
+        @Test
+        @DisplayName("이미지/파일/라벨이 모두 포함된 메모 상세 조회가 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getOneDetailMemo_WithAll_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            Long memoId = 100L;
+
+            MemoDetailResponse.ImageInfo image1 = new MemoDetailResponse.ImageInfo(
+                    1L,
+                    "http://s3/presigned/image1.jpg",
+                    "seminar_slide.png",
+                    "png",
+                    "0.24MB"
+            );
+
+            MemoDetailResponse.ImageInfo image2 = new MemoDetailResponse.ImageInfo(
+                    2L,
+                    "http://s3/presigned/image2.jpg",
+                    "photo.jpg",
+                    "jpg",
+                    "1.50MB"
+            );
+
+            MemoDetailResponse.FileInfo file = new MemoDetailResponse.FileInfo(
+                    1L,
+                    "http://s3/presigned/file1.pdf",
+                    "SOPT_7th_seminar.pdf",
+                    "pdf",
+                    "1.00MB"
+            );
+
+            MemoDetailResponse expectedResponse = new MemoDetailResponse(
+                    memoId,
+                    "SOPT 세미나 정리",
+                    "7차 세미나 내용은 매우 중요합니다.",
+                    List.of(image1, image2),
+                    List.of(file),
+                    List.of("SOPT", "교양", "레퍼런스"),
+                    LocalDateTime.of(2026, 1, 16, 10, 30),
+                    false,  // AI 생성 아님
+                    List.of()  // sourceList 비어있음
+            );
+
+            when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo/{memoId}", memoId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.memoId").value(memoId))
+                    .andExpect(jsonPath("$.data.title").value("SOPT 세미나 정리"))
+                    .andExpect(jsonPath("$.data.content").value("7차 세미나 내용은 매우 중요합니다."))
+                    .andExpect(jsonPath("$.data.images").isArray())
+                    .andExpect(jsonPath("$.data.images.length()").value(2))
+                    .andExpect(jsonPath("$.data.images[0].imageId").value(1L))
+                    .andExpect(jsonPath("$.data.images[0].imageName").value("seminar_slide.png"))
+                    .andExpect(jsonPath("$.data.images[0].imageSize").value("0.24MB"))
+                    .andExpect(jsonPath("$.data.files").isArray())
+                    .andExpect(jsonPath("$.data.files.length()").value(1))
+                    .andExpect(jsonPath("$.data.files[0].fileId").value(1L))
+                    .andExpect(jsonPath("$.data.files[0].fileName").value("SOPT_7th_seminar.pdf"))
+                    .andExpect(jsonPath("$.data.labelList").isArray())
+                    .andExpect(jsonPath("$.data.labelList.length()").value(3))
+                    .andExpect(jsonPath("$.data.labelList[0]").value("SOPT"))
+                    .andExpect(jsonPath("$.data.isAiGenerated").value(false))
+                    .andExpect(jsonPath("$.data.sourceList").isArray())
+                    .andExpect(jsonPath("$.data.sourceList.length()").value(0));
+
+            verify(memoService, times(1))
+                    .getOneMemoDetail(eq(userId), eq(memoId));
+        }
+
+        @Test
+        @DisplayName("sourceList 가 비어있는 일반 메모 상세 조회가 성공해야 한다. ")
+        @WithMockCustomUser(userId = 1L)
+        void getOneDetailMemo_NotAiGenerated_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            Long memoId = 300L;
+
+            MemoDetailResponse expectedResponse = new MemoDetailResponse(
+                    memoId,
+                    "일반 메모",
+                    "사용자가 직접 작성한 메모입니다.",
+                    List.of(),
+                    List.of(),
+                    List.of("개인"),
+                    LocalDateTime.of(2026, 1, 16, 12, 0),
+                    false,  // AI 생성 아님
+                    List.of()  // sourceList 비어있음
+            );
+
+            when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo/{memoId}", memoId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.isAiGenerated").value(false))
+                    .andExpect(jsonPath("$.data.sourceList").isArray())
+                    .andExpect(jsonPath("$.data.sourceList.length()").value(0));
+
+            verify(memoService, times(1))
+                    .getOneMemoDetail(eq(userId), eq(memoId));
+        }
+
+        @Test
+        @DisplayName("텍스트만 있는 메모 상세 조회가 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void getOneDetailMemo_WithoutMedia_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            Long memoId = 400L;
+
+            MemoDetailResponse expectedResponse = new MemoDetailResponse(
+                    memoId,
+                    "텍스트만 있는 메모",
+                    "이미지나 파일 없이 텍스트만 있습니다.",
+                    List.of(),  // 이미지 없음
+                    List.of(),  // 파일 없음
+                    List.of("메모"),
+                    LocalDateTime.of(2026, 1, 16, 13, 0),
+                    false,
+                    List.of()
+            );
+
+            when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(get("/api/v1/memo/{memoId}", memoId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memoId").value(memoId))
+                    .andExpect(jsonPath("$.data.images").isArray())
+                    .andExpect(jsonPath("$.data.images.length()").value(0))
+                    .andExpect(jsonPath("$.data.files").isArray())
+                    .andExpect(jsonPath("$.data.files.length()").value(0));
+
+            verify(memoService, times(1))
+                    .getOneMemoDetail(eq(userId), eq(memoId));
+        }
+    }
+
+
+    }
+
