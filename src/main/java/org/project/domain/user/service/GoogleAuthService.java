@@ -112,7 +112,7 @@ public class GoogleAuthService {
                 refreshTokenRepository.delete(refreshJti);
             } catch (Exception e) {
                 log.warn("Refresh Token 삭제 실패: {}", e.getMessage());
-                throw new LoginException(LoginErrorCode.REFRESH_TOKEN_DELETE_FAILED);
+//                throw new LoginException(LoginErrorCode.REFRESH_TOKEN_DELETE_FAILED);
             }
         }
 
@@ -127,7 +127,7 @@ public class GoogleAuthService {
                 blacklistTokenRepository.save(accessJti, accessTtl);
             } catch (Exception e) {
                 log.warn("액세스 토큰 블랙리스트 등록 실패: {}", e.getMessage());
-                throw new LoginException(LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED);
+//                throw new LoginException(LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED);
             }
         }
 
