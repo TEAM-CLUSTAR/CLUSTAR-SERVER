@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
+import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.entity.User;
@@ -24,11 +26,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.util.Collections;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -132,7 +133,7 @@ class MemoControllerTest {
                     List.of(
                             new MemoPresignedUrlRequest.UploadRequest("png", 2048L, 1)
                     ),
-                    Collections.emptyList()  // 파일 없음
+                    List.of()  // 파일 없음
             );
 
             MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
@@ -140,7 +141,7 @@ class MemoControllerTest {
                             new MemoPresignedUrlResponse.PresignedUrlResponse(
                                     "img-key", "http://s3/img", 2048L, "png", 1)
                     ),
-                    Collections.emptyList()
+                    List.of()
             );
 
             when(memoService.issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class)))
@@ -170,14 +171,14 @@ class MemoControllerTest {
             Long userId = 2L;
 
             MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
-                    Collections.emptyList(),  // 이미지 없음
+                    List.of(),  // 이미지 없음
                     List.of(
                             new MemoPresignedUrlRequest.UploadRequest("pdf", 5120L, 1)
                     )
             );
 
             MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
-                    Collections.emptyList(),
+                    List.of(),
                     List.of(
                             new MemoPresignedUrlResponse.PresignedUrlResponse(
                                     "file-key", "http://s3/file", 5120L, "pdf", 1)
@@ -337,7 +338,7 @@ class MemoControllerTest {
             // given
             MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
                     List.of(new MemoPresignedUrlRequest.UploadRequest("jpg", 1024L, 1)),
-                    Collections.emptyList()
+                    List.of()
             );
 
             // when & then
@@ -355,8 +356,47 @@ class MemoControllerTest {
 
         @Nested
         @DisplayName("메모 생성 테스트")
+        @IssuePresignedUrlsTest.WithMockCustomUser(userId = 1L)
         class CreateMemoTests{
-        
+
+        @DisplayName("이미지/파일/라벨 없이 메모만 작성하는 것이 성공해야한다.")
+        @Test
+        void createMemo_Basic_Success() throws Exception {
+            // given 준비
+            Long userId = 1L;
+
+            MemoCreateRequest request = new MemoCreateRequest(
+                    "SOPT 세미나",                    // title
+                    "7차 세미나 내용은 ~가 중요~.",    // content
+                    List.of(),
+                    List.of(),
+                    List.of()// files
+            );
+
+            MemoResponse expectedResponse = new MemoResponse(
+                    100L,                             // memoId
+                    "SOPT 세미나",                    // title
+                    LocalDateTime.now()               // createdAt
+            );
+
+            when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isCreated())           // 201
+                    .andExpect(jsonPath("$.code").value(201))
+                    .andExpect(jsonPath("$.data.memoId").value(100L))
+                    .andExpect(jsonPath("$.data.title").value("SOPT 세미나"))
+                    .andExpect(jsonPath("$.data.createdAt").exists());
+
+            verify(memoService, times(1))
+                    .createMemo(eq(userId), any(MemoCreateRequest.class));
+        }
+
         }
 
 }
