@@ -17,7 +17,7 @@ public class StructureMemoStrategy implements MemoAiStrategy {
 
     @Override
     public Prompt buildPrompt(
-            List<String> memos,
+            String context,
             MemoAiOptions option,
             String userPrompt
     ) {
@@ -29,15 +29,13 @@ public class StructureMemoStrategy implements MemoAiStrategy {
         - 본문은 작성하지 말고 구조만 출력한다
         """;
 
-        String memoContent = String.join("\n\n---\n\n", memos);
-
         String user = """
         사용자 요청:
         %s
 
-        메모 목록:
+        참고 메모:
         %s
-        """.formatted(userPrompt, memoContent);
+        """.formatted(userPrompt, context);
 
         return new Prompt(
                 List.of(

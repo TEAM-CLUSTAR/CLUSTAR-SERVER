@@ -9,7 +9,7 @@ public interface MemoAiStrategy {
     MemoAiOptions supports();
 
     Prompt buildPrompt(
-            List<String> memos,
+            String context,
             MemoAiOptions option,
             String userPrompt
     );

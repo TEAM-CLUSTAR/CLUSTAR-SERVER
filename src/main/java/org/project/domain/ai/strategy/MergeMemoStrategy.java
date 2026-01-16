@@ -17,7 +17,7 @@ public class MergeMemoStrategy implements MemoAiStrategy {
 
     @Override
     public Prompt buildPrompt(
-            List<String> memos,
+            String context,
             MemoAiOptions option,
             String userPrompt
     ) {
@@ -30,15 +30,13 @@ public class MergeMemoStrategy implements MemoAiStrategy {
         - 하나의 완성된 문서처럼 작성한다
         """;
 
-        String memoContent = String.join("\n\n---\n\n", memos);
-
         String user = """
         사용자 요청:
         %s
 
-        메모 목록:
+        참고 메모:
         %s
-        """.formatted(userPrompt, memoContent);
+        """.formatted(userPrompt, context);
 
         return new Prompt(
                 List.of(
