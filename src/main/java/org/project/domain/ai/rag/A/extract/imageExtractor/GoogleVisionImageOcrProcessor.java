@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.A.extract;
+package org.project.domain.ai.rag.A.extract.imageExtractor;
 
 import com.google.cloud.vision.v1.*;
 import com.google.protobuf.ByteString;

@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.A.extract;
+package org.project.domain.ai.rag.A.extract.imageExtractor;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.event.dto.ImageBinary;

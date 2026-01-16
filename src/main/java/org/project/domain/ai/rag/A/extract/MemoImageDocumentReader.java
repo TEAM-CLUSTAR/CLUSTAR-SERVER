@@ -2,6 +2,8 @@ package org.project.domain.ai.rag.A.extract;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.event.dto.ImageBinary;
+import org.project.domain.ai.rag.A.extract.imageExtractor.ImageOcrProcessor;
+import org.project.domain.ai.rag.A.extract.imageExtractor.MemoImageBinaryLoader;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
