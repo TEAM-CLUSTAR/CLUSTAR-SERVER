@@ -6,10 +6,12 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.request.MemoAiRequest;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.service.MemoAiService;
+import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,9 +30,10 @@ public class AiController {
     @PostMapping("/memos")
     @BusinessExceptionDescription(SwaggerResponseDescription.MEMO_AI)
     public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody @Valid MemoAiRequest request
     ) {
-        MemoAiResponse response = aiService.generateMemoAi(request);
+        MemoAiResponse response = aiService.generateMemoAi(userDetails.getUserId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

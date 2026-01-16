@@ -27,7 +27,7 @@ public class MemoAiServiceImpl implements MemoAiService {
 
 
     @Override
-    public MemoAiResponse generateMemoAi(MemoAiRequest request) {
+    public MemoAiResponse generateMemoAi(Long userId, MemoAiRequest request) {
 
         MemoAiOptions option = request.option();
 
@@ -35,9 +35,15 @@ public class MemoAiServiceImpl implements MemoAiService {
         MemoAiStrategy strategy = strategyFactory.get(option);
 
         // 메모 조회
-        List<Memo> memos = memoRepository.findAllById(request.memoIds());
+//        List<Memo> memos = memoRepository.findAllById(request.memoIds());
+        List<Memo> memos = memoRepository.findAllByIdInAndUser_Id(request.memoIds(), userId);
 
         if (memos.isEmpty()) {
+            throw new AiException(AiErrorCode.MEMO_NOT_FOUND);
+        }
+
+        // 요청한 모든 메모가 조회되었는지 검증
+        if (memos.size() != request.memoIds().size()) {
             throw new AiException(AiErrorCode.MEMO_NOT_FOUND);
         }
 
