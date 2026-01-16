@@ -9,6 +9,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.project.domain.ai.service.ContextEmbeddingService;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -58,6 +59,8 @@ class MemoServiceImplTest {
     @Mock private MemoImageRepository memoImageRepository;
     @Mock private MemoFileRepository memoFileRepository;
     @Mock private MemoLabelRepository memoLabelRepository;
+
+    @Mock private ContextEmbeddingService embeddingService;
 
     @Mock private S3KeyUtil s3KeyUtil;
     @Mock private S3Util s3Util;

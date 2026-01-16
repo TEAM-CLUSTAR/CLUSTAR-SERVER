@@ -30,6 +30,7 @@ import org.project.global.security.client.dto.GoogleAccountProfileResponse;
 import org.project.global.security.properties.JwtProperties;
 import org.project.global.util.CookieUtil;
 import org.project.global.util.JWTUtil;
+import org.project.global.util.TokenResponseBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -54,7 +55,7 @@ class GoogleAuthServiceTest {
     @Mock private JwtProperties jwtProperties;
     @Mock private CookieConfig cookieConfig;
 
-    @Mock private org.project.global.util.TokenResponseBuilder tokenResponseBuilder;
+    @Mock private TokenResponseBuilder tokenResponseBuilder;
     @Mock private BlacklistTokenRepository blacklistTokenRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private LabelRepository labelRepository;
