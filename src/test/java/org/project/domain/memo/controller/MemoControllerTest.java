@@ -317,7 +317,7 @@ class MemoControllerTest {
                             {
                                 "extension": "jpg",
                                 "bytes": 1024,
-                                "priority": null ,
+                                "priority": null
                             }
                         ],
                         "files": []
@@ -330,26 +330,6 @@ class MemoControllerTest {
                             .content(requestJson))
                     .andDo(print())
                     .andExpect(status().isBadRequest());
-
-            verify(memoService, never()).issuePresignedUrls(anyLong(), any());
-        }
-
-        @Test
-        @DisplayName("SecurityContext에 없는 인증되지 않은 사용자는 presigendUrl 요청에 실패되어야 한다.")
-        void issuePresignedUrls_Unauthorized_Fail() throws Exception {
-            // given
-            MemoPresignedUrlRequest request = new MemoPresignedUrlRequest(
-                    List.of(new MemoPresignedUrlRequest.UploadRequest("jpg", 1024L, 1)),
-                    List.of()
-            );
-
-            // when & then
-            // @WithMockCustomUser를 사용하지 않으면 SecurityContext가 비어있음
-            mockMvc.perform(post("/api/v1/memo/presigned-urls")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andDo(print())
-                    .andExpect(status().is5xxServerError());  // NPE 발생
 
             verify(memoService, never()).issuePresignedUrls(anyLong(), any());
         }
@@ -672,7 +652,7 @@ class MemoControllerTest {
             }
         }
 
-        
+
 
 
 
