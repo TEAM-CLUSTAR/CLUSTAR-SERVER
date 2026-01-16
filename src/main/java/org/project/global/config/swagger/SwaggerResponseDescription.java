@@ -41,7 +41,7 @@ public enum SwaggerResponseDescription {
 
     MEMO_AI(new LinkedHashSet<>(Set.of(
             AiErrorCode.UNSUPPORTED_TYPE,
-            AiErrorCode.MEMO_NOT_FOUND
+            AiErrorCode.MEMO_NOT_FOUND,
             LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED,
             UserErrorCode.NOT_FOUND_USER,
             MemoErrorCode.INVALID_S3_KEY_FORMAT,
