@@ -1,9 +1,15 @@
 package org.project.domain.ai.dto;
 
-import org.project.domain.ai.entity.ContextEmbedding;
+public interface ContextEmbeddingWithScore {
 
-public record ContextEmbeddingWithScore(
-        ContextEmbedding embedding,
-        double similarity
-) {
+    Long getId();
+    Long getMemoId();
+    String getContextType();
+    Long getContextId();
+    Integer getChunkIndex();
+    String getSourcePreview();
+    String getContent();     // 실제 텍스트
+    String getModel();
+
+    Double getSimilarity();
 }
