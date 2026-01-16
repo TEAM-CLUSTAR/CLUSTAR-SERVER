@@ -1,14 +1,12 @@
 package org.project.domain.ai.strategy;
 
-import org.springframework.ai.chat.prompt.Prompt;
-
-import java.util.List;
+import org.project.domain.ai.dto.BuiltPrompt;
 
 public interface MemoAiStrategy {
 
     MemoAiOptions supports();
 
-    Prompt buildPrompt(
+    BuiltPrompt buildPrompt(
             String context,
             MemoAiOptions option,
             String userPrompt

@@ -1,5 +1,6 @@
 package org.project.domain.ai.strategy;
 
+import org.project.domain.ai.dto.BuiltPrompt;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -16,7 +17,7 @@ public class SummaryMemoStrategy implements MemoAiStrategy {
     }
 
     @Override
-    public Prompt buildPrompt(
+    public BuiltPrompt buildPrompt(
             String context,
             MemoAiOptions option,
             String userPrompt
@@ -29,6 +30,17 @@ public class SummaryMemoStrategy implements MemoAiStrategy {
         - 불필요한 설명은 제거한다
         """;
 
+        String finalPromptText = """
+        [SYSTEM]
+        %s
+
+        [CONTEXT]
+        %s
+
+        [USER]
+        %s
+        """.formatted(system, context, userPrompt);
+
         String user = """
         사용자 요청:
         %s
@@ -37,12 +49,14 @@ public class SummaryMemoStrategy implements MemoAiStrategy {
         %s
         """.formatted(userPrompt, context);
 
-        return new Prompt(
+        Prompt prompt = new Prompt(
                 List.of(
                         new SystemMessage(system),
                         new UserMessage(user)
                 )
         );
+
+        return new BuiltPrompt(prompt, finalPromptText);
     }
 }
 

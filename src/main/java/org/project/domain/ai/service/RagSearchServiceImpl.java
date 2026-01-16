@@ -3,6 +3,7 @@ package org.project.domain.ai.service;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.ContextEmbeddingWithScore;
 import org.project.domain.ai.entity.ContextEmbedding;
+import org.project.domain.ai.entity.ContextType;
 import org.project.domain.ai.repository.ContextEmbeddingRepository;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ public class RagSearchServiceImpl implements RagSearchService {
 
     private final ContextEmbeddingRepository embeddingRepository;
 
+    @Override
     public List<ContextEmbedding> searchRelevantChunks(
             List<Long> memoIds,
             float[] queryEmbedding,
@@ -26,14 +28,24 @@ public class RagSearchServiceImpl implements RagSearchService {
                 embeddingRepository.searchByMemoIds(
                         memoIds,
                         queryEmbedding,
-                        topK * 2 // 여유분
+                        topK * 2
                 );
 
         return results.stream()
-                .filter(r -> r.similarity() >= SIMILARITY_THRESHOLD)
+                .filter(r -> r.getSimilarity() >= SIMILARITY_THRESHOLD)
                 .limit(topK)
-                .map(ContextEmbeddingWithScore::embedding)
+                .map(r -> ContextEmbedding.builder()
+                        .id(r.getId())
+                        .contextType(ContextType.valueOf(r.getContextType()))
+                        .contextId(r.getContextId())
+                        .memoId(r.getMemoId())
+                        .chunkIndex(r.getChunkIndex())
+                        .sourcePreview(r.getSourcePreview())
+                        .model(r.getModel())
+                        .build()
+                )
                 .toList();
     }
+
 }
 

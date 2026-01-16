@@ -1,6 +1,7 @@
 package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.dto.BuiltPrompt;
 import org.project.domain.ai.dto.request.MemoAiRequest;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.entity.ContextEmbedding;
@@ -53,15 +54,21 @@ public class MemoAiServiceImpl implements MemoAiService {
         String context =
                 ragContextBuilder.build(chunks);
 
-        Prompt prompt =
+        BuiltPrompt builtPrompt =
                 strategy.buildPrompt(
                         context,
                         request.option(),
                         request.userPrompt()
                 );
 
-        String result = chatClient.prompt(prompt).call().content();
+        String result =
+                chatClient.prompt(builtPrompt.prompt()).call().content();
 
-        return MemoAiResponse.of(result, request.option(), request.memoIds());
+        return MemoAiResponse.of(
+                result,
+                request.option(),
+                request.memoIds(),
+                builtPrompt.promptSnapshot()
+        );
     }
 }
