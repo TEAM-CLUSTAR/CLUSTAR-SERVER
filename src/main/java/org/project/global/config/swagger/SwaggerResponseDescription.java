@@ -18,6 +18,15 @@ public enum SwaggerResponseDescription {
             UserErrorCode.NOT_FOUND_USER
     ))),
 
+    GOOGLE_LOGIN(new LinkedHashSet<>(Set.of(
+
+    ))),
+
+    GOOGLE_LOGIN_CALLBACK(new LinkedHashSet<>(Set.of(
+            LoginErrorCode.AUTH_SOCIAL_LOGIN_FAIL,
+            LoginErrorCode.NOT_FOUND_GOOGLE_ACCESS_TOKEN_RESPONSE
+    ))),
+
     REISSUE_TOKEN(new LinkedHashSet<>(Set.of(
             LoginErrorCode.REFRESH_TOKEN_NOT_FOUND,
             LoginErrorCode.INVALID_REFRESH_TOKEN,
@@ -27,6 +36,12 @@ public enum SwaggerResponseDescription {
 
     LOGOUT(new LinkedHashSet<>(Set.of(
             LoginErrorCode.REFRESH_TOKEN_DELETE_FAILED,
+            LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED
+    ))),
+
+    MEMO_AI(new LinkedHashSet<>(Set.of(
+            AiErrorCode.UNSUPPORTED_TYPE,
+            AiErrorCode.MEMO_NOT_FOUND
             LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED,
             UserErrorCode.NOT_FOUND_USER,
             MemoErrorCode.INVALID_S3_KEY_FORMAT,

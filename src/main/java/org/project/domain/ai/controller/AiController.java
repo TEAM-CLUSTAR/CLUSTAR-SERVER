@@ -1,10 +1,13 @@
 package org.project.domain.ai.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.request.MemoAiRequest;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.service.MemoAiService;
+import org.project.global.annotation.BusinessExceptionDescription;
+import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +22,11 @@ public class AiController {
 
     private final MemoAiService aiService;
 
+    @Operation(summary = "메모 AI 채팅",
+            description = "메모ids, 프롬프트, 옵션으로 AI채팅을 요청합니다.\n" +
+                    "옵션 : MERGE, STRUCTURE, SUMMARY")
     @PostMapping("/memos")
+    @BusinessExceptionDescription(SwaggerResponseDescription.MEMO_AI)
     public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
             @RequestBody @Valid MemoAiRequest request
     ) {

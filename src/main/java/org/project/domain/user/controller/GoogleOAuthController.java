@@ -31,6 +31,7 @@ public class GoogleOAuthController {
     @Operation(summary = "구글 소셜로그인 API",
             description = "구글로 로그인 요청을 전송합니다.\n" +
                     "그후 아래 API에 인가코드를 넣어 요청합니다.")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN)
     public ResponseEntity<Void> redirectToGoogleAuth() {
         String redirectUri = googleOAuthProperties.getRegistration().getGoogle().getRedirectUri();
         String clientId = googleOAuthProperties.getRegistration().getGoogle().getClientId();
@@ -53,6 +54,7 @@ public class GoogleOAuthController {
             description = "리다이렉트에서 AccessCode를 가지고 서버로 돌아오기 위한 엔드포인트입니다\n" +
                     "해당 코드를 이용해서 사용자 정보를 파싱하고 액세스 토큰는 헤더에, 리프레시 토큰은 쿠키에 담아 반환합니다")
     @GetMapping("/oauth/google/callback")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN_CALLBACK)
     public ResponseEntity<ApiResponse<Void>> callback(
             @RequestParam String code,
             HttpServletResponse response

@@ -1,5 +1,7 @@
 package org.project.domain.ai.strategy;
 
+import org.project.global.exception.domainException.AiException;
+import org.project.global.exception.errorcode.AiErrorCode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,6 +21,6 @@ public class MemoAiStrategyFactory {
 
     public MemoAiStrategy get(MemoAiOptions type) {
         return Optional.ofNullable(strategies.get(type))
-                .orElseThrow(() -> new IllegalArgumentException("Unsupported type"));
+                .orElseThrow(() -> new AiException(AiErrorCode.UNSUPPORTED_TYPE));
     }
 }
