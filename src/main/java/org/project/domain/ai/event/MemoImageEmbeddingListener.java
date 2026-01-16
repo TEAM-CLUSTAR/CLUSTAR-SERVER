@@ -2,7 +2,8 @@ package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.A.extract.MemoImageDocumentReader;
-import org.project.domain.ai.rag.B.transform.MemoImageDocumentTransformer;
+import org.project.domain.ai.rag.B.transform.MemoImageChunkTransformer;
+import org.project.domain.ai.rag.B.transform.MemoImageOcrNormalizeTransformer;
 import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
 import org.springframework.ai.document.Document;
@@ -18,8 +19,9 @@ import java.util.List;
 public class MemoImageEmbeddingListener {
 
     private final MemoImageDocumentReader memoImageDocumentReader;
-    private final MemoImageDocumentTransformer memoImageDocumentTransformer;
+    private final MemoImageOcrNormalizeTransformer memoImageDocumentTransformer;
     private final VectorStoreDocumentLoader vectorStoreDocumentLoader;
+    private final MemoImageChunkTransformer imageChunkTransformer;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -33,12 +35,14 @@ public class MemoImageEmbeddingListener {
                         event.userId()
                 );
 
-        // 2️⃣ Transform
-        List<Document> transformed =
+        // 2️⃣ normalized
+        List<Document> normalized =
                 memoImageDocumentTransformer.transform(documents);
 
-        // 3️⃣ Load
-        vectorStoreDocumentLoader.load(transformed);
+        List<Document> chunked =
+                imageChunkTransformer.transform(normalized);
+
+        vectorStoreDocumentLoader.load(chunked);
     }
 }
 
