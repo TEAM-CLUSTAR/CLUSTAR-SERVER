@@ -16,7 +16,6 @@ import java.util.List;
 public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     private static final String MODEL_NAME = "text-embedding-004";
-    private static final int PREVIEW_LENGTH = 100;
 
     private final EmbeddingModel embeddingModel;
     private final ContextEmbeddingRepository embeddingRepository;
@@ -57,7 +56,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                     .contextId(memoId)
                     .memoId(memoId)
                     .chunkIndex(index++)
-                    .sourcePreview(preview(chunk))
+                    .chunkedContent(chunk)
                     .embedding(vector)
                     .model(MODEL_NAME)
                     .build();
@@ -92,7 +91,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                     .contextId(imageId)
                     .memoId(memoId)
                     .chunkIndex(index++)
-                    .sourcePreview(preview(chunk))
+                    .chunkedContent(chunk)
                     .embedding(vector)
                     .model(MODEL_NAME)
                     .build();
@@ -123,19 +122,12 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                     .contextId(fileId)
                     .memoId(memoId)
                     .chunkIndex(index++)
-                    .sourcePreview(preview(chunk))
+                    .chunkedContent(chunk)
                     .embedding(vector)
                     .model(MODEL_NAME)
                     .build();
 
             embeddingRepository.save(embedding);
         }
-    }
-
-    private String preview(String text) {
-        if (text == null) return null;
-        return text.length() <= PREVIEW_LENGTH
-                ? text
-                : text.substring(0, PREVIEW_LENGTH);
     }
 }

@@ -25,7 +25,7 @@ public class DefaultRagContextBuilder implements RagContextBuilder {
                     .append(chunk.getChunkIndex())
                     .append("]\n");
 
-            sb.append(chunk.getSourcePreview())
+            sb.append(chunk.getChunkedContent())
                     .append("\n\n");
 
             if (sb.length() > MAX_CONTEXT_LENGTH) {

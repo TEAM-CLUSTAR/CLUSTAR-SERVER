@@ -85,3 +85,7 @@ cloud:
   aws:
     s3:
       bucket: clustar-bucket-01
+
+logging:
+  level:
+    root: DEBUG

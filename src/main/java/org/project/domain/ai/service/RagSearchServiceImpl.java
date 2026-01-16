@@ -40,7 +40,7 @@ public class RagSearchServiceImpl implements RagSearchService {
                         .contextId(r.getContextId())
                         .memoId(r.getMemoId())
                         .chunkIndex(r.getChunkIndex())
-                        .sourcePreview(r.getSourcePreview())
+                        .chunkedContent(r.getChunkedContent())
                         .model(r.getModel())
                         .build()
                 )

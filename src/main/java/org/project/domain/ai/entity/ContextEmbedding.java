@@ -54,10 +54,10 @@ public class ContextEmbedding extends BaseEntity {
     private Integer chunkIndex;
 
     /**
-     * 로깅 / 디버깅용 원본 텍스트 미리보기
+     * RAG용 실제 chunk 본문 (임베딩과 1:1)
      */
-    @Column(name = "source_preview", length = 500)
-    private String sourcePreview;
+    @Column(name = "chunked_content", columnDefinition = "TEXT", nullable = false)
+    private String chunkedContent;
 
     /**
      * Vector (pgvector)

@@ -30,7 +30,7 @@ public interface ContextEmbeddingRepository
                         ce.context_type     AS contextType,
                         ce.context_id       AS contextId,
                         ce.chunk_index      AS chunkIndex,
-                        ce.source_preview   AS sourcePreview,
+                        ce.chunked_content   AS chunkedContent,
                         ce.model            AS model,
                         (1 - (ce.embedding <=> CAST(:queryEmbedding AS vector))) AS similarity
                     FROM context_embedding ce

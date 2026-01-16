@@ -7,7 +7,7 @@ public interface ContextEmbeddingWithScore {
     String getContextType();
     Long getContextId();
     Integer getChunkIndex();
-    String getSourcePreview();
+    String getChunkedContent();
     String getContent();     // 실제 텍스트
     String getModel();
 
