@@ -1,6 +1,7 @@
 package org.project.domain.ai.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.entity.ContextType;
 import org.project.domain.ai.dto.response.RagContextChunkResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
