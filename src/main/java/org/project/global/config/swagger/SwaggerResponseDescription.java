@@ -45,10 +45,11 @@ public enum SwaggerResponseDescription {
 
     CREATE_AI_MEMO(new LinkedHashSet<>(Set.of(
 
+    ))),
+
+    GET_PRESIGNED_URLS(new LinkedHashSet<>(Set.of(
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
     )));
-
-
-
 
 
     private final Set<ErrorCode> errorCodeList;

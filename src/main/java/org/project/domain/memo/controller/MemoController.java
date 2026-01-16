@@ -40,6 +40,7 @@ public class MemoController {
                     """
     )
     @PostMapping("/presigned-urls")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_PRESIGNED_URLS)
     public ResponseEntity<ApiResponse<MemoPresignedUrlResponse>> issuePresignedUrls(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody MemoPresignedUrlRequest request
