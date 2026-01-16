@@ -87,6 +87,7 @@ public class MemoController {
                 """
     )
     @GetMapping
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_MEMOS)
     public ResponseEntity<ApiResponse<MemoListDashboardResponse>> getMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,
 
@@ -122,6 +123,7 @@ public class MemoController {
             AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
             라벨은 리스트의 앞부터 우선순위가 높은 순서 입니다.
             """)
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_ONE_MEMO)
     public ResponseEntity<ApiResponse<MemoDetailResponse>> getOneDetailMemo
             (@AuthenticationPrincipal CustomUserDetails userDetails,
              @PathVariable Long memoId
@@ -138,6 +140,7 @@ public class MemoController {
 
     @DeleteMapping("/{memoId}")
     @Operation(summary = "메모 삭제", description = "특정 메모를 삭제합니다.")
+    @BusinessExceptionDescription(SwaggerResponseDescription.DELETE_MEMO)
     public ResponseEntity<ApiResponse<Void>> deleteMemo(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long memoId
