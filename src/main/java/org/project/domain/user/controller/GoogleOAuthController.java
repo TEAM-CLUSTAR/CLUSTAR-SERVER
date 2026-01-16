@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.service.GoogleAuthService;
+import org.project.global.annotation.BusinessExceptionDescription;
+import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
 import org.project.global.security.properties.GoogleOAuthProperties;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,7 @@ public class GoogleOAuthController {
     @Operation(summary = "구글 소셜로그인 API",
             description = "구글로 로그인 요청을 전송합니다.\n" +
                     "그후 아래 API에 인가코드를 넣어 요청합니다.")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN)
     public ResponseEntity<Void> redirectToGoogleAuth() {
         String redirectUri = googleOAuthProperties.getRegistration().getGoogle().getRedirectUri();
         String clientId = googleOAuthProperties.getRegistration().getGoogle().getClientId();
@@ -51,6 +54,7 @@ public class GoogleOAuthController {
             description = "리다이렉트에서 AccessCode를 가지고 서버로 돌아오기 위한 엔드포인트입니다\n" +
                     "해당 코드를 이용해서 사용자 정보를 파싱하고 액세스 토큰는 헤더에, 리프레시 토큰은 쿠키에 담아 반환합니다")
     @GetMapping("/oauth/google/callback")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN_CALLBACK)
     public ResponseEntity<ApiResponse<Void>> callback(
             @RequestParam String code,
             HttpServletResponse response
@@ -60,6 +64,7 @@ public class GoogleOAuthController {
 
     @Operation(summary = "로그아웃 API")
     @PostMapping("/logout")
+    @BusinessExceptionDescription(SwaggerResponseDescription.LOGOUT)
     public ResponseEntity<ApiResponse<String>> logout(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                       HttpServletRequest request,
                                                       HttpServletResponse response) {
@@ -74,6 +79,7 @@ public class GoogleOAuthController {
             description = "Refresh Token을 이용하여 새로운 Access Token을 발급합니다.\n" +
                     "Refresh Token은 Cookie에서 자동으로 읽어옵니다.")
     @PostMapping("/oauth/reissue")
+    @BusinessExceptionDescription(SwaggerResponseDescription.REISSUE_TOKEN)
     public ResponseEntity<ApiResponse<Void>> reissueToken(
             HttpServletRequest request,
             HttpServletResponse response

@@ -41,7 +41,7 @@ public record MemoCreateRequest(
                 @Schema(description = "확장자", example = "png")
                 String extension,
 
-                @Schema(description = "정렬 우선순위", example = "1")
+                @Schema(description = "정렬 우선순위", example = "0")
                 Integer priority
         ) {
         }
@@ -62,7 +62,7 @@ public record MemoCreateRequest(
                 @Schema(description = "확장자", example = "pdf")
                 String extension,
 
-                @Schema(description = "정렬 우선순위", example = "1")
+                @Schema(description = "정렬 우선순위", example = "0")
                 Integer priority
         ) {
         }

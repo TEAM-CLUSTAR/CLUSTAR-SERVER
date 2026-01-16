@@ -7,20 +7,18 @@ import org.project.global.exception.domainException.S3CustomException;
 import org.project.global.exception.errorcode.S3ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.core.sync.RequestBody;
+import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
-import java.io.IOException;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -121,7 +119,7 @@ public class S3Util {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(s3Key)
-                .contentType(resolveContentType(extension))
+                .contentType(resolveMimeTypeByExtension(extension).toString())
                 .build();
 
         PutObjectPresignRequest presignRequest =
@@ -145,17 +143,42 @@ public class S3Util {
     }
 
     /**
-     * 확장자 → Content-Type 매핑
+     * S3 객체 다운로드 (이미지/파일 공용)
      */
-    private String resolveContentType(String extension) {
-        return switch (extension.toLowerCase()) {
-            case "jpg", "jpeg" -> "image/jpeg";
-            case "png" -> "image/png";
-            case "gif" -> "image/gif";
-            case "webp" -> "image/webp";
-            case "pdf" -> "application/pdf";
-            case "txt" -> "text/plain";
-            default -> "application/octet-stream";
+    public byte[] download(String s3Key) {
+
+        try {
+            GetObjectRequest request = GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(s3Key)
+                    .build();
+
+            ResponseBytes<GetObjectResponse> objectBytes =
+                    s3Client.getObjectAsBytes(request);
+
+            return objectBytes.asByteArray();
+
+        } catch (NoSuchKeyException e) {
+            log.error("S3에 존재하지 않는 key - Key: {}", s3Key, e);
+            throw new S3CustomException(S3ErrorCode.FILE_NOT_FOUND);
+        } catch (S3Exception e) {
+            log.error("S3 다운로드 실패 - Key: {}, ErrorCode: {}", s3Key, e.awsErrorDetails().errorCode(), e);
+            throw new S3CustomException(S3ErrorCode.FILE_DOWNLOAD_FAILED);
+        }
+    }
+
+    public MimeType resolveMimeTypeByExtension(String extension) {
+        if (extension == null || extension.isBlank()) {
+            return MimeTypeUtils.APPLICATION_OCTET_STREAM;
+        }
+        return switch (extension.toLowerCase(Locale.ROOT)) {
+            case "jpg", "jpeg" -> MimeTypeUtils.IMAGE_JPEG;
+            case "png" -> MimeTypeUtils.IMAGE_PNG;
+            case "gif" -> MimeTypeUtils.IMAGE_GIF;
+            case "webp" -> MimeType.valueOf("image/webp");
+            case "pdf" -> MimeType.valueOf("application/pdf");
+            case "txt" -> MimeTypeUtils.TEXT_PLAIN;
+            default -> MimeTypeUtils.APPLICATION_OCTET_STREAM;
         };
     }
 }

@@ -1,6 +1,7 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.service.ContextEmbeddingService;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
@@ -13,6 +14,8 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.event.MemoDeletedEvent;
+import org.project.domain.memo.event.MemoFileCreatedEvent;
+import org.project.domain.memo.event.MemoImageCreatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
@@ -49,6 +52,8 @@ public class MemoServiceImpl implements MemoService {
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
     private final MemoLabelRepository memoLabelRepository;
+
+    private final ContextEmbeddingService embeddingService;
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
@@ -104,6 +109,7 @@ public class MemoServiceImpl implements MemoService {
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
+        embeddingService.saveMemoEmbedding(savedMemo.getId(), savedMemo.getContent());
 
         // 이미지 메타데이터 저장 (optional)
         saveMemoImages(savedMemo, request.images(), userId);
@@ -265,6 +271,10 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         memoImageRepository.saveAll(memoImages);
+
+        eventPublisher.publishEvent(
+                new MemoImageCreatedEvent(memoImages)
+        );
     }
 
     private MemoImage createMemoImage(Memo memo, MemoCreateRequest.ImageRequest request, Long userId) {
@@ -290,6 +300,10 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         memoFileRepository.saveAll(memoFiles);
+
+        eventPublisher.publishEvent(
+                new MemoFileCreatedEvent(memoFiles)
+        );
     }
 
     private MemoFile createMemoFile(Memo memo, MemoCreateRequest.FileRequest request, Long userId) {

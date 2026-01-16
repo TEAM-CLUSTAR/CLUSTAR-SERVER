@@ -47,6 +47,27 @@ spring:
       host: localhost
       port: 6379
 
+  ai:
+    model:
+      embedding:
+        text: google-genai
+
+    google:
+      genai:
+        api-key: test-google-ai-api-key
+
+        chat:
+          options:
+            model: gemini-3-flash-preview
+            temperature: 0.7
+            candidate-count: 1
+
+        embedding:
+          api-key: test-google-ai-api-key
+          text:
+            options:
+              model: text-embedding-004
+
 jwt:
   secret-key: test-secret-key-test-secret-key-test-secret-key
   expire-length: 3600000 # 60분

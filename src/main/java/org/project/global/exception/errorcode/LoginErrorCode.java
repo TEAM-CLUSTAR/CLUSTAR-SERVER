@@ -14,12 +14,16 @@ public enum LoginErrorCode implements ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, 401, "리프레시 토큰이 유효하지 않습니다."),
     ALREADY_LOGOUT_TOKEN(HttpStatus.UNAUTHORIZED, 401, "이미 로그아웃된 토큰입니다."),
     INVALID_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, 401, "유효하지 않은 엑세스 토큰입니다."),
+    REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, 401, "리프레시 토큰이 만료되었습니다."),
 
     /**
      * 404 NOT FOUND
      */
     // 구글 엑세스 토큰 관련
     NOT_FOUND_GOOGLE_ACCESS_TOKEN_RESPONSE(HttpStatus.NOT_FOUND, 404, "구글 액세스 토큰 응답을 찾을 수 없습니다."),
+
+    REFRESH_TOKEN_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, 500, "Refresh Token 삭제에 실패했습니다."),
+    ACCESS_TOKEN_BLACKLIST_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, 500, "Access Token 블랙리스트 등록에 실패했습니다.")
     ;
 
 

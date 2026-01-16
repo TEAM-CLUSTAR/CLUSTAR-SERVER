@@ -1,11 +1,7 @@
 package org.project.global.config.swagger;
 
 import lombok.Getter;
-import org.project.domain.user.errorcode.UserErrorCode;
-import org.project.global.exception.errorcode.ErrorCode;
-import org.project.global.exception.errorcode.GlobalErrorCode;
-import org.project.global.exception.errorcode.MemoErrorCode;
-import org.project.global.exception.errorcode.S3ErrorCode;
+import org.project.global.exception.errorcode.*;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -15,11 +11,39 @@ import java.util.Set;
 public enum SwaggerResponseDescription {
 
     GET_USER(new LinkedHashSet<>(Set.of(
-            UserErrorCode.USER_NOT_FOUND
+            UserErrorCode.NOT_FOUND_USER
     ))),
 
     CREATE_MEMO(new LinkedHashSet<>(Set.of(
-            UserErrorCode.USER_NOT_FOUND,
+            UserErrorCode.NOT_FOUND_USER
+    ))),
+
+    GOOGLE_LOGIN(new LinkedHashSet<>(Set.of(
+
+    ))),
+
+    GOOGLE_LOGIN_CALLBACK(new LinkedHashSet<>(Set.of(
+            LoginErrorCode.AUTH_SOCIAL_LOGIN_FAIL,
+            LoginErrorCode.NOT_FOUND_GOOGLE_ACCESS_TOKEN_RESPONSE
+    ))),
+
+    REISSUE_TOKEN(new LinkedHashSet<>(Set.of(
+            LoginErrorCode.REFRESH_TOKEN_NOT_FOUND,
+            LoginErrorCode.INVALID_REFRESH_TOKEN,
+            UserErrorCode.NOT_FOUND_USER,
+            LoginErrorCode.REFRESH_TOKEN_EXPIRED
+    ))),
+
+    LOGOUT(new LinkedHashSet<>(Set.of(
+            LoginErrorCode.REFRESH_TOKEN_DELETE_FAILED,
+            LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED
+    ))),
+
+    MEMO_AI(new LinkedHashSet<>(Set.of(
+            AiErrorCode.UNSUPPORTED_TYPE,
+            AiErrorCode.MEMO_NOT_FOUND,
+            LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED,
+            UserErrorCode.NOT_FOUND_USER,
             MemoErrorCode.INVALID_S3_KEY_FORMAT,
             MemoErrorCode.S3_KEY_USER_MISMATCH,
             S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
@@ -50,7 +74,6 @@ public enum SwaggerResponseDescription {
     GET_PRESIGNED_URLS(new LinkedHashSet<>(Set.of(
             S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
     )));
-
 
     private final Set<ErrorCode> errorCodeList;
 

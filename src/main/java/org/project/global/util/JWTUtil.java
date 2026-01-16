@@ -7,6 +7,8 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.project.global.exception.domainException.LoginException;
+import org.project.global.exception.errorcode.LoginErrorCode;
 import org.project.global.security.properties.JwtProperties;
 import org.springframework.stereotype.Component;
 
@@ -106,14 +108,14 @@ public class JWTUtil {
             // 만료 체크 (만료된 경우 ExpiredJwtException 발생)
             Date expiration = claims.getExpiration();
             if (expiration.before(new Date())) {
-                throw new JwtException("Refresh Token is expired");
+                throw new LoginException(LoginErrorCode.REFRESH_TOKEN_EXPIRED);
             }
 
             // userId(subject) 반환
             return Long.parseLong(claims.getSubject());
 
         } catch (JwtException | IllegalArgumentException e) {
-            throw new JwtException("Invalid Refresh Token: " + e.getMessage());
+            throw new LoginException(LoginErrorCode.INVALID_REFRESH_TOKEN);
         }
     }
 }

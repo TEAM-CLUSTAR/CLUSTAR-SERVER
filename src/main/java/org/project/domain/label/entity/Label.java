@@ -45,10 +45,10 @@ public class Label {
      */
     public static List<Label> createDefaultLabels(User user) {
         return List.of(
+                create("졸업 프로젝트", user),
+                create("교양", user),
                 create("SOPT", user),
-                create("학교", user),
-                create("책", user),
-                create("졸업프로젝트", user)
+                create("레퍼런스", user)
         );
     }
 }
