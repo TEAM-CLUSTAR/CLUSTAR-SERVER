@@ -48,6 +48,19 @@ spring:
       host: ${SPRING_REDIS_HOST:redis}
       port: ${SPRING_REDIS_PORT:6379}
 
+  ai:
+    vectorstore:
+      type: pgvector
+      pgvector:
+        schema-name: public
+        table-name: vector_store
+        dimensions: 768
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
+        initialize-schema: false
+        schema-validation: false
+        remove-existing-vector-store-table: false
+
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   expire-length: 3600000 # 60분
