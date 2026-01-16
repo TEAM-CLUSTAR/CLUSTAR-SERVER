@@ -14,6 +14,7 @@ public enum LoginErrorCode implements ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, 401, "리프레시 토큰이 유효하지 않습니다."),
     ALREADY_LOGOUT_TOKEN(HttpStatus.UNAUTHORIZED, 401, "이미 로그아웃된 토큰입니다."),
     INVALID_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, 401, "유효하지 않은 엑세스 토큰입니다."),
+    REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, 401, "리프레시 토큰이 만료되었습니다."),
 
     /**
      * 404 NOT FOUND

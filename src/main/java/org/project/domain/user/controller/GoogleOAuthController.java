@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.service.GoogleAuthService;
+import org.project.global.annotation.BusinessExceptionDescription;
+import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
 import org.project.global.security.properties.GoogleOAuthProperties;
 import org.springframework.http.HttpStatus;
@@ -74,6 +76,7 @@ public class GoogleOAuthController {
             description = "Refresh Token을 이용하여 새로운 Access Token을 발급합니다.\n" +
                     "Refresh Token은 Cookie에서 자동으로 읽어옵니다.")
     @PostMapping("/oauth/reissue")
+    @BusinessExceptionDescription(SwaggerResponseDescription.REISSUE_TOKEN)
     public ResponseEntity<ApiResponse<Void>> reissueToken(
             HttpServletRequest request,
             HttpServletResponse response
