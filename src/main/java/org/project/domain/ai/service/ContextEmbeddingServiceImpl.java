@@ -110,7 +110,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
         int index = 0;
         for (String chunk : chunks) {
 
-            float[] vector = embeddingModel.embed(chunk);
+            float[] vector = generateEmbedding(chunk);
 
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO_FILE)

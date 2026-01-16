@@ -9,7 +9,7 @@ public enum UserErrorCode implements ErrorCode {
     /**
      * 404 NOT_FOUND
      */
-    NOT_FOUND_USER(HttpStatus.NOT_FOUND, 40402, "존재하지 않는 사용자입니다.");
+    NOT_FOUND_USER(HttpStatus.NOT_FOUND, 404, "존재하지 않는 사용자입니다.");
 
     private final HttpStatus status;
     private final int code;

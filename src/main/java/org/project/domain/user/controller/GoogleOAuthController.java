@@ -62,6 +62,7 @@ public class GoogleOAuthController {
 
     @Operation(summary = "로그아웃 API")
     @PostMapping("/logout")
+    @BusinessExceptionDescription(SwaggerResponseDescription.LOGOUT)
     public ResponseEntity<ApiResponse<String>> logout(@AuthenticationPrincipal CustomUserDetails userDetails,
                                                       HttpServletRequest request,
                                                       HttpServletResponse response) {

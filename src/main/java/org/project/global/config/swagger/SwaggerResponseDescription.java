@@ -1,12 +1,7 @@
 package org.project.global.config.swagger;
 
 import lombok.Getter;
-import org.project.global.exception.errorcode.ErrorCode;
-import org.project.global.exception.errorcode.GlobalErrorCode;
-import org.project.global.exception.errorcode.LoginErrorCode;
-import org.project.global.exception.errorcode.UserErrorCode;
-import org.project.global.exception.errorcode.MemoErrorCode;
-import org.project.global.exception.errorcode.S3ErrorCode;
+import org.project.global.exception.errorcode.*;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -28,7 +23,12 @@ public enum SwaggerResponseDescription {
             LoginErrorCode.INVALID_REFRESH_TOKEN,
             UserErrorCode.NOT_FOUND_USER,
             LoginErrorCode.REFRESH_TOKEN_EXPIRED
-            UserErrorCode.USER_NOT_FOUND,
+    ))),
+
+    LOGOUT(new LinkedHashSet<>(Set.of(
+            LoginErrorCode.REFRESH_TOKEN_DELETE_FAILED,
+            LoginErrorCode.ACCESS_TOKEN_BLACKLIST_FAILED,
+            UserErrorCode.NOT_FOUND_USER,
             MemoErrorCode.INVALID_S3_KEY_FORMAT,
             MemoErrorCode.S3_KEY_USER_MISMATCH,
             S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED

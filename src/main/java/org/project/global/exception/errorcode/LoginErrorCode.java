@@ -21,6 +21,9 @@ public enum LoginErrorCode implements ErrorCode {
      */
     // 구글 엑세스 토큰 관련
     NOT_FOUND_GOOGLE_ACCESS_TOKEN_RESPONSE(HttpStatus.NOT_FOUND, 404, "구글 액세스 토큰 응답을 찾을 수 없습니다."),
+
+    REFRESH_TOKEN_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, 500, "Refresh Token 삭제에 실패했습니다."),
+    ACCESS_TOKEN_BLACKLIST_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, 500, "Access Token 블랙리스트 등록에 실패했습니다.")
     ;
 
 
