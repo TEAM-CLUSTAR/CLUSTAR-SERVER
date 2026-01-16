@@ -109,6 +109,10 @@ dependencies {
 
     // Google Vision OCR
     implementation("com.google.cloud:google-cloud-vision:3.39.0")
+
+    // TikaDocumentReader
+    implementation 'org.springframework.ai:spring-ai-tika-document-reader'
+
 }
 
 def querydslDir = "src/main/generated/querydsl"
