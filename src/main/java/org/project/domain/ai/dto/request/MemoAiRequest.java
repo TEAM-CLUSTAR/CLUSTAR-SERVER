@@ -13,7 +13,7 @@ public record MemoAiRequest(
         MemoAiOptions option,
 
         @NotEmpty
-        List<Long> memoIds
+        List<@NotNull Long> memoIds
 ) {
     public static MemoAiRequest of(
             String userPrompt,
