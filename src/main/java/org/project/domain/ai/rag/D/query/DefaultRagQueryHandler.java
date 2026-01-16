@@ -2,6 +2,7 @@ package org.project.domain.ai.rag.D.query;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.request.MemoAiRequest;
+import org.project.domain.ai.rag.D.query.dto.RagQuery;
 import org.springframework.stereotype.Component;
 
 @Component

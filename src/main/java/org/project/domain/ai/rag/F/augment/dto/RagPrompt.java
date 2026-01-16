@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.F.augment;
+package org.project.domain.ai.rag.F.augment.dto;
 
 public record RagPrompt(
         String systemPrompt,

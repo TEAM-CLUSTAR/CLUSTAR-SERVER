@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.D.query;
+package org.project.domain.ai.rag.D.query.dto;
 
 
 import org.project.domain.ai.dto.MemoAiOptions;

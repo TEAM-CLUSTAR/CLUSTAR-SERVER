@@ -1,7 +1,7 @@
 package org.project.domain.ai.rag.G.generate;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.rag.F.augment.RagPrompt;
+import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 

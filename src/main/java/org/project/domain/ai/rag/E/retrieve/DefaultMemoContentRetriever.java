@@ -1,7 +1,7 @@
 package org.project.domain.ai.rag.E.retrieve;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.rag.D.query.RagQuery;
+import org.project.domain.ai.rag.D.query.dto.RagQuery;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
