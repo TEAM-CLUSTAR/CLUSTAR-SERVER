@@ -1081,7 +1081,7 @@ class MemoControllerTest {
         }
 
         @Test
-        @DisplayName("sourceList 가 비어있는 일반 메모 상세 조회가 성공해야 한다. ")
+        @DisplayName("sourceList가 비어있는 일반 메모 상세 조회가 성공해야 한다.")
         @WithMockCustomUser(userId = 1L)
         void getOneDetailMemo_NotAiGenerated_Success() throws Exception {
             // given
