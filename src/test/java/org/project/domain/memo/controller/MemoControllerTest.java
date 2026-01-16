@@ -337,12 +337,12 @@ class MemoControllerTest {
             verify(memoService, never()).issuePresignedUrls(anyLong(), any());
         }
 
-        }
+    }
 
-        @Nested
-        @DisplayName("메모 생성 테스트")
-        @WithMockCustomUser(userId = 1L)
-        class CreateMemoTests{
+    @Nested
+    @DisplayName("메모 생성 테스트")
+    @WithMockCustomUser(userId = 1L)
+    class CreateMemoTests {
 
         @DisplayName("이미지/파일/라벨 없이 메모만 작성하는 것이 성공해야한다.")
         @Test
@@ -382,404 +382,404 @@ class MemoControllerTest {
                     .createMemo(eq(userId), any(MemoCreateRequest.class));
         }
 
-            @Test
-            @DisplayName("라벨과 함께 메모를 작성하는 것이 성공해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_WithLabels_Success() throws Exception {
-                // given
-                Long userId = 1L;
+        @Test
+        @DisplayName("라벨과 함께 메모를 작성하는 것이 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_WithLabels_Success() throws Exception {
+            // given
+            Long userId = 1L;
 
-                MemoCreateRequest request = new MemoCreateRequest(
-                        "SOPT 세미나",
-                        "7차 세미나 내용은 ~가 중요~.",
-                        List.of("SOPT", "교양", "레퍼런스"),  // 라벨 3개
-                        List.of(),  // 이미지 없음
-                        List.of()   // 파일 없음
-                );
+            MemoCreateRequest request = new MemoCreateRequest(
+                    "SOPT 세미나",
+                    "7차 세미나 내용은 ~가 중요~.",
+                    List.of("SOPT", "교양", "레퍼런스"),  // 라벨 3개
+                    List.of(),  // 이미지 없음
+                    List.of()   // 파일 없음
+            );
 
-                MemoResponse expectedResponse = new MemoResponse(
-                        101L,
-                        "SOPT 세미나",
-                        LocalDateTime.now()
-                );
+            MemoResponse expectedResponse = new MemoResponse(
+                    101L,
+                    "SOPT 세미나",
+                    LocalDateTime.now()
+            );
 
-                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
-                        .thenReturn(expectedResponse);
+            when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                    .thenReturn(expectedResponse);
 
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                        .andDo(print())
-                        .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.code").value(201))
-                        .andExpect(jsonPath("$.data.memoId").value(101L))
-                        .andExpect(jsonPath("$.data.title").value("SOPT 세미나"))
-                        .andExpect(jsonPath("$.data.createdAt").exists());
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.code").value(201))
+                    .andExpect(jsonPath("$.data.memoId").value(101L))
+                    .andExpect(jsonPath("$.data.title").value("SOPT 세미나"))
+                    .andExpect(jsonPath("$.data.createdAt").exists());
 
-                verify(memoService, times(1))
-                        .createMemo(eq(userId), any(MemoCreateRequest.class));
-            }
-
-            @Test
-            @DisplayName("이미지와 함께 메모를 작성하는 것이 성공해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_WithImages_Success() throws Exception {
-                // given
-                Long userId = 1L;
-
-                MemoCreateRequest.ImageRequest image1 = new MemoCreateRequest.ImageRequest(
-                        "memo-image/1/53238404-f89d-4728-9dc0-efb2a3c7787b.png",
-                        "seminar_slide.png",
-                        245678L,
-                        "png",
-                        1
-                );
-
-                MemoCreateRequest.ImageRequest image2 = new MemoCreateRequest.ImageRequest(
-                        "memo-image/1/another-uuid.jpg",
-                        "photo.jpg",
-                        532198L,
-                        "jpg",
-                        2
-                );
-
-                MemoCreateRequest request = new MemoCreateRequest(
-                        "이미지가 포함된 메모",
-                        "세미나 사진들입니다.",
-                        List.of(),                   // 라벨 없음
-                        List.of(image1, image2),     // 이미지 2개
-                        List.of()                    // 파일 없음
-                );
-
-                MemoResponse expectedResponse = new MemoResponse(
-                        102L,
-                        "이미지가 포함된 메모",
-                        LocalDateTime.now()
-                );
-
-                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
-                        .thenReturn(expectedResponse);
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                        .andDo(print())
-                        .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.code").value(201))
-                        .andExpect(jsonPath("$.data.memoId").value(102L))
-                        .andExpect(jsonPath("$.data.title").value("이미지가 포함된 메모"))
-                        .andExpect(jsonPath("$.data.createdAt").exists());
-
-                verify(memoService, times(1))
-                        .createMemo(eq(userId), any(MemoCreateRequest.class));
-            }
-
-            @Test
-            @DisplayName("파일과 함께 메모를 작성하는 것이 성공해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_WithFiles_Success() throws Exception {
-                // given
-                Long userId = 1L;
-
-                MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
-                        "memo-file/1/780fd26c-8ab7-4762-b148-b9c8c071795b.pdf",
-                        "SOPT_7th_seminar.pdf",
-                        1048576L,
-                        "pdf",
-                        1
-                );
-
-                MemoCreateRequest request = new MemoCreateRequest(
-                        "파일이 포함된 메모",
-                        "세미나 자료입니다.",
-                        List.of(),          // 라벨 없음
-                        List.of(),          // 이미지 없음
-                        List.of(file)       // 파일 1개
-                );
-
-                MemoResponse expectedResponse = new MemoResponse(
-                        103L,
-                        "파일이 포함된 메모",
-                        LocalDateTime.now()
-                );
-
-                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
-                        .thenReturn(expectedResponse);
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                        .andDo(print())
-                        .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.code").value(201))
-                        .andExpect(jsonPath("$.data.memoId").value(103L))
-                        .andExpect(jsonPath("$.data.title").value("파일이 포함된 메모"))
-                        .andExpect(jsonPath("$.data.createdAt").exists());
-
-                verify(memoService, times(1))
-                        .createMemo(eq(userId), any(MemoCreateRequest.class));
-            }
-
-            @Test
-            @DisplayName("라벨, 이미지, 파일이 모두 포함된 메모를 작성하는 것이 성공해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_WithAll_Success() throws Exception {
-                // given
-                Long userId = 1L;
-
-                MemoCreateRequest.ImageRequest image = new MemoCreateRequest.ImageRequest(
-                        "memo-image/1/uuid-image.png",
-                        "slide.png",
-                        245678L,
-                        "png",
-                        1
-                );
-
-                MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
-                        "memo-file/1/uuid-file.pdf",
-                        "document.pdf",
-                        1048576L,
-                        "pdf",
-                        1
-                );
-
-                MemoCreateRequest request = new MemoCreateRequest(
-                        "완전한 메모",
-                        "모든 것이 포함된 메모입니다.",
-                        List.of("SOPT", "교양"),    // 라벨 2개
-                        List.of(image),             // 이미지 1개
-                        List.of(file)               // 파일 1개
-                );
-
-                MemoResponse expectedResponse = new MemoResponse(
-                        104L,
-                        "완전한 메모",
-                        LocalDateTime.now()
-                );
-
-                when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
-                        .thenReturn(expectedResponse);
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                        .andDo(print())
-                        .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.code").value(201))
-                        .andExpect(jsonPath("$.data.memoId").value(104L))
-                        .andExpect(jsonPath("$.data.title").value("완전한 메모"))
-                        .andExpect(jsonPath("$.data.createdAt").exists());
-
-                verify(memoService, times(1))
-                        .createMemo(eq(userId), any(MemoCreateRequest.class));
-            }
-
-            @Test
-            @DisplayName("title이 null이면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_TitleNull_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": null,
-                "content": "내용입니다.",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("title이 빈 문자열이면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_TitleEmpty_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "",
-                "content": "내용입니다.",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-
-            @Test
-            @DisplayName("title이 공백만 있으면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_TitleBlank_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "   ",
-                "content": "내용입니다.",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("content가 null이면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_ContentNull_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "제목입니다.",
-                "content": null,
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("content가 빈 문자열이면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_ContentEmpty_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "제목입니다.",
-                "content": "",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("content가 공백만 있으면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_ContentBlank_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "제목입니다.",
-                "content": "   ",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("title 필드가 누락되면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_TitleMissing_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "content": "내용입니다.",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-                // title 필드 자체가 없음
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
-            @Test
-            @DisplayName("content 필드가 누락되면 실패해야 한다.")
-            @WithMockCustomUser(userId = 1L)
-            void createMemo_ContentMissing_Fail() throws Exception {
-                // given
-                String requestJson = """
-            {
-                "title": "제목입니다.",
-                "labelNames": [],
-                "images": [],
-                "files": []
-            }
-            """;
-                // content 필드 자체가 없음
-
-                // when & then
-                mockMvc.perform(post("/api/v1/memo")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson))
-                        .andDo(print())
-                        .andExpect(status().isBadRequest());  // 400
-
-                verify(memoService, never()).createMemo(anyLong(), any());
-            }
-
+            verify(memoService, times(1))
+                    .createMemo(eq(userId), any(MemoCreateRequest.class));
         }
+
+        @Test
+        @DisplayName("이미지와 함께 메모를 작성하는 것이 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_WithImages_Success() throws Exception {
+            // given
+            Long userId = 1L;
+
+            MemoCreateRequest.ImageRequest image1 = new MemoCreateRequest.ImageRequest(
+                    "memo-image/1/53238404-f89d-4728-9dc0-efb2a3c7787b.png",
+                    "seminar_slide.png",
+                    245678L,
+                    "png",
+                    1
+            );
+
+            MemoCreateRequest.ImageRequest image2 = new MemoCreateRequest.ImageRequest(
+                    "memo-image/1/another-uuid.jpg",
+                    "photo.jpg",
+                    532198L,
+                    "jpg",
+                    2
+            );
+
+            MemoCreateRequest request = new MemoCreateRequest(
+                    "이미지가 포함된 메모",
+                    "세미나 사진들입니다.",
+                    List.of(),                   // 라벨 없음
+                    List.of(image1, image2),     // 이미지 2개
+                    List.of()                    // 파일 없음
+            );
+
+            MemoResponse expectedResponse = new MemoResponse(
+                    102L,
+                    "이미지가 포함된 메모",
+                    LocalDateTime.now()
+            );
+
+            when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.code").value(201))
+                    .andExpect(jsonPath("$.data.memoId").value(102L))
+                    .andExpect(jsonPath("$.data.title").value("이미지가 포함된 메모"))
+                    .andExpect(jsonPath("$.data.createdAt").exists());
+
+            verify(memoService, times(1))
+                    .createMemo(eq(userId), any(MemoCreateRequest.class));
+        }
+
+        @Test
+        @DisplayName("파일과 함께 메모를 작성하는 것이 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_WithFiles_Success() throws Exception {
+            // given
+            Long userId = 1L;
+
+            MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
+                    "memo-file/1/780fd26c-8ab7-4762-b148-b9c8c071795b.pdf",
+                    "SOPT_7th_seminar.pdf",
+                    1048576L,
+                    "pdf",
+                    1
+            );
+
+            MemoCreateRequest request = new MemoCreateRequest(
+                    "파일이 포함된 메모",
+                    "세미나 자료입니다.",
+                    List.of(),          // 라벨 없음
+                    List.of(),          // 이미지 없음
+                    List.of(file)       // 파일 1개
+            );
+
+            MemoResponse expectedResponse = new MemoResponse(
+                    103L,
+                    "파일이 포함된 메모",
+                    LocalDateTime.now()
+            );
+
+            when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.code").value(201))
+                    .andExpect(jsonPath("$.data.memoId").value(103L))
+                    .andExpect(jsonPath("$.data.title").value("파일이 포함된 메모"))
+                    .andExpect(jsonPath("$.data.createdAt").exists());
+
+            verify(memoService, times(1))
+                    .createMemo(eq(userId), any(MemoCreateRequest.class));
+        }
+
+        @Test
+        @DisplayName("라벨, 이미지, 파일이 모두 포함된 메모를 작성하는 것이 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_WithAll_Success() throws Exception {
+            // given
+            Long userId = 1L;
+
+            MemoCreateRequest.ImageRequest image = new MemoCreateRequest.ImageRequest(
+                    "memo-image/1/uuid-image.png",
+                    "slide.png",
+                    245678L,
+                    "png",
+                    1
+            );
+
+            MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
+                    "memo-file/1/uuid-file.pdf",
+                    "document.pdf",
+                    1048576L,
+                    "pdf",
+                    1
+            );
+
+            MemoCreateRequest request = new MemoCreateRequest(
+                    "완전한 메모",
+                    "모든 것이 포함된 메모입니다.",
+                    List.of("SOPT", "교양"),    // 라벨 2개
+                    List.of(image),             // 이미지 1개
+                    List.of(file)               // 파일 1개
+            );
+
+            MemoResponse expectedResponse = new MemoResponse(
+                    104L,
+                    "완전한 메모",
+                    LocalDateTime.now()
+            );
+
+            when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
+                    .thenReturn(expectedResponse);
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.code").value(201))
+                    .andExpect(jsonPath("$.data.memoId").value(104L))
+                    .andExpect(jsonPath("$.data.title").value("완전한 메모"))
+                    .andExpect(jsonPath("$.data.createdAt").exists());
+
+            verify(memoService, times(1))
+                    .createMemo(eq(userId), any(MemoCreateRequest.class));
+        }
+
+        @Test
+        @DisplayName("title이 null이면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_TitleNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": null,
+                        "content": "내용입니다.",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("title이 빈 문자열이면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_TitleEmpty_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "",
+                        "content": "내용입니다.",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+
+        @Test
+        @DisplayName("title이 공백만 있으면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_TitleBlank_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "   ",
+                        "content": "내용입니다.",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("content가 null이면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ContentNull_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목입니다.",
+                        "content": null,
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("content가 빈 문자열이면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ContentEmpty_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목입니다.",
+                        "content": "",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("content가 공백만 있으면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ContentBlank_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목입니다.",
+                        "content": "   ",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("title 필드가 누락되면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_TitleMissing_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "content": "내용입니다.",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+            // title 필드 자체가 없음
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("content 필드가 누락되면 실패해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ContentMissing_Fail() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목입니다.",
+                        "labelNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+            // content 필드 자체가 없음
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+    }
 
     @Nested
     @DisplayName("메모 목록 조회 테스트")
@@ -1155,6 +1155,32 @@ class MemoControllerTest {
         }
     }
 
+    @Nested
+    @DisplayName("메모 삭제 테스트")
+    class DeleteMemoTest {
 
+        @Test
+        @DisplayName("메모 삭제가 성공해야 한다.")
+        @WithMockCustomUser(userId = 1L)
+        void deleteMemo_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            Long memoId = 100L;
+
+            // Service는 void 반환이므로 doNothing() 사용
+            doNothing().when(memoService).deleteMemo(eq(userId), eq(memoId));
+
+            // when & then
+            mockMvc.perform(delete("/api/v1/memo/{memoId}", memoId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data").doesNotExist());  // null
+
+            verify(memoService, times(1))
+                    .deleteMemo(eq(userId), eq(memoId));
+        }
     }
+}
 
