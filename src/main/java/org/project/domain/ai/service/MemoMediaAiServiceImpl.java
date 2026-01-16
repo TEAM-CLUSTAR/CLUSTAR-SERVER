@@ -10,7 +10,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
-import org.springframework.util.MimeTypeUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -79,11 +78,16 @@ public class MemoMediaAiServiceImpl implements MemoMediaAiService {
      * 헬퍼 메서드
      */
     private MimeType resolveMimeType(String s3Key) {
-        String lowerKey = s3Key.toLowerCase();
-            if (lowerKey.endsWith(".png")) return MimeTypeUtils.IMAGE_PNG;
-            if (lowerKey.endsWith(".gif")) return MimeTypeUtils.IMAGE_GIF;
-            if (lowerKey.endsWith(".webp")) return MimeType.valueOf("image/webp");
-            return MimeTypeUtils.IMAGE_JPEG;
+        String extension = getExtension(s3Key);
+        return s3Util.resolveMimeTypeByExtension(extension);
+    }
+
+    private String getExtension(String filename) {
+        int idx = filename.lastIndexOf('.');
+        if (idx == -1) {
+            return "";
         }
+        return filename.substring(idx + 1);
+    }
 }
 
