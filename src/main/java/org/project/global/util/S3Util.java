@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -167,7 +168,10 @@ public class S3Util {
     }
 
     public MimeType resolveMimeTypeByExtension(String extension) {
-        return switch (extension.toLowerCase()) {
+        if (extension == null || extension.isBlank()) {
+            return MimeTypeUtils.APPLICATION_OCTET_STREAM;
+        }
+        return switch (extension.toLowerCase(Locale.ROOT)) {
             case "jpg", "jpeg" -> MimeTypeUtils.IMAGE_JPEG;
             case "png" -> MimeTypeUtils.IMAGE_PNG;
             case "gif" -> MimeTypeUtils.IMAGE_GIF;
