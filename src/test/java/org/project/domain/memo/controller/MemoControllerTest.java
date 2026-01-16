@@ -54,7 +54,7 @@ class MemoControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    // 커스텀 어노테이션 -> 테스트 전 authntication 객체를 자동 설정하기 위해
+    // 커스텀 어노테이션 -> 테스트 전 authentication 객체를 자동 설정하기 위해
     @Retention(RetentionPolicy.RUNTIME)
     @WithSecurityContext(factory = WithMockCustomUserSecurityContextFactory.class)
     @interface WithMockCustomUser {

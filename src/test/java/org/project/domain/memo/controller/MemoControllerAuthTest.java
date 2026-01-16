@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MemoController.class)
-@AutoConfigureMockMvc(addFilters = true) 
+@AutoConfigureMockMvc(addFilters = true)
 @DisplayName("메모 컨트롤러 인증 테스트")
 class MemoControllerAuthTest {
 
