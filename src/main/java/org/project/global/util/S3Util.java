@@ -159,9 +159,11 @@ public class S3Util {
             return objectBytes.asByteArray();
 
         } catch (NoSuchKeyException e) {
-            throw new IllegalArgumentException("S3에 존재하지 않는 key입니다: " + s3Key, e);
+            log.error("S3에 존재하지 않는 key - Key: {}", s3Key, e);
+            throw new S3CustomException(S3ErrorCode.FILE_NOT_FOUND);
         } catch (S3Exception e) {
-            throw new IllegalStateException("S3 다운로드 실패: " + s3Key, e);
+            log.error("S3 다운로드 실패 - Key: {}, ErrorCode: {}", s3Key, e.awsErrorDetails().errorCode(), e);
+            throw new S3CustomException(S3ErrorCode.FILE_DOWNLOAD_FAILED);
         }
     }
 
