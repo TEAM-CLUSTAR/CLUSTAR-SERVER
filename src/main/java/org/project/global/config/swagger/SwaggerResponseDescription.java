@@ -5,6 +5,7 @@ import org.project.domain.user.errorcode.UserErrorCode;
 import org.project.global.exception.errorcode.ErrorCode;
 import org.project.global.exception.errorcode.GlobalErrorCode;
 import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.exception.errorcode.S3ErrorCode;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -18,8 +19,38 @@ public enum SwaggerResponseDescription {
     ))),
 
     CREATE_MEMO(new LinkedHashSet<>(Set.of(
-            UserErrorCode.USER_NOT_FOUND
+            UserErrorCode.USER_NOT_FOUND,
+            MemoErrorCode.INVALID_S3_KEY_FORMAT,
+            MemoErrorCode.S3_KEY_USER_MISMATCH,
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+    ))),
+
+    GET_MEMOS(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+    ))),
+
+    GET_ONE_MEMO(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+    ))),
+
+    DELETE_MEMO(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            S3ErrorCode.FILE_DELETE_FAILED
+    ))),
+
+    CREATE_AI_MEMO(new LinkedHashSet<>(Set.of(
+
+    ))),
+
+    GET_PRESIGNED_URLS(new LinkedHashSet<>(Set.of(
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
     )));
+
 
     private final Set<ErrorCode> errorCodeList;
 

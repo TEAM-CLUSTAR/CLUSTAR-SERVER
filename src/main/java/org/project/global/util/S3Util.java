@@ -34,56 +34,6 @@ public class S3Util {
     private String bucket;
 
     /**
-     *
-     * @param file 업로드할 파일
-     * @param folder S3 폴더 경로 (예: "memo-image", "memo-file")
-     * @param userId 사용자 ID
-     * @return S3 Key (예: "memo-image/1/uuid_filename.jpg")
-     */
-    public String uploadFile(MultipartFile file, String folder, Long userId) {
-        if (file == null || file.isEmpty()) {
-            throw new S3CustomException(S3ErrorCode.FILE_EMPTY);
-        }
-
-        try {
-            // 고유한 파일명 생성
-            String originalFilename = file.getOriginalFilename();
-            String uuid = UUID.randomUUID().toString();
-            String fileName = uuid + "_" + originalFilename;
-            String key = folder + "/" + userId + "/" + fileName;
-
-            // S3에 업로드
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(key)
-                    .contentType(file.getContentType())
-                    .contentLength(file.getSize())
-                    .build();
-
-            s3Client.putObject(
-                    putObjectRequest,
-                    RequestBody.fromInputStream(file.getInputStream(), file.getSize())
-            );
-
-            log.info("S3 파일 업로드 성공 - Key: {}", key);
-
-            return key;
-
-        } catch (IOException e) {
-            log.error("파일 읽기 실패", e);
-            throw new S3CustomException(S3ErrorCode.FILE_UPLOAD_FAILED);
-
-        } catch (S3Exception e) {  // AWS S3 서비스 에러
-            log.error("AWS S3 업로드 실패 - ErrorCode: {}", e.awsErrorDetails().errorCode(), e);
-            throw new S3CustomException(S3ErrorCode.FILE_UPLOAD_FAILED);
-
-        } catch (Exception e) {  // 기타 예상치 못한 에러
-            log.error("파일 업로드 중 예상치 못한 에러", e);
-            throw new S3CustomException(S3ErrorCode.FILE_UPLOAD_FAILED);
-        }
-    }
-
-    /**
      * Presigned GET URL 생성 (24시간 유효)
      * @param key S3 Key
      * @return Presigned URL (key가 null이면 null 반환)

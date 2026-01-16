@@ -1,6 +1,7 @@
 package org.project.domain.memo.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.List;
 )
 public record MemoPresignedUrlRequest(
 
+        @Valid
         @NotNull
         @Schema(
                 description = "업로드할 이미지 목록",
@@ -31,6 +33,7 @@ public record MemoPresignedUrlRequest(
         )
         List<UploadRequest> images,
 
+        @Valid
         @Schema(
                 description = "업로드할 파일 목록",
                 example = """
