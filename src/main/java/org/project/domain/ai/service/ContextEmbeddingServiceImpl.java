@@ -37,7 +37,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
      */
     @Override
     @Transactional
-    public void saveMemoEmbedding(Long memoId, String memoText) {
+    public void saveMemoEmbedding(Long userId, Long memoId, String memoText) {
 
         // 수정 시 기존 embedding 제거
         embeddingRepository.deleteByContextTypeAndContextId(
@@ -52,10 +52,14 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
             float[] vector = generateEmbedding(chunk);
 
+            // RAG 검색용으로 memoId/userId/chunkText를 함께 저장한다.
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO)
                     .contextId(memoId)
+                    .memoId(memoId)
+                    .userId(userId)
                     .chunkIndex(index++)
+                    .chunkText(chunk)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
                     .model(MODEL_NAME)
@@ -71,7 +75,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
      */
     @Override
     @Transactional
-    public void saveImageEmbedding(Long imageId, String imageDescription) {
+    public void saveImageEmbedding(Long userId, Long memoId, Long imageId, String imageDescription) {
 
         // 수정 시 기존 embedding 제거
         embeddingRepository.deleteByContextTypeAndContextId(
@@ -86,10 +90,14 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
             float[] vector = generateEmbedding(chunk);
 
+            // 이미지 설명도 메모 본문과 동일하게 검색 컨텍스트로 사용한다.
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO_IMAGE)
                     .contextId(imageId)
+                    .memoId(memoId)
+                    .userId(userId)
                     .chunkIndex(index++)
+                    .chunkText(chunk)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
                     .model(MODEL_NAME)
@@ -101,7 +109,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     @Override
     @Transactional
-    public void saveFileEmbedding(Long fileId, String content) {
+    public void saveFileEmbedding(Long userId, Long memoId, Long fileId, String content) {
 
         // 수정 시 기존 embedding 제거
         embeddingRepository.deleteByContextTypeAndContextId(
@@ -116,10 +124,14 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
             float[] vector = generateEmbedding(chunk);
 
+            // 파일 본문도 청크 단위로 저장해 RAG에서 재사용한다.
             ContextEmbedding embedding = ContextEmbedding.builder()
                     .contextType(ContextType.MEMO_FILE)
                     .contextId(fileId)
+                    .memoId(memoId)
+                    .userId(userId)
                     .chunkIndex(index++)
+                    .chunkText(chunk)
                     .sourcePreview(preview(chunk))
                     .embedding(vector)
                     .model(MODEL_NAME)
