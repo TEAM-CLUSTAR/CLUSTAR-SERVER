@@ -594,6 +594,86 @@ class MemoControllerTest {
                 verify(memoService, times(1))
                         .createMemo(eq(userId), any(MemoCreateRequest.class));
             }
+
+            @Test
+            @DisplayName("title이 null이면 실패해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_TitleNull_Fail() throws Exception {
+                // given
+                String requestJson = """
+            {
+                "title": null,
+                "content": "내용입니다.",
+                "labelNames": [],
+                "images": [],
+                "files": []
+            }
+            """;
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson))
+                        .andDo(print())
+                        .andExpect(status().isBadRequest());  // 400
+
+                verify(memoService, never()).createMemo(anyLong(), any());
+            }
+
+            @Test
+            @DisplayName("title이 빈 문자열이면 실패해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_TitleEmpty_Fail() throws Exception {
+                // given
+                String requestJson = """
+            {
+                "title": "",
+                "content": "내용입니다.",
+                "labelNames": [],
+                "images": [],
+                "files": []
+            }
+            """;
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson))
+                        .andDo(print())
+                        .andExpect(status().isBadRequest());  // 400
+
+                verify(memoService, never()).createMemo(anyLong(), any());
+            }
+
+
+            @Test
+            @DisplayName("title이 공백만 있으면 실패해야 한다.")
+            @WithMockCustomUser(userId = 1L)
+            void createMemo_TitleBlank_Fail() throws Exception {
+                // given
+                String requestJson = """
+            {
+                "title": "   ",
+                "content": "내용입니다.",
+                "labelNames": [],
+                "images": [],
+                "files": []
+            }
+            """;
+
+                // when & then
+                mockMvc.perform(post("/api/v1/memo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson))
+                        .andDo(print())
+                        .andExpect(status().isBadRequest());  // 400
+
+                verify(memoService, never()).createMemo(anyLong(), any());
+            }
         }
+
+        
+
+
 
 }
