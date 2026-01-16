@@ -106,6 +106,9 @@ dependencies {
 
     // docx
     implementation 'org.apache.poi:poi-ooxml:5.4.0'
+
+    // Google Vision OCR
+    implementation("com.google.cloud:google-cloud-vision:3.39.0")
 }
 
 def querydslDir = "src/main/generated/querydsl"
