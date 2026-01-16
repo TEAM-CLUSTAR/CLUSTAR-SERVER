@@ -12,7 +12,7 @@ public class TextChunker {
 
     public List<String> chunk(String text) {
 
-        if (text == null || text.isEmpty()) {
+        if (text == null || text.isBlank()) {
             return new ArrayList<>();
         }
 
