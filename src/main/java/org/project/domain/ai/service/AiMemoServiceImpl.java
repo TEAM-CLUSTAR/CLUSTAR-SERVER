@@ -32,7 +32,6 @@ import java.util.List;
 public class AiMemoServiceImpl implements AiMemoService {
 
     private static final int DEFAULT_TOP_K = 6;
-    private static final String RAG_SOURCE = "RAG";
 
     private final ChatClient chatClient;
     private final ContextEmbeddingSearchService embeddingSearchService;
@@ -86,7 +85,8 @@ public class AiMemoServiceImpl implements AiMemoService {
                 .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
 
         String title = resolveTitle(result.title());
-        Memo memo = Memo.createAiMemo(title, result.content(), user, RAG_SOURCE);
+        String source = formatSourceMemoIds(request.memoIds());
+        Memo memo = Memo.createAiMemo(title, result.content(), user, source);
         Memo savedMemo = memoRepository.save(memo);
 
         // 4) 새 메모도 임베딩 저장
@@ -211,7 +211,7 @@ public class AiMemoServiceImpl implements AiMemoService {
         String trimmed = raw.trim();
         int newlineIndex = trimmed.indexOf('\n');
         if (newlineIndex == -1) {
-            return new RagGeneratedMemo(trimmed, "");
+            return new RagGeneratedMemo(trimmed, ""); // 추후 예외처리 필요
         }
 
         String title = trimmed.substring(0, newlineIndex).trim();
@@ -223,5 +223,13 @@ public class AiMemoServiceImpl implements AiMemoService {
     }
 
     private record RagGeneratedMemo(String title, String content) {
+    }
+
+    private String formatSourceMemoIds(List<Long> memoIds) {
+        String joined = memoIds.stream()
+                .map(String::valueOf)
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+        return "[" + joined + "]";
     }
 }
