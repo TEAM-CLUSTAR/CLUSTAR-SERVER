@@ -16,7 +16,7 @@ import java.util.StringJoiner;
 public class ContextEmbeddingSearchServiceImpl implements ContextEmbeddingSearchService {
 
     private final EmbeddingModel embeddingModel;
-    private final ContextEmbeddingSearchRepository searchRepository;
+    private final ContextEmbeddingSearchRepository embeddingSearchRepository;
 
     @Override
     public List<RagContextChunkResponse> searchTopK(
@@ -32,7 +32,7 @@ public class ContextEmbeddingSearchServiceImpl implements ContextEmbeddingSearch
         float[] queryVector = embeddingModel.embed(queryText);
         String vectorLiteral = toVectorLiteral(queryVector);
 
-        return searchRepository.searchTopK(
+        return embeddingSearchRepository.searchTopK(
                 userId,
                 memoIds,
                 vectorLiteral,
