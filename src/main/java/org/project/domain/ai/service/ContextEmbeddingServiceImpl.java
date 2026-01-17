@@ -16,7 +16,7 @@ import java.util.List;
 public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
 
     private static final String MODEL_NAME = "text-embedding-004";
-    private static final int PREVIEW_LENGTH = 300;
+    private static final int PREVIEW_LENGTH = 100;
 
     private final EmbeddingModel embeddingModel;
     private final ContextEmbeddingRepository embeddingRepository;
@@ -45,8 +45,10 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
                 memoId
         );
 
+        // 텍스트 -> 청크로 분할
         List<String> chunks = textChunker.chunk(memoText);
 
+        // 각 청크를 임베딩으로 변환 + 저장
         int index = 0;
         for (String chunk : chunks) {
 
