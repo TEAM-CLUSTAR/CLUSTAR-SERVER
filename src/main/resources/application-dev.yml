@@ -49,6 +49,10 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
 
   ai:
+    model:
+      embedding:
+        text: google-genai
+
     vectorstore:
       type: pgvector
       pgvector:
@@ -60,6 +64,22 @@ spring:
         initialize-schema: false
         schema-validation: false
         remove-existing-vector-store-table: false
+
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY}
+
+        chat:
+          options:
+            model: gemini-3-flash-preview
+            temperature: 0.7
+            candidate-count: 1
+
+        embedding:
+          api-key: ${GOOGLE_AI_API_KEY}
+          text:
+            options:
+              model: text-embedding-004
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}

@@ -95,7 +95,6 @@ jobs:
             echo "GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}" >> .env
             
             
-            
             # 배포 스크립트 실행권한 부여
             sudo chmod +x deploy.sh
             
