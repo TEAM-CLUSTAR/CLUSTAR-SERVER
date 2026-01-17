@@ -1,11 +1,11 @@
 package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.dto.request.RagMemoCreateRequest;
-import org.project.domain.ai.dto.request.RagPromptConfigRequest;
+import org.project.domain.ai.dto.request.AiMemoCreateRequest;
+import org.project.domain.ai.dto.request.AiPromptConfigRequest;
 import org.project.domain.ai.dto.response.RagContextChunkResponse;
-import org.project.domain.ai.dto.response.RagMemoCreateResponse;
-import org.project.domain.ai.dto.response.RagPromptConfigResponse;
+import org.project.domain.ai.dto.response.AiMemoCreateResponse;
+import org.project.domain.ai.dto.response.AiPromptResponse;
 import org.project.domain.ai.strategy.MemoAiOptions;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
@@ -29,26 +29,27 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MemoRagServiceImpl implements MemoRagService {
+public class AiMemoServiceImpl implements AiMemoService {
 
     private static final int DEFAULT_TOP_K = 6;
     private static final String RAG_SOURCE = "RAG";
 
     private final ChatClient chatClient;
-    private final ContextEmbeddingSearchService searchService;
+    private final ContextEmbeddingSearchService embeddingSearchService;
     private final MemoRepository memoRepository;
     private final UserRepository userRepository;
     private final ContextEmbeddingService embeddingService;
-    private final PromptConfigService promptConfigService;
+    private final AiPromptConfigService aiPromptConfigService;
 
     @Override
     @Transactional
-    public RagMemoCreateResponse createRagMemo(Long userId, RagMemoCreateRequest request) {
-        int topK = request.topK() != null ? request.topK() : DEFAULT_TOP_K;
-        RagPromptConfigResponse storedConfig = promptConfigService.get(request.option());
+    public AiMemoCreateResponse createAiMemo(Long userId, AiMemoCreateRequest request) {
 
-        // 1) 질의 텍스트 → 유사 컨텍스트 검색
-        List<RagContextChunkResponse> contexts = searchService.searchTopK(
+        int topK = request.topK() != null ? request.topK() : DEFAULT_TOP_K;
+        AiPromptResponse storedConfig = aiPromptConfigService.get(request.option());
+
+        // 1) 사용자 질의 텍스트와 유사 컨텍스트 검색
+        List<RagContextChunkResponse> contexts = embeddingSearchService.searchTopK(
                 userId,
                 request.userPrompt(),
                 request.memoIds(),
@@ -91,7 +92,7 @@ public class MemoRagServiceImpl implements MemoRagService {
         // 4) 새 메모도 임베딩 저장
         embeddingService.saveMemoEmbedding(userId, savedMemo.getId(), savedMemo.getContent());
 
-        return RagMemoCreateResponse.of(
+        return AiMemoCreateResponse.of(
                 savedMemo.getId(),
                 savedMemo.getTitle(),
                 savedMemo.getContent(),
@@ -109,12 +110,13 @@ public class MemoRagServiceImpl implements MemoRagService {
         return "RAG 정리 메모 " + now;
     }
 
+    // == 내부 메서드들 == //
     private RagGeneratedMemo generateMemoFromContext(
             String userPrompt,
             String contextText,
             MemoAiOptions option,
-            RagPromptConfigRequest promptConfig,
-            RagPromptConfigResponse storedConfig,
+            AiPromptConfigRequest promptConfig,
+            AiPromptResponse storedConfig,
             AppliedPrompt appliedPrompt
     ) {
         String system = appliedPrompt.systemPrompt();
@@ -146,8 +148,8 @@ public class MemoRagServiceImpl implements MemoRagService {
 
     private AppliedPrompt resolveAppliedPrompt(
             MemoAiOptions option,
-            RagPromptConfigRequest promptConfig,
-            RagPromptConfigResponse storedConfig
+            AiPromptConfigRequest promptConfig,
+            AiPromptResponse storedConfig
     ) {
         if (promptConfig != null && promptConfig.systemPrompt() != null && !promptConfig.systemPrompt().isBlank()) {
             return new AppliedPrompt(promptConfig.systemPrompt(), promptConfig.temperature());
@@ -203,7 +205,7 @@ public class MemoRagServiceImpl implements MemoRagService {
      */
     private RagGeneratedMemo parseGeneratedMemo(String raw) {
         if (raw == null) {
-            return new RagGeneratedMemo(null, "");
+            return new RagGeneratedMemo(null, ""); // 추후 예외처리 필요
         }
 
         String trimmed = raw.trim();

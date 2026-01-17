@@ -2,7 +2,7 @@ package org.project.domain.ai.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-public record RagMemoCreateResponse(
+public record AiMemoCreateResponse(
         @Schema(description = "생성된 메모 ID", example = "13")
         Long memoId,
         @Schema(description = "생성된 메모 제목", example = "RAG 정리 메모 2026-01-17 05:10")
@@ -11,12 +11,12 @@ public record RagMemoCreateResponse(
         String content,
         @Schema(description = "RAG 검색으로 사용된 컨텍스트 청크 개수", example = "6")
         int contextCount,
-        @Schema(description = "실제로 적용된 시스템 프롬프트", example = "너는 요약 전문가야...")
+        @Schema(description = "실제로 적용된 시스템 프롬프트", example = "너는 나만의 똑똑한 메모 정리 AI야..~")
         String appliedSystemPrompt,
-        @Schema(description = "실제로 적용된 temperature", example = "0.3")
+        @Schema(description = "실제로 적용된 temperature", example = "0.7")
         Double appliedTemperature
 ) {
-    public static RagMemoCreateResponse of(
+    public static AiMemoCreateResponse of(
             Long memoId,
             String title,
             String content,
@@ -24,7 +24,7 @@ public record RagMemoCreateResponse(
             String appliedSystemPrompt,
             Double appliedTemperature
     ) {
-        return new RagMemoCreateResponse(
+        return new AiMemoCreateResponse(
                 memoId,
                 title,
                 content,
