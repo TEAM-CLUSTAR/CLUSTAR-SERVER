@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.project.domain.ai.strategy.MemoAiOptions;
 
 import java.util.List;
@@ -15,6 +16,8 @@ public record AiMemoCreateRequest(
         String userPrompt,
 
         @Schema(description = "유사도 검색 시 반환할 청크 개수 (많을수록 더 많은 컨텍스트 제공)", example = "5")
+        @NotNull
+        @Positive
         Integer topK,
 
         @NotNull
