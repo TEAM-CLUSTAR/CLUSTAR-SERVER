@@ -52,6 +52,9 @@ spring:
       embedding:
         text: google-genai
 
+    vectorstore:
+      type: none
+
     google:
       genai:
         api-key: test-google-ai-api-key

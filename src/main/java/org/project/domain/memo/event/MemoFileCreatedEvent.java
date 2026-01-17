@@ -5,6 +5,7 @@ import org.project.domain.memo.entity.MemoFile;
 import java.util.List;
 
 public record MemoFileCreatedEvent(
+        Long userId,
         List<MemoFile> memoFiles
 ) {
 }

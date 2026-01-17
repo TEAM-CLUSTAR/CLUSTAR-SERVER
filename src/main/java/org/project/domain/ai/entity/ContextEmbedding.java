@@ -45,10 +45,28 @@ public class ContextEmbedding extends BaseEntity {
     private Long contextId;
 
     /**
+     * memo.id (이미지/파일도 부모 메모 id를 저장)
+     */
+    @Column(name = "memo_id", nullable = false)
+    private Long memoId;
+
+    /**
+     * user.id (RAG 검색에서 사용자 필터링용)
+     */
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    /**
      * 청킹 순서 (0부터 시작)
      */
     @Column(name = "chunk_index", nullable = false)
     private Integer chunkIndex;
+
+    /**
+     * RAG 컨텍스트로 사용할 원문 청크
+     */
+    @Column(name = "chunk_text", nullable = false, columnDefinition = "TEXT")
+    private String chunkText;
 
     /**
      * 로깅 / 디버깅용 원본 텍스트 미리보기

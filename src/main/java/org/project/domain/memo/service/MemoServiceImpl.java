@@ -109,7 +109,7 @@ public class MemoServiceImpl implements MemoService {
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
-        embeddingService.saveMemoEmbedding(savedMemo.getId(), savedMemo.getContent());
+        embeddingService.saveMemoEmbedding(userId, savedMemo.getId(), savedMemo.getContent());
 
         // 이미지 메타데이터 저장 (optional)
         saveMemoImages(savedMemo, request.images(), userId);
@@ -273,7 +273,7 @@ public class MemoServiceImpl implements MemoService {
         memoImageRepository.saveAll(memoImages);
 
         eventPublisher.publishEvent(
-                new MemoImageCreatedEvent(memoImages)
+                new MemoImageCreatedEvent(userId, memoImages)
         );
     }
 
@@ -302,7 +302,7 @@ public class MemoServiceImpl implements MemoService {
         memoFileRepository.saveAll(memoFiles);
 
         eventPublisher.publishEvent(
-                new MemoFileCreatedEvent(memoFiles)
+                new MemoFileCreatedEvent(userId, memoFiles)
         );
     }
 

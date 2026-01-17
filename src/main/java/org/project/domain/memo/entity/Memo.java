@@ -76,6 +76,21 @@ public class Memo extends BaseEntity {
         return memo;
     }
 
+    // RAG/AI로 생성된 메모 생성
+    public static Memo createAiMemo(String title, String content, User user, String source) {
+        Memo memo = Memo.builder()
+                .title(title)
+                .content(content)
+                .user(user)
+                .isAiGenerated(true)
+                .source(source)
+                .build();
+
+        user.getMemos().add(memo);
+
+        return memo;
+    }
+
 
     public List<Label> getLabels() {
         return memoLabels.stream()

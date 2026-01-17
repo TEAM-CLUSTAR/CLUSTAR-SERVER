@@ -108,7 +108,16 @@ public record MemoDetailResponse(
         }
 
         try {
-            return Arrays.stream(source.split(","))
+            String normalized = source.trim();
+            if (normalized.startsWith("[") && normalized.endsWith("]")) {
+                normalized = normalized.substring(1, normalized.length() - 1);
+            }
+
+            if (normalized.isBlank()) {
+                return Collections.emptyList();
+            }
+
+            return Arrays.stream(normalized.split(","))
                     .map(String::trim)
                     .map(Long::parseLong)
                     .toList();

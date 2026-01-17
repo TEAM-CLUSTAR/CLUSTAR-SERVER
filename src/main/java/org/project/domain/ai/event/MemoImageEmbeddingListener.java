@@ -28,10 +28,11 @@ public class MemoImageEmbeddingListener {
                     );
 
             contextEmbeddingService.saveImageEmbedding(
+                    event.userId(),
+                    image.getMemo().getId(),
                     image.getId(),
                     description
             );
         }
     }
 }
-
