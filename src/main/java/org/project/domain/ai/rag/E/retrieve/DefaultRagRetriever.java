@@ -1,6 +1,7 @@
 package org.project.domain.ai.rag.E.retrieve;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
 import org.project.domain.ai.rag.E.retrieve.file.MemoFileRetriever;
 import org.project.domain.ai.rag.E.retrieve.image.MemoImageRetriever;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DefaultRagRetriever implements RagRetriever {
@@ -25,31 +27,53 @@ public class DefaultRagRetriever implements RagRetriever {
 
         List<Document> results = new ArrayList<>();
 
-        // Memo Text
         results.addAll(
-                safeRetrieve(() -> memoContentRetriever.retrieve(query))
+                safeRetrieve(
+                        () -> memoContentRetriever.retrieve(query),
+                        "MEMO_TEXT",
+                        query
+                )
         );
 
-        // Memo Image
         results.addAll(
-                safeRetrieve(() -> memoImageRetriever.retrieve(query))
+                safeRetrieve(
+                        () -> memoImageRetriever.retrieve(query),
+                        "MEMO_IMAGE",
+                        query
+                )
         );
 
-        // Memo File
         results.addAll(
-                safeRetrieve(() -> memoFileRetriever.retrieve(query))
+                safeRetrieve(
+                        () -> memoFileRetriever.retrieve(query),
+                        "MEMO_FILE",
+                        query
+                )
         );
 
         return results;
     }
 
-    private List<Document> safeRetrieve(Supplier<List<Document>> supplier) {
+
+    private List<Document> safeRetrieve(
+            Supplier<List<Document>> supplier,
+            String retrieverName,
+            RagQuery query
+    ) {
         try {
             List<Document> documents = supplier.get();
             return documents != null ? documents : List.of();
         } catch (Exception e) {
-            // Retriever 하나 실패해도 전체 파이프라인은 유지
+            log.warn(
+                    "[RAG][RETRIEVE_FAIL] retriever={} userId={} memoIds={} prompt={}",
+                    retrieverName,
+                    query.userId(),
+                    query.memoIds(),
+                    query.userPrompt(),
+                    e
+            );
             return List.of();
         }
     }
+
 }

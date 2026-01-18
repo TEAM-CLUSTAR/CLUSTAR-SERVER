@@ -42,7 +42,14 @@ public class DefaultMemoContentRetriever implements MemoContentRetriever {
                 .filterExpression(buildFilter(query))
                 .build();
 
-        return vectorStore.similaritySearch(searchRequest);
+        List<Document> documents = vectorStore.similaritySearch(searchRequest);
+
+        // source metadata 추가
+        documents.forEach(doc ->
+                doc.getMetadata().put("rag_source", RagDocumentType.MEMO_TEXT.name())
+        );
+
+        return documents;
     }
 
     /**

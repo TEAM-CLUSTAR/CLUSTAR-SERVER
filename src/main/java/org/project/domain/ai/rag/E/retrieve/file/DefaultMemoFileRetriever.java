@@ -27,7 +27,14 @@ public class DefaultMemoFileRetriever implements MemoFileRetriever {
                 .filterExpression(buildFilter(query))
                 .build();
 
-        return vectorStore.similaritySearch(request);
+        List<Document> documents = vectorStore.similaritySearch(request);
+
+        // source metadata 추가
+        documents.forEach(doc ->
+                doc.getMetadata().put("rag_source", RagDocumentType.MEMO_FILE.name())
+        );
+
+        return documents;
     }
 
     private Filter.Expression buildFilter(RagQuery query) {

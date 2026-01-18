@@ -28,7 +28,14 @@ public class DefaultMemoImageRetriever implements MemoImageRetriever {
                 .filterExpression(buildFilter(query))
                 .build();
 
-        return vectorStore.similaritySearch(searchRequest);
+        List<Document> documents = vectorStore.similaritySearch(searchRequest);
+
+        // source metadata 추가
+        documents.forEach(doc ->
+                doc.getMetadata().put("rag_source", RagDocumentType.MEMO_IMAGE.name())
+        );
+
+        return documents;
     }
 
     private Filter.Expression buildFilter(RagQuery query) {
