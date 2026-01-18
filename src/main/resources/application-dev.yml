@@ -53,18 +53,6 @@ spring:
       embedding:
         text: google-genai
 
-#    vectorstore:
-#      type: pgvector
-#      pgvector:
-#        schema-name: public
-#        table-name: vector_store
-#        dimensions: 768
-#        distance-type: COSINE_DISTANCE
-#        index-type: HNSW
-#        initialize-schema: false
-#        schema-validation: false
-#        remove-existing-vector-store-table: false
-
     google:
       genai:
         api-key: ${GOOGLE_AI_API_KEY}
@@ -83,10 +71,14 @@ spring:
 
     vectorstore:
       pgvector:
-        initialize-schema: true
+        schema-name: public
+        table-name: vector_store
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 768
+        initialize-schema: false
+        schema-validation: true
+        remove-existing-vector-store-table: false
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
