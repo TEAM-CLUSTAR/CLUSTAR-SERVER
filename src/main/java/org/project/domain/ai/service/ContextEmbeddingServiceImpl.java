@@ -230,7 +230,6 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
             return;
         }
 
-        String documentId = contextType.name() + "-" + contextId + "-" + chunkIndex;
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("contextType", contextType.name());
         metadata.put("contextId", contextId.toString());
@@ -240,7 +239,7 @@ public class ContextEmbeddingServiceImpl implements ContextEmbeddingService{
         metadata.put("sourcePreview", sourcePreview);
         metadata.put("model", model);
 
-        Document document = new Document(documentId, chunkText, metadata);
+        Document document = new Document(chunkText, metadata);
         vectorStore.add(List.of(document));
     }
 
