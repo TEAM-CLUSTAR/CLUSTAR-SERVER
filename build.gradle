@@ -107,7 +107,7 @@ dependencies {
     testImplementation 'org.springframework.ai:spring-ai-spring-boot-testcontainers'
 
     // test h2
-//    testImplementation 'com.h2database:h2'
+    testImplementation 'com.h2database:h2'
 }
 
 def querydslDir = "src/main/generated/querydsl"

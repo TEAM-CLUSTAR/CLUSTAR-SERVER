@@ -117,7 +117,11 @@ public class AiEvaluationServiceImpl implements AiEvaluationService {
 
         return Arrays.stream(contextPart.split("\\[SOURCE:"))
                 .skip(1)
-                .map(s -> s.substring(s.indexOf("]") + 1).trim())
+                .map(s -> {
+                    int idx = s.indexOf("]");
+                    return idx >= 0 ? s.substring(idx + 1).trim() : s.trim();
+                    })
+                .filter(s -> !s.isEmpty())
                 .toList();
     }
 
