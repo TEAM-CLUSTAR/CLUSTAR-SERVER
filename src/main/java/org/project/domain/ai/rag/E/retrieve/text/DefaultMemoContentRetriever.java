@@ -1,7 +1,9 @@
-package org.project.domain.ai.rag.E.retrieve;
+package org.project.domain.ai.rag.E.retrieve.text;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
+import org.project.global.exception.domainException.AiException;
+import org.project.global.exception.errorcode.AiErrorCode;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -19,13 +21,17 @@ public class DefaultMemoContentRetriever implements MemoContentRetriever {
     public List<Document> retrieve(RagQuery query) {
 
         /*
-         * 🔍 Memo TEXT Retrieval
+         * Memo TEXT Retrieval
          *
          * metadata 기준:
          * - userId
          * - memoId
          * - type = MEMO_TEXT
          */
+
+        if (query.memoIds() == null || query.memoIds().isEmpty()) {
+            throw new AiException(AiErrorCode.EMPTY_MEMO_IDS);
+        }
 
         SearchRequest searchRequest = SearchRequest.builder()
                 .query(query.userPrompt())
