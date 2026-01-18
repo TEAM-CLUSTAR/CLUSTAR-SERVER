@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.B.transform;
+package org.project.domain.ai.rag.B.transform.image;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.document.DocumentTransformer;
@@ -21,7 +21,7 @@ public class MemoImageOcrNormalizeTransformer implements DocumentTransformer {
 
         for (Document doc : documents) {
 
-            // ✅ Text Document만 처리
+            // Text Document만 처리
             if (!doc.isText()) {
                 continue;
             }

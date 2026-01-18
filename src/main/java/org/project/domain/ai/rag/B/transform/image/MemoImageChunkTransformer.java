@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.B.transform;
+package org.project.domain.ai.rag.B.transform.image;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.document.DocumentTransformer;
