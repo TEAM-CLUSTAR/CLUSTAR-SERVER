@@ -101,14 +101,14 @@ dependencies {
     // Hibernate
     implementation "org.hibernate.orm:hibernate-vector:6.4.4.Final"
 
-    // pdf
-    implementation 'org.apache.pdfbox:pdfbox:2.0.30'
-
-    // docx
-    implementation 'org.apache.poi:poi-ooxml:5.4.0'
-
-    // Google Vision OCR
-    implementation("com.google.cloud:google-cloud-vision:3.39.0")
+//    // pdf
+//    implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+//
+//    // docx
+//    implementation 'org.apache.poi:poi-ooxml:5.4.0'
+//
+//    // Google Vision OCR
+//    implementation("com.google.cloud:google-cloud-vision:3.39.0")
 
     // TikaDocumentReader
     implementation 'org.springframework.ai:spring-ai-tika-document-reader'

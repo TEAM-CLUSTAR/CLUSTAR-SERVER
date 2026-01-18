@@ -81,9 +81,6 @@ spring:
             options:
               model: text-embedding-004
 
-      credentials:
-        location: classpath:gcp-vision.json
-
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   expire-length: 3600000 # 60분
