@@ -1,7 +1,6 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.service.ContextEmbeddingService;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
@@ -16,6 +15,7 @@ import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.event.MemoFileCreatedEvent;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
+import org.project.domain.memo.event.MemoTextCreatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
@@ -52,8 +52,6 @@ public class MemoServiceImpl implements MemoService {
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
     private final MemoLabelRepository memoLabelRepository;
-
-    private final ContextEmbeddingService embeddingService;
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
@@ -109,7 +107,13 @@ public class MemoServiceImpl implements MemoService {
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
-        embeddingService.saveMemoEmbedding(userId, savedMemo.getId(), savedMemo.getContent());
+
+        eventPublisher.publishEvent(
+                new MemoTextCreatedEvent(
+                        savedMemo.getId(),
+                        userId
+                )
+        );
 
         // 이미지 메타데이터 저장 (optional)
         saveMemoImages(savedMemo, request.images(), userId);
@@ -273,7 +277,13 @@ public class MemoServiceImpl implements MemoService {
         memoImageRepository.saveAll(memoImages);
 
         eventPublisher.publishEvent(
-                new MemoImageCreatedEvent(userId, memoImages)
+                new MemoImageCreatedEvent(
+                        memo.getId(),
+                        userId,
+                        memoImages.stream()
+                                .map(MemoImage::getId)
+                                .toList()
+                )
         );
     }
 
@@ -302,7 +312,13 @@ public class MemoServiceImpl implements MemoService {
         memoFileRepository.saveAll(memoFiles);
 
         eventPublisher.publishEvent(
-                new MemoFileCreatedEvent(userId, memoFiles)
+                new MemoFileCreatedEvent(
+                        memo.getId(),
+                        userId,
+                        memoFiles.stream()
+                                .map(MemoFile::getId)
+                                .toList()
+                )
         );
     }
 

@@ -1,38 +1,43 @@
 package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.service.ContextEmbeddingService;
-import org.project.domain.ai.service.MemoMediaAiService;
-import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.ai.rag.A.extract.MemoImageDocumentReader;
+import org.project.domain.ai.rag.B.transform.image.MemoImageDocumentTransformer;
+import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
+import org.springframework.ai.document.Document;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class MemoImageEmbeddingListener {
 
-    private final MemoMediaAiService memoMediaAiService;
-    private final ContextEmbeddingService contextEmbeddingService;
+    private final MemoImageDocumentReader memoImageDocumentReader;
+    private final MemoImageDocumentTransformer memoImageDocumentTransformer;
+    private final VectorStoreDocumentLoader vectorStoreDocumentLoader;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(MemoImageCreatedEvent event) {
 
-        for (MemoImage image : event.memoImages()) {
-            String description =
-                    memoMediaAiService.generateImageDescription(
-                            image.getImageS3Key()
-                    );
+        // 1️⃣ Extract
+        List<Document> documents =
+                memoImageDocumentReader.read(
+                        event.memoId(),
+                        event.memoImageIds(),
+                        event.userId()
+                );
 
-            contextEmbeddingService.saveImageEmbedding(
-                    event.userId(),
-                    image.getMemo().getId(),
-                    image.getId(),
-                    description
-            );
-        }
+        // 2️⃣ Transform
+        List<Document> transformed =
+                memoImageDocumentTransformer.transform(documents);
+
+        vectorStoreDocumentLoader.load(transformed);
     }
 }
+
