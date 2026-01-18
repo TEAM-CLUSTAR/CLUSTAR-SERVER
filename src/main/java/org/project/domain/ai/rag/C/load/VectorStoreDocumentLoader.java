@@ -41,9 +41,13 @@ public class VectorStoreDocumentLoader {
                 });
 
 
-        vectorStore.write(documents);
-
-        log.info("[VectorStore] Load completed");
+        try {
+            vectorStore.write(documents);
+            log.info("[VectorStore] Load completed");
+        } catch (Exception e) {
+            log.error("[VectorStore] Failed to load {} documents: {}", documents.size(), e.getMessage(), e);
+            throw e;
+        }
     }
 }
 
