@@ -21,10 +21,6 @@ public class RagContextBuilder {
 
     private String formatDocument(Document document) {
 
-        if (!document.isText()) {
-            return "";
-        }
-
         String source = String.valueOf(
                 document.getMetadata().getOrDefault("rag_source", "unknown")
         );
@@ -49,5 +45,4 @@ public class RagContextBuilder {
                 document.getText()
         );
     }
-
 }
