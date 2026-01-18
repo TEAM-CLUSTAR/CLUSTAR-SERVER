@@ -20,15 +20,15 @@ public class DefaultRagAugmenter implements RagAugmenter {
             RagQuery query,
             List<Document> documents
     ) {
-        // 1️⃣ System Prompt 결정 (option 기반)
+        // System Prompt 결정 (option 기반)
         String systemPrompt =
                 systemPromptResolver.resolve(query.option());
 
-        // 2️⃣ Context 생성 (retrieved documents)
+        // Context 생성 (retrieved documents)
         String context =
                 contextBuilder.build(documents);
 
-        // 3️⃣ RagPrompt 생성
+        // RagPrompt 생성
         return RagPrompt.of(
                 systemPrompt,
                 query.userPrompt(),

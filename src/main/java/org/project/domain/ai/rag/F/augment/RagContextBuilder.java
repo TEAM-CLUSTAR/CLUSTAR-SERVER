@@ -19,24 +19,30 @@ public class RagContextBuilder {
                 .collect(Collectors.joining("\n\n"));
     }
 
-//    private String formatDocument(Document document) {
-//        return """
-//            [SOURCE]
-//            %s
-//            """.formatted(document.getFormattedContent());
-//    }
-
     private String formatDocument(Document document) {
+
+        if (!document.isText()) {
+            return ""; // 또는 media 처리
+        }
+
         String source = String.valueOf(
-                document.getMetadata().getOrDefault("source", "unknown")
+                document.getMetadata().getOrDefault("rag_source", "unknown")
         );
 
+        String fileName = String.valueOf(
+                document.getMetadata().getOrDefault("fileName", "")
+        );
+
+        String sourceLabel = fileName.isBlank()
+                ? source
+                : source + " | " + fileName;
+
         return """
-            [SOURCE: %s]
-            %s
-            """.formatted(
-                source,
-                document.getFormattedContent()
+        [SOURCE: %s]
+        %s
+        """.formatted(
+                sourceLabel,
+                document.getText()
         );
     }
 
