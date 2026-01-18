@@ -81,6 +81,13 @@ spring:
             options:
               model: text-embedding-004
 
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
+
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   expire-length: 3600000 # 60분
