@@ -49,4 +49,27 @@ public class DefaultRagPipeline implements RagPipeline {
                 prompt.toDebugString()
         );
     }
+
+    @Override
+    public MemoAiResponse runForPlan(Long userId, MemoAiRequest request, String planPrompt) {
+        // 1️⃣ Query
+        RagQuery query = queryHandler.handle(userId, request);
+
+        // 2️⃣ Retrieve
+        List<Document> documents = retriever.retrieve(query);
+
+        // 3️⃣ Augment
+        RagPrompt prompt = augmenter.augment(query, documents);
+
+        // 4️⃣ Generate
+        String content = generator.generate(prompt);
+
+        // 5️⃣ Response 조립 (파이프라인 책임 OK)
+        return MemoAiResponse.of(
+                content,
+                query.option(),
+                query.memoIds(),
+                prompt.toDebugString()
+        );
+    }
 }

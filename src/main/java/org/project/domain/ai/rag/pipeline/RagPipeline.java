@@ -9,4 +9,10 @@ public interface RagPipeline {
             Long userId,
             MemoAiRequest request
     );
+
+    MemoAiResponse runForPlan(
+            Long userId,
+            MemoAiRequest request,
+            String planPrompt
+    );
 }

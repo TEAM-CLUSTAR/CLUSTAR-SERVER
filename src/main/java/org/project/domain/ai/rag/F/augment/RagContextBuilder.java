@@ -22,7 +22,7 @@ public class RagContextBuilder {
     private String formatDocument(Document document) {
 
         if (!document.isText()) {
-            return ""; // 또는 media 처리
+            return "";
         }
 
         String source = String.valueOf(
