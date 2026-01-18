@@ -57,11 +57,11 @@ spring:
       type: pgvector
       pgvector:
         schema-name: public
-        table-name: vector_store
+        table-name: memo_vector_store
         dimensions: 768
         distance-type: COSINE_DISTANCE
         index-type: HNSW
-        initialize-schema: false
+        initialize-schema: true
         schema-validation: false
         remove-existing-vector-store-table: false
 
