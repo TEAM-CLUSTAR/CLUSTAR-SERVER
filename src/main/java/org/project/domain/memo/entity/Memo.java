@@ -5,9 +5,9 @@ import lombok.*;
 import org.project.domain.label.entity.Label;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -77,18 +77,30 @@ public class Memo extends BaseEntity {
     }
 
     // RAG/AI로 생성된 메모 생성
-    public static Memo createAiMemo(String title, String content, User user, String source) {
+    public static Memo createAiMemo(String title, String content, User user, List<Long> sourceMemoIds) {
         Memo memo = Memo.builder()
                 .title(title)
                 .content(content)
                 .user(user)
                 .isAiGenerated(true)
-                .source(source)
+                .source(formatSource(sourceMemoIds))
                 .build();
 
         user.getMemos().add(memo);
 
         return memo;
+    }
+
+    private static String formatSource(List<Long> sourceMemoIds) {
+        if (sourceMemoIds == null || sourceMemoIds.isEmpty()) {
+            return "[]";
+        }
+
+        String joined = sourceMemoIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(", "));
+
+        return "[" + joined + "]";
     }
 
 
