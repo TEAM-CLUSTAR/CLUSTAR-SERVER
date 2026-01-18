@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
@@ -72,6 +73,28 @@ public class MemoController {
         Long userId = userDetails.getUserId();
 
         MemoResponse response = memoService.createMemo(userId, request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created(response));
+    }
+
+    @Operation(
+            summary = "AI 메모 작성",
+            description = """
+                AI 응답 결과를 기반으로 메모를 작성합니다.
+                제목과 본문을 분리해서 전달해야 합니다.
+                """
+    )
+    @PostMapping("/ai")
+    @BusinessExceptionDescription(SwaggerResponseDescription.CREATE_MEMO)
+    public ResponseEntity<ApiResponse<MemoResponse>> createAiMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MemoAiCreateRequest request
+    ) {
+
+        Long userId = userDetails.getUserId();
+
+        MemoResponse response = memoService.createAiMemo(userId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(response));
