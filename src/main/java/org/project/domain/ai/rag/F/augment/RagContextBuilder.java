@@ -21,7 +21,11 @@ public class RagContextBuilder {
 
     private String formatDocument(Document document) {
 
-        if (!document.isText()) {
+        String type = String.valueOf(
+                document.getMetadata().get("type")
+        );
+
+        if (!type.startsWith("MEMO_")) {
             return "";
         }
 
@@ -38,7 +42,7 @@ public class RagContextBuilder {
         );
 
         String sourceLabel = fileName.isBlank()
-                ? source
+                ? source + " | memoId=" + memoId
                 : source + " | " + fileName + " | memoId=" + memoId;
 
         return """
@@ -49,5 +53,4 @@ public class RagContextBuilder {
                 document.getText()
         );
     }
-
 }
