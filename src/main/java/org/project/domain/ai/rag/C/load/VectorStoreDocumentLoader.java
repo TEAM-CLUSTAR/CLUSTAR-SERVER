@@ -31,7 +31,7 @@ public class VectorStoreDocumentLoader {
                             ? "null"
                             : text.substring(0, Math.min(100, text.length()));
 
-                    log.info(
+                    log.debug(
                             "[Chunk Preview] id={}, length={}, preview=\"{}\", metadata={}",
                             doc.getId(),
                             text != null ? text.length() : -1,

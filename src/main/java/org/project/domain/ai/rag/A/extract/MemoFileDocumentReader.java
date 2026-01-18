@@ -36,7 +36,7 @@ public class MemoFileDocumentReader {
 
             MemoFileBinary file = memoFileBinaryLoader.load(fileId);
 
-            // 파일 크기 제한
+            // 추후 파일 크기를 제한하도록 수정
             if (file.fileSize() > MAX_FILE_SIZE) {
                 continue;
             }
