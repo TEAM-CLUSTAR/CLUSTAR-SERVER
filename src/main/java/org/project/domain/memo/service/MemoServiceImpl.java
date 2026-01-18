@@ -1,7 +1,6 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.ai.service.ContextEmbeddingService;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
@@ -53,8 +52,6 @@ public class MemoServiceImpl implements MemoService {
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
     private final MemoLabelRepository memoLabelRepository;
-
-    private final ContextEmbeddingService embeddingService;
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
