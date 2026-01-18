@@ -1,12 +1,15 @@
 package org.project.domain.ai.rag.E.retrieve.text;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.rag.A.extract.RagDocumentType;
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
 import org.project.global.exception.domainException.AiException;
 import org.project.global.exception.errorcode.AiErrorCode;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -45,17 +48,23 @@ public class DefaultMemoContentRetriever implements MemoContentRetriever {
     /**
      * VectorStore metadata filter 생성
      */
-    private String buildFilter(RagQuery query) {
-        return """
-               userId == %d
-               && type == "MEMO_TEXT"
-               && memoId in [%s]
-               """.formatted(
-                query.userId(),
-                query.memoIds().stream()
-                        .map(String::valueOf)
-                        .reduce((a, b) -> a + "," + b)
-                        .orElse("")
-        );
+    private Filter.Expression buildFilter(RagQuery query) {
+        FilterExpressionBuilder b = new FilterExpressionBuilder();
+
+        FilterExpressionBuilder.Op base =
+                b.and(
+                        b.eq("type", RagDocumentType.MEMO_TEXT.name()),
+                        b.eq("userId", query.userId())
+                );
+
+        FilterExpressionBuilder.Op memoFilter =
+                b.in(
+                        "memoId",
+                        query.memoIds().stream()
+                                .map(id -> (Object) id)
+                                .toList()
+                );
+
+        return b.and(base, memoFilter).build();
     }
 }

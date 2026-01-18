@@ -2,12 +2,15 @@ package org.project.domain.ai.rag.E.retrieve;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
+import org.project.domain.ai.rag.E.retrieve.file.MemoFileRetriever;
+import org.project.domain.ai.rag.E.retrieve.image.MemoImageRetriever;
+import org.project.domain.ai.rag.E.retrieve.text.MemoContentRetriever;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
-import java.util.function.Supplier;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Component
 @RequiredArgsConstructor
@@ -22,17 +25,17 @@ public class DefaultRagRetriever implements RagRetriever {
 
         List<Document> results = new ArrayList<>();
 
-        // 1️⃣ Memo Text
+        // Memo Text
         results.addAll(
                 safeRetrieve(() -> memoContentRetriever.retrieve(query))
         );
 
-        // 2️⃣ Memo Image
+        // Memo Image
         results.addAll(
                 safeRetrieve(() -> memoImageRetriever.retrieve(query))
         );
 
-        // 3️⃣ Memo File
+        // Memo File
         results.addAll(
                 safeRetrieve(() -> memoFileRetriever.retrieve(query))
         );
@@ -45,7 +48,7 @@ public class DefaultRagRetriever implements RagRetriever {
             List<Document> documents = supplier.get();
             return documents != null ? documents : List.of();
         } catch (Exception e) {
-            // ❗ Retriever 하나 실패해도 전체 파이프라인은 유지
+            // Retriever 하나 실패해도 전체 파이프라인은 유지
             return List.of();
         }
     }
