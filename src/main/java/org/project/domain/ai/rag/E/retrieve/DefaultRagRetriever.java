@@ -65,11 +65,10 @@ public class DefaultRagRetriever implements RagRetriever {
             return documents != null ? documents : List.of();
         } catch (Exception e) {
             log.warn(
-                    "[RAG][RETRIEVE_FAIL] retriever={} userId={} memoIds={} prompt={}",
+                    "[RAG][RETRIEVE_FAIL] retriever={} userId={} memoIds={}",
                     retrieverName,
                     query.userId(),
                     query.memoIds(),
-                    query.userPrompt(),
                     e
             );
             return List.of();
