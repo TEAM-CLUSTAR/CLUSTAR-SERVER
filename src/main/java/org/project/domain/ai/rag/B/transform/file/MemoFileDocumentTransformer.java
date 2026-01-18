@@ -1,17 +1,23 @@
-package org.project.domain.ai.rag.B.transform;
+package org.project.domain.ai.rag.B.transform.file;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.document.DocumentTransformer;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 public class MemoFileDocumentTransformer {
 
     private final List<DocumentTransformer> transformers;
+
+    public MemoFileDocumentTransformer(
+            @Qualifier("fileTransformers")
+            List<DocumentTransformer> transformers
+    ) {
+        this.transformers = transformers;
+    }
 
     public List<Document> transform(List<Document> documents) {
         List<Document> current = documents;
