@@ -58,18 +58,22 @@ public class DefaultRagPipeline implements RagPipeline {
         // 2️⃣ Retrieve
         List<Document> documents = retriever.retrieve(query);
 
-        // 3️⃣ Augment
-        RagPrompt prompt = augmenter.augment(query, documents);
+        // 3️⃣ Augment (기본 system prompt 생성)
+        RagPrompt basePrompt = augmenter.augment(query, documents);
+
+        // 🔁 systemPrompt만 planPrompt로 교체
+        RagPrompt planPromptApplied =
+                basePrompt.withSystemPrompt(planPrompt);
 
         // 4️⃣ Generate
-        String content = generator.generate(prompt);
+        String content = generator.generate(planPromptApplied);
 
-        // 5️⃣ Response 조립 (파이프라인 책임 OK)
+        // 5️⃣ Response
         return MemoAiResponse.of(
                 content,
                 query.option(),
                 query.memoIds(),
-                prompt.toDebugString()
+                planPromptApplied.toDebugString()
         );
     }
 }

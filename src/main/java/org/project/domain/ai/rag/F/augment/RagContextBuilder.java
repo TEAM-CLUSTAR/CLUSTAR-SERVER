@@ -33,9 +33,13 @@ public class RagContextBuilder {
                 document.getMetadata().getOrDefault("fileName", "")
         );
 
+        String memoId = String.valueOf(
+                document.getMetadata().getOrDefault("memoId", "")
+        );
+
         String sourceLabel = fileName.isBlank()
                 ? source
-                : source + " | " + fileName;
+                : source + " | " + fileName + " | memoId=" + memoId;
 
         return """
         [SOURCE: %s]

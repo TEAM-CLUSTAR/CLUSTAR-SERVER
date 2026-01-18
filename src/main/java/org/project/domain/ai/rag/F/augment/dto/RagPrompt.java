@@ -29,4 +29,15 @@ public record RagPrompt(
                 %s
                 """.formatted(systemPrompt, userPrompt, context);
     }
+
+    /**
+     * systemPrompt만 교체 (Plan API 용 메서드)
+     */
+    public RagPrompt withSystemPrompt(String newSystemPrompt) {
+        return new RagPrompt(
+                newSystemPrompt,
+                this.userPrompt,
+                this.context
+        );
+    }
 }
