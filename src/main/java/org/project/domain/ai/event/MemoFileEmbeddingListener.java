@@ -2,7 +2,7 @@ package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.A.extract.MemoFileDocumentReader;
-import org.project.domain.ai.rag.B.transform.MemoFileDocumentTransformer;
+import org.project.domain.ai.rag.B.transform.file.MemoFileDocumentTransformer;
 import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
 import org.project.domain.memo.event.MemoFileCreatedEvent;
 import org.springframework.ai.document.Document;

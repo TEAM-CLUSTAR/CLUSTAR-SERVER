@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.B.transform;
+package org.project.domain.ai.rag.B.transform.text;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;

@@ -2,11 +2,13 @@ package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.A.extract.MemoDocumentReader;
-import org.project.domain.ai.rag.B.transform.MemoTextTransformer;
+import org.project.domain.ai.rag.B.transform.text.MemoTextTransformer;
 import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.event.MemoTextCreatedEvent;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.springframework.ai.document.Document;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -27,10 +29,12 @@ public class MemoTextEmbeddingListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+//    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handle(MemoTextCreatedEvent event) {
 
         // 1️⃣ Extract
-        Memo memo = memoRepository.getReferenceById(event.memoId());
+        Memo memo = memoRepository.findById(event.memoId())
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
         List<Document> extractedDocuments =
                 memoDocumentReader.readText(memo);
