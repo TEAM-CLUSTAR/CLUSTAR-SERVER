@@ -14,4 +14,18 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
 
     @Query("SELECT m FROM Memo m JOIN FETCH m.user WHERE m.id = :memoId AND m.isDeleted = false")
     Optional<Memo> findByIdWithUserAndNotDeleted(@Param("memoId") Long memoId);
+
+    @Query("""
+            SELECT DISTINCT m
+            FROM Memo m
+            LEFT JOIN FETCH m.memoLabels ml
+            LEFT JOIN FETCH ml.label
+            WHERE m.user.id = :userId
+              AND m.id IN :memoIds
+              AND m.isDeleted = false
+            """)
+    List<Memo> findByIdInWithLabelsAndNotDeleted(
+            @Param("userId") Long userId,
+            @Param("memoIds") List<Long> memoIds
+    );
 }
