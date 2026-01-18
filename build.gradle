@@ -77,19 +77,12 @@ dependencies {
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
-
     // monitoring
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
     // S3
     implementation platform("software.amazon.awssdk:bom:2.31.68")
     implementation "software.amazon.awssdk:s3"
-
-    // test h2
-    testImplementation 'com.h2database:h2'
 
     // Spring ai
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
@@ -101,18 +94,20 @@ dependencies {
     // Hibernate
     implementation "org.hibernate.orm:hibernate-vector:6.4.4.Final"
 
-//    // pdf
-//    implementation 'org.apache.pdfbox:pdfbox:2.0.30'
-//
-//    // docx
-//    implementation 'org.apache.poi:poi-ooxml:5.4.0'
-//
-//    // Google Vision OCR
-//    implementation("com.google.cloud:google-cloud-vision:3.39.0")
-
     // TikaDocumentReader
     implementation 'org.springframework.ai:spring-ai-tika-document-reader'
 
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+
+    // test ai
+    testImplementation 'org.springframework.ai:spring-ai-test'
+    testImplementation 'org.springframework.ai:spring-ai-spring-boot-testcontainers'
+
+    // test h2
+    testImplementation 'com.h2database:h2'
 }
 
 def querydslDir = "src/main/generated/querydsl"
