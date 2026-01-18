@@ -5,6 +5,7 @@ import org.project.domain.ai.event.dto.ImageBinary;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.springframework.ai.content.Media;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -20,7 +21,8 @@ public class MemoImageBinaryLoader {
 
     private final MemoImageRepository memoImageRepository;
     private final S3Client s3Client;
-    private final String bucketName = "clustar-bucket-01";
+    @Value("${cloud.aws.s3.bucket}")
+    private String bucketName;
 
     public ImageBinary load(Long imageId) {
 
