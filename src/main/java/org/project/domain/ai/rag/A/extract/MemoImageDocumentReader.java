@@ -48,11 +48,12 @@ public class MemoImageDocumentReader {
                     return Document.builder()
                             .text(ocrText)
                             .metadata(Map.of(
+                                    "type", RagDocumentType.MEMO_IMAGE.name(),
+                                    "source", "memo-image-ocr",
                                     "memoId", memoId,
                                     "imageId", imageId,
                                     "userId", userId,
-                                    "s3Key", image.s3Key(),
-                                    "source", "memo-image"
+                                    "s3Key", image.s3Key()
                             ))
                             .build();
                 })

@@ -21,6 +21,7 @@ public class MemoDocumentReader {
         Document document = new Document(
                 memo.getContent(),
                 Map.of(
+                        "type", RagDocumentType.MEMO_TEXT.name(),
                         "source", "memo-text",
                         "memoId", memo.getId(),
                         "userId", memo.getUser().getId(),

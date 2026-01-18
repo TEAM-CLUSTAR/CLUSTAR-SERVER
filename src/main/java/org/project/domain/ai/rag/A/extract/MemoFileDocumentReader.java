@@ -36,12 +36,12 @@ public class MemoFileDocumentReader {
 
             MemoFileBinary file = memoFileBinaryLoader.load(fileId);
 
-            // 1️⃣ 파일 크기 제한
+            // 파일 크기 제한
             if (file.fileSize() > MAX_FILE_SIZE) {
                 continue;
             }
 
-            // 2️⃣ byte[] → Resource
+            // byte[] → Resource
             Resource resource = new ByteArrayResource(file.bytes()) {
                 @Override
                 public String getFilename() {
@@ -49,14 +49,14 @@ public class MemoFileDocumentReader {
                 }
             };
 
-            // 3️⃣ Tika Reader
+            // Tika Reader
             TikaDocumentReader reader = new TikaDocumentReader(resource);
 
             List<Document> documents;
             try {
                 documents = reader.read();
             } catch (Exception e) {
-                // ❗ 파일 하나 실패해도 파이프라인 유지
+                // 파일 하나 실패해도 파이프라인 유지
                 continue;
             }
 
@@ -68,13 +68,13 @@ public class MemoFileDocumentReader {
                 }
 
                 doc.getMetadata().putAll(Map.of(
-                        "type", "MEMO_FILE",
+                        "type", RagDocumentType.MEMO_FILE.name(),
+                        "source", "memo-file-tika",
                         "memoId", memoId,
                         "fileId", fileId,
                         "userId", userId,
                         "fileName", file.fileName(),
-                        "fileExtension", file.extension(),
-                        "source", "memo-file"
+                        "fileExtension", file.extension()
                 ));
 
                 result.add(doc);

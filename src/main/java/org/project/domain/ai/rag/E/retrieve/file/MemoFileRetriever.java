@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.E.retrieve;
+package org.project.domain.ai.rag.E.retrieve.file;
 
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
 import org.springframework.ai.document.Document;
