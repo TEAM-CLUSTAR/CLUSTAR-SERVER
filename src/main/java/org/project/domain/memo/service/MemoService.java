@@ -1,6 +1,7 @@
 package org.project.domain.memo.service;
 
 import org.project.domain.memo.dto.request.MemoCreateRequest;
+import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
@@ -18,6 +19,8 @@ public interface MemoService {
     );
 
     MemoResponse createMemo(Long userId, MemoCreateRequest request);
+
+    MemoResponse createAiMemo(Long userId, MemoAiCreateRequest request);
 
     MemoListDashboardResponse getMemosWithMedia(
             Long userId,

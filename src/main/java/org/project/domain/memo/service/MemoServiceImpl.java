@@ -3,6 +3,7 @@ package org.project.domain.memo.service;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -120,6 +122,42 @@ public class MemoServiceImpl implements MemoService {
 
         // 파일 메타데이터 저장 (optional)
         saveMemoFiles(savedMemo, request.files(), userId);
+
+        return MemoResponse.from(savedMemo);
+    }
+
+    @Transactional
+    @Override
+    public MemoResponse createAiMemo(Long userId, MemoAiCreateRequest request) {
+
+        User user = getUserOrThrow(userId);
+
+        List<Long> sourceMemoIds = request.sourceMemoIds().stream()
+                .distinct()
+                .toList();
+
+        List<Memo> sourceMemos =
+                memoRepository.findByIdInWithLabelsAndNotDeleted(userId, sourceMemoIds);
+
+        validateSourceMemos(sourceMemoIds, sourceMemos);
+
+        Memo memo = Memo.createAiMemo(
+                request.title(),
+                request.content(),
+                user,
+                sourceMemoIds
+        );
+
+        attachLabels(memo, resolveCommonLabelNames(sourceMemos), user);
+
+        Memo savedMemo = memoRepository.save(memo);
+
+        eventPublisher.publishEvent(
+                new MemoTextCreatedEvent(
+                        savedMemo.getId(),
+                        userId
+                )
+        );
 
         return MemoResponse.from(savedMemo);
     }
@@ -263,6 +301,44 @@ public class MemoServiceImpl implements MemoService {
                 .orElseGet(() -> labelRepository.save(
                         Label.create(labelName, user)
                 ));
+    }
+
+    private void validateSourceMemos(List<Long> sourceMemoIds, List<Memo> sourceMemos) {
+        Set<Long> requestedIds = Set.copyOf(sourceMemoIds);
+        Set<Long> foundIds = sourceMemos.stream()
+                .map(Memo::getId)
+                .collect(Collectors.toSet());
+
+        if (requestedIds.size() != foundIds.size()) {
+            throw new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+        }
+    }
+
+    private List<String> resolveCommonLabelNames(List<Memo> sourceMemos) {
+        String commonLabel = null;
+
+        for (Memo memo : sourceMemos) {
+            List<Label> labels = memo.getLabels();
+            if (labels.size() != 1) {
+                return List.of();
+            }
+
+            String labelName = labels.get(0).getName();
+            if (commonLabel == null) {
+                commonLabel = labelName;
+                continue;
+            }
+
+            if (!commonLabel.equals(labelName)) {
+                return List.of();
+            }
+        }
+
+        if (commonLabel == null) {
+            return List.of();
+        }
+
+        return List.of(commonLabel);
     }
 
     private void saveMemoImages(Memo memo, List<MemoCreateRequest.ImageRequest> images, Long userId) {

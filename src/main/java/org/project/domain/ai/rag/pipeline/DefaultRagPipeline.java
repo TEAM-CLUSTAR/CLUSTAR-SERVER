@@ -9,6 +9,7 @@ import org.project.domain.ai.rag.E.retrieve.RagRetriever;
 import org.project.domain.ai.rag.F.augment.RagAugmenter;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 import org.project.domain.ai.rag.G.generate.RagGenerator;
+import org.project.global.util.MemoContentParser;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
@@ -40,10 +41,13 @@ public class DefaultRagPipeline implements RagPipeline {
 
         // 4️⃣ Generate
         String content = generator.generate(prompt);
+        MemoContentParser.ParsedMemoContent parsed =
+                MemoContentParser.parseTitleAndContent(content);
 
         // 5️⃣ Response 조립 (파이프라인 책임 OK)
         return MemoAiResponse.of(
-                content,
+                parsed.title(),
+                parsed.content(),
                 query.option(),
                 query.memoIds(),
                 prompt.toDebugString()
@@ -67,10 +71,13 @@ public class DefaultRagPipeline implements RagPipeline {
 
         // 4️⃣ Generate
         String content = generator.generate(planPromptApplied);
+        MemoContentParser.ParsedMemoContent parsed =
+                MemoContentParser.parseTitleAndContent(content);
 
         // 5️⃣ Response
         return MemoAiResponse.of(
-                content,
+                parsed.title(),
+                parsed.content(),
                 query.option(),
                 query.memoIds(),
                 planPromptApplied.toDebugString()
