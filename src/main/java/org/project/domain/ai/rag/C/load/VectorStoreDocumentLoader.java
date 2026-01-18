@@ -24,13 +24,22 @@ public class VectorStoreDocumentLoader {
         log.info("[VectorStore] Loading {} documents (chunks)", documents.size());
 
         documents.stream()
-                .limit(2)
-                .forEach(doc -> log.debug(
-                        "[Chunk Preview] id={}, length={}, metadata={}",
-                        doc.getId(),
-                        doc.getText() != null ? doc.getText().length() : -1,
-                        doc.getMetadata()
-                ));
+                .limit(10)
+                .forEach(doc -> {
+                    String text = doc.getText();
+                    String preview = (text == null)
+                            ? "null"
+                            : text.substring(0, Math.min(100, text.length()));
+
+                    log.info(
+                            "[Chunk Preview] id={}, length={}, preview=\"{}\", metadata={}",
+                            doc.getId(),
+                            text != null ? text.length() : -1,
+                            preview.replaceAll("\\s+", " "), // 줄바꿈 정리
+                            doc.getMetadata()
+                    );
+                });
+
 
         vectorStore.write(documents);
 
