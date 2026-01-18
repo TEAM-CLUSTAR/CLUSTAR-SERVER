@@ -12,8 +12,8 @@ import org.project.global.exception.errorcode.MemoErrorCode;
 import org.springframework.ai.document.Document;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
@@ -29,11 +29,10 @@ public class MemoTextEmbeddingListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-//    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handle(MemoTextCreatedEvent event) {
 
         // 1️⃣ Extract
-        Memo memo = memoRepository.findById(event.memoId())
+        Memo memo = memoRepository.findByIdWithUserAndNotDeleted(event.memoId())
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
         List<Document> extractedDocuments =
