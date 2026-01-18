@@ -37,7 +37,7 @@ public class MemoImageDocumentReader {
                     }
 
                     String ocrText =
-                            ocrProcessor.extractText(image.bytes());
+                            ocrProcessor.extractText(image.bytes(), image.mimeType());
 
                     // OCR 실패 이미지 제외
                     if (ocrText == null || ocrText.isBlank()) {

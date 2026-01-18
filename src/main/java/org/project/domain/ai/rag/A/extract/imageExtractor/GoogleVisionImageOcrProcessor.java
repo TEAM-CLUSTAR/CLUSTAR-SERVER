@@ -7,6 +7,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeType;
 
 import java.util.List;
 
@@ -18,17 +19,17 @@ public class GoogleVisionImageOcrProcessor implements ImageOcrProcessor {
     private final ChatClient chatClient;
 
     @Override
-    public String extractText(byte[] imageBytes) {
+    public String extractText(byte[] imageBytes, MimeType mimeType) {
 
         try {
-            // 1️⃣ Media 객체 (Spring AI 규격)
+            // Media 객체 (Spring AI 규격)
             Media imageMedia = Media.builder()
-                    .mimeType(Media.Format.IMAGE_PNG) // JPG면 IMAGE_JPEG
+                    .mimeType(mimeType)
                     .data(imageBytes)
-                    .name("memo-image") // 중립적인 이름 (프롬프트 인젝션 방지)
+                    .name("memo-image")
                     .build();
 
-            // 2️⃣ 이미지 문서화 프롬프트
+            // 이미지 문서화 프롬프트
             String promptText = """
                 당신은 문서 분석 전문가입니다.
 
@@ -43,13 +44,13 @@ public class GoogleVisionImageOcrProcessor implements ImageOcrProcessor {
                 - 불필요한 감상이나 의견은 제외하세요
                 """;
 
-            // 3️⃣ UserMessage (텍스트 + Media)
+            // UserMessage (텍스트 + Media)
             UserMessage userMessage = UserMessage.builder()
                     .text(promptText)
                     .media(List.of(imageMedia))
                     .build();
 
-            // 4️⃣ Chat 호출
+            // Chat 호출
             String result = chatClient
                     .prompt(new Prompt(List.of(userMessage)))
                     .call()

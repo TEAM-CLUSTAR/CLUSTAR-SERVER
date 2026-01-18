@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.event.dto.ImageBinary;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.repository.MemoImageRepository;
+import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeType;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -38,10 +40,29 @@ public class MemoImageBinaryLoader {
             throw new IllegalStateException("Failed to load image from S3", e);
         }
 
+        MimeType mimeType = toMediaFormat(image.getImageExtension());
+
         return new ImageBinary(
                 bytes,
                 image.getImageS3Key(),
-                image.getImageBytes()
+                image.getImageBytes(),
+                mimeType
         );
     }
+
+    private MimeType toMediaFormat(String extension) {
+
+        if (extension == null) {
+            return null;
+        }
+
+        return switch (extension.toLowerCase()) {
+            case "png" -> Media.Format.IMAGE_PNG;
+            case "jpg", "jpeg" -> Media.Format.IMAGE_JPEG;
+            case "webp" -> Media.Format.IMAGE_WEBP;
+            case "gif" -> Media.Format.IMAGE_GIF;
+            default -> null;
+        };
+    }
+
 }
