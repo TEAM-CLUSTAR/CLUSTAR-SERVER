@@ -22,6 +22,11 @@ public class GoogleVisionImageOcrProcessor implements ImageOcrProcessor {
     public String extractText(byte[] imageBytes, MimeType mimeType) {
 
         try {
+            if (mimeType == null) {
+                log.warn("Unknown MIME type, skipping OCR");
+                return null;
+            }
+
             // Media 객체 (Spring AI 규격)
             Media imageMedia = Media.builder()
                     .mimeType(mimeType)
