@@ -4,7 +4,7 @@ import java.util.regex.Pattern;
 
 public final class MarkdownUtil {
     private static final Pattern FENCED_CODE = Pattern.compile("(?s)```.*?```");
-    private static final Pattern INLINE_CODE = Pattern.compile("`[^`]*`");
+    private static final Pattern INLINE_CODE = Pattern.compile("`([^`]*)`");
     private static final Pattern IMAGES = Pattern.compile("!\\[(.*?)]\\((.*?)\\)");
     private static final Pattern LINKS = Pattern.compile("\\[(.*?)]\\((.*?)\\)");
     // 헤더 기호 제거
@@ -32,7 +32,7 @@ public final class MarkdownUtil {
 
         String result = input;
         result = FENCED_CODE.matcher(result).replaceAll("");
-        result = INLINE_CODE.matcher(result).replaceAll("");
+        result = INLINE_CODE.matcher(result).replaceAll("$1");
         result = IMAGES.matcher(result).replaceAll("$1");
         result = LINKS.matcher(result).replaceAll("$1");
         result = HEADING.matcher(result).replaceAll("");
