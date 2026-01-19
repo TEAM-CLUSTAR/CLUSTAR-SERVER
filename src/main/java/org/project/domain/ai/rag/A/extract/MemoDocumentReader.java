@@ -24,9 +24,7 @@ public class MemoDocumentReader {
                         "type", RagDocumentType.MEMO_TEXT.name(),
                         "memoId", memo.getId(),
                         "userId", memo.getUser().getId(),
-                        "title", memo.getTitle(),
-                        "isPinned", memo.getIsPinned(),
-                        "isAiGenerated", memo.getIsAiGenerated()
+                        "title", memo.getTitle()
                 )
         );
 

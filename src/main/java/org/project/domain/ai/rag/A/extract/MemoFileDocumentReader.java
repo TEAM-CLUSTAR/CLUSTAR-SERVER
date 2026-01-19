@@ -76,6 +76,7 @@ public class MemoFileDocumentReader {
                         "fileExtension", file.extension(),
                         "s3Key", file.s3Key()
                 ));
+                doc.getMetadata().remove("source");
 
                 result.add(doc);
             }
