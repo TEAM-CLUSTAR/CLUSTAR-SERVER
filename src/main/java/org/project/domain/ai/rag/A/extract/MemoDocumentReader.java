@@ -22,7 +22,6 @@ public class MemoDocumentReader {
                 memo.getContent(),
                 Map.of(
                         "type", RagDocumentType.MEMO_TEXT.name(),
-                        "source", "memo-text",
                         "memoId", memo.getId(),
                         "userId", memo.getUser().getId(),
                         "title", memo.getTitle(),
