@@ -803,7 +803,10 @@ class MemoControllerTest {
                             false,  // isPinned
                             false,  // isAiGenerated
                             LocalDateTime.now(),
-                            List.of("SOPT", "교양")
+                            List.of(
+                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT"),
+                                    new MemoListDashboardResponse.LabelResponse(2L, "교양")
+                            )
                     );
 
             MemoListDashboardResponse.MemoDashboardResponse memo2 =
@@ -871,7 +874,9 @@ class MemoControllerTest {
                             false,
                             false,
                             LocalDateTime.now(),
-                            List.of("SOPT")
+                            List.of(
+                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT")
+                            )
                     );
 
             MemoListDashboardResponse expectedResponse =

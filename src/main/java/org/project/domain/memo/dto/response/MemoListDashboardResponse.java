@@ -34,7 +34,7 @@ public record MemoListDashboardResponse(
             Boolean isAiGenerated,
             LocalDateTime createdAt,
 
-            List<String> labelList
+            List<LabelResponse> labelList
     ) {
 
         /**
@@ -57,9 +57,26 @@ public record MemoListDashboardResponse(
                     memo.getIsPinned(),
                     memo.getIsAiGenerated(),
                     memo.getCreatedAt(),
-                    memo.getLabels().stream()
-                            .map(Label::getName)
+                    memo.getMemoLabels().stream()
+                            .map(MemoLabel::getLabel)
+                            .map(LabelResponse::from)
                             .toList()
+            );
+        }
+    }
+
+    /**
+     * 라벨 응답
+     */
+    public record LabelResponse(
+            Long labelId,
+            String name
+    ) {
+
+        public static LabelResponse from(Label label) {
+            return new LabelResponse(
+                    label.getId(),
+                    label.getName()
             );
         }
     }
