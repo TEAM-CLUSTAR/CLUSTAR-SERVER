@@ -43,6 +43,7 @@ public record MemoListDashboardResponse(
          */
         public static MemoDashboardResponse of(
                 Memo memo,
+                String content,
                 String representativeImageUrl,
                 int imageCount,
                 int fileCount
@@ -50,7 +51,7 @@ public record MemoListDashboardResponse(
             return new MemoDashboardResponse(
                     memo.getId(),
                     memo.getTitle(),
-                    memo.getContent(),
+                    content,
                     representativeImageUrl,
                     imageCount,
                     fileCount,
@@ -62,6 +63,15 @@ public record MemoListDashboardResponse(
                             .map(LabelResponse::from)
                             .toList()
             );
+        }
+
+        public static MemoDashboardResponse of(
+                Memo memo,
+                String representativeImageUrl,
+                int imageCount,
+                int fileCount
+        ) {
+            return of(memo, memo.getContent(), representativeImageUrl, imageCount, fileCount);
         }
     }
 

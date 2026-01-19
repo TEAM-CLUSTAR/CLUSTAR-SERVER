@@ -25,6 +25,7 @@ import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
 import org.project.global.util.FileSizeUtil;
+import org.project.global.util.MarkdownUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
 import org.springframework.context.ApplicationEventPublisher;
@@ -248,7 +249,7 @@ public class MemoServiceImpl implements MemoService {
         List<Memo> memos = memoRepository.findAllByUserIdWithLabelsAndNotDeleted(userId);
 
         List<MemoStructureResponse> responses = memos.stream()
-                .map(MemoStructureResponse::from)
+                .map(memo -> MemoStructureResponse.from(memo, MarkdownUtil.strip(memo.getContent())))
                 .toList();
 
         return MemoStructureListResponse.from(responses);
@@ -448,6 +449,7 @@ public class MemoServiceImpl implements MemoService {
 
         return MemoListDashboardResponse.MemoDashboardResponse.of(
                 memo,
+                MarkdownUtil.strip(memo.getContent()),
                 representativeImageUrl,
                 memoImages.size(),
                 memoFiles.size()

@@ -18,10 +18,17 @@ public record MemoStructureResponse(
     public static MemoStructureResponse from(
             Memo memo
     ) {
+        return from(memo, memo.getContent());
+    }
+
+    public static MemoStructureResponse from(
+            Memo memo,
+            String content
+    ) {
         return new MemoStructureResponse(
                 memo.getId(),
                 memo.getTitle(),
-                memo.getContent(),
+                content,
                 memo.getMemoLabels().stream()
                         .map(MemoLabel::getLabel)
                         .map(MemoListDashboardResponse.LabelResponse::from)
@@ -29,5 +36,4 @@ public record MemoStructureResponse(
         );
     }
 }
-
 
