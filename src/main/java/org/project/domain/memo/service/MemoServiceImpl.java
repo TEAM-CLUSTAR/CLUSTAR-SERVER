@@ -6,10 +6,7 @@ import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
-import org.project.domain.memo.dto.response.MemoDetailResponse;
-import org.project.domain.memo.dto.response.MemoListDashboardResponse;
-import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
-import org.project.domain.memo.dto.response.MemoResponse;
+import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
@@ -243,6 +240,18 @@ public class MemoServiceImpl implements MemoService {
         List<MemoDetailResponse.FileInfo> files = mapToFileInfos(memo.getMemoFiles());
 
         return MemoDetailResponse.from(memo, images, files);
+    }
+
+    @Override
+    public MemoStructureListResponse getStructureMemo(Long userId){
+        // 메모 + 라벨 한번에 조회
+        List<Memo> memos = memoRepository.findAllByUserIdWithLabelsAndNotDeleted(userId);
+
+        List<MemoStructureResponse> responses = memos.stream()
+                .map(MemoStructureResponse::from)
+                .toList();
+
+        return MemoStructureListResponse.from(responses);
     }
 
     @Override
