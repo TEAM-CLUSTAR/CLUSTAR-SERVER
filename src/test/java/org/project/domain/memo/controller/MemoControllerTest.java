@@ -803,10 +803,7 @@ class MemoControllerTest {
                             false,  // isPinned
                             false,  // isAiGenerated
                             LocalDateTime.now(),
-                            List.of(
-                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT"),
-                                    new MemoListDashboardResponse.LabelResponse(2L, "교양")
-                            )
+                            List.of("SOPT", "교양")
                     );
 
             MemoListDashboardResponse.MemoDashboardResponse memo2 =
@@ -847,7 +844,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos[0].imageCount").value(2))
                     .andExpect(jsonPath("$.data.memos[0].fileCount").value(1))
                     .andExpect(jsonPath("$.data.memos[0].isPinned").value(false))
-                    .andExpect(jsonPath("$.data.memos[0].labels.length()").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].labelList.length()").value(2))
                     .andExpect(jsonPath("$.data.memos[1].memoId").value(2L))
                     .andExpect(jsonPath("$.data.memos[1].isPinned").value(true));
 
@@ -874,9 +871,7 @@ class MemoControllerTest {
                             false,
                             false,
                             LocalDateTime.now(),
-                            List.of(
-                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT")
-                            )
+                            List.of("SOPT")
                     );
 
             MemoListDashboardResponse expectedResponse =
@@ -897,8 +892,7 @@ class MemoControllerTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.memos.length()").value(1))
-                    .andExpect(jsonPath("$.data.memos[0].labels[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.memos[0].labels[0].name").value("SOPT"));
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0]").value("SOPT"));
 
             verify(memoService, times(1))
                     .getMemosWithMedia(eq(userId), eq(labelIds), eq(null), eq(null), eq(20));
@@ -1183,4 +1177,3 @@ class MemoControllerTest {
         }
     }
 }
-
