@@ -596,8 +596,20 @@ class MemoServiceImplTest {
             Memo memo = Memo.createMemo("제목", "내용", user);
             String imageKey1 = "memo/images/key-001.jpg";
             String imageKey2 = "memo/images/key-002.png";
-            memo.addImage(imageKey1, 1024L, "jpg", 1);
-            memo.addImage(imageKey2, 2048L, "png", 2);
+            memo.getMemoImages().add(MemoImage.builder()
+                    .memo(memo)
+                    .imageS3Key(imageKey1)
+                    .imageBytes(1024L)
+                    .imageExtension("jpg")
+                    .imagePriority(1)
+                    .build());
+            memo.getMemoImages().add(MemoImage.builder()
+                    .memo(memo)
+                    .imageS3Key(imageKey2)
+                    .imageBytes(2048L)
+                    .imageExtension("png")
+                    .imagePriority(2)
+                    .build());
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             // when
