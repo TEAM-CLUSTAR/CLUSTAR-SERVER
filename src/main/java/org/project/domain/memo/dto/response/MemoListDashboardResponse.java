@@ -63,20 +63,4 @@ public record MemoListDashboardResponse(
             );
         }
     }
-
-    /**
-     * 라벨 응답
-     */
-    public record LabelResponse(
-            Long labelId,
-            String name
-    ) {
-
-        public static LabelResponse from(Label label) {
-            return new LabelResponse(
-                    label.getId(),
-                    label.getName()
-            );
-        }
-    }
 }
