@@ -34,7 +34,7 @@ public record MemoListDashboardResponse(
             Boolean isAiGenerated,
             LocalDateTime createdAt,
 
-            List<String> labelList
+            List<LabelResponse> labelList
     ) {
 
         /**
@@ -43,6 +43,7 @@ public record MemoListDashboardResponse(
          */
         public static MemoDashboardResponse of(
                 Memo memo,
+                String content,
                 String representativeImageUrl,
                 int imageCount,
                 int fileCount
@@ -50,16 +51,42 @@ public record MemoListDashboardResponse(
             return new MemoDashboardResponse(
                     memo.getId(),
                     memo.getTitle(),
-                    memo.getContent(),
+                    content,
                     representativeImageUrl,
                     imageCount,
                     fileCount,
                     memo.getIsPinned(),
                     memo.getIsAiGenerated(),
                     memo.getCreatedAt(),
-                    memo.getLabels().stream()
-                            .map(Label::getName)
+                    memo.getMemoLabels().stream()
+                            .map(MemoLabel::getLabel)
+                            .map(LabelResponse::from)
                             .toList()
+            );
+        }
+
+        public static MemoDashboardResponse of(
+                Memo memo,
+                String representativeImageUrl,
+                int imageCount,
+                int fileCount
+        ) {
+            return of(memo, memo.getContent(), representativeImageUrl, imageCount, fileCount);
+        }
+    }
+
+    /**
+     * 라벨 응답
+     */
+    public record LabelResponse(
+            Long labelId,
+            String name
+    ) {
+
+        public static LabelResponse from(Label label) {
+            return new LabelResponse(
+                    label.getId(),
+                    label.getName()
             );
         }
     }

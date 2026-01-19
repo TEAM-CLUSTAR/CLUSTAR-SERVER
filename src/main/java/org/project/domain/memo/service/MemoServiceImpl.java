@@ -6,10 +6,7 @@ import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
-import org.project.domain.memo.dto.response.MemoDetailResponse;
-import org.project.domain.memo.dto.response.MemoListDashboardResponse;
-import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
-import org.project.domain.memo.dto.response.MemoResponse;
+import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
@@ -28,6 +25,7 @@ import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.UserErrorCode;
 import org.project.global.util.FileSizeUtil;
+import org.project.global.util.MarkdownUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
 import org.springframework.context.ApplicationEventPublisher;
@@ -246,6 +244,18 @@ public class MemoServiceImpl implements MemoService {
     }
 
     @Override
+    public MemoStructureListResponse getStructureMemo(Long userId){
+        // 메모 + 라벨 한번에 조회
+        List<Memo> memos = memoRepository.findAllByUserIdWithLabelsAndNotDeleted(userId);
+
+        List<MemoStructureResponse> responses = memos.stream()
+                .map(memo -> MemoStructureResponse.from(memo, MarkdownUtil.strip(memo.getContent())))
+                .toList();
+
+        return MemoStructureListResponse.from(responses);
+    }
+
+    @Override
     @Transactional
     public void deleteMemo(Long userId, Long memoId) {
 
@@ -439,6 +449,7 @@ public class MemoServiceImpl implements MemoService {
 
         return MemoListDashboardResponse.MemoDashboardResponse.of(
                 memo,
+                MarkdownUtil.strip(memo.getContent()),
                 representativeImageUrl,
                 memoImages.size(),
                 memoFiles.size()

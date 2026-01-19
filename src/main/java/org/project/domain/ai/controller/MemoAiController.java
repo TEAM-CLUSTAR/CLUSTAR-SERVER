@@ -33,7 +33,7 @@ public class MemoAiController {
     private final AiEvaluationService aiEvaluationService;
 
     @Operation(
-            summary = "메모 기반 AI 응답 생성",
+            summary = "AI 메모 응답 생성",
             description = """
                     선택한 메모들을 기반으로 RAG를 수행하여
                     AI 응답을 생성합니다.
