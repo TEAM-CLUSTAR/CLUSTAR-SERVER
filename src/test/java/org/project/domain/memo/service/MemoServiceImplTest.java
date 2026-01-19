@@ -141,6 +141,56 @@ class MemoServiceImplTest {
         }
 
         @Test
+        @DisplayName("이미지 개수가 5개를 초과하면 예외가 발생한다.")
+        void createMemo_TooManyImages() {
+            given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
+
+            List<MemoCreateRequest.ImageRequest> images = List.of(
+                    new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", 100L, "png", 1),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", 100L, "png", 2),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/3.png", "3.png", 100L, "png", 3),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/4.png", "4.png", 100L, "png", 4),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/5.png", "5.png", 100L, "png", 5),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/6.png", "6.png", 100L, "png", 6)
+            );
+
+            MemoCreateRequest tooManyImagesRequest = new MemoCreateRequest(
+                    "제목",
+                    "내용",
+                    null,
+                    images,
+                    List.of()
+            );
+
+            assertThatThrownBy(() -> memoService.createMemo(user.getId(), tooManyImagesRequest))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TOO_MANY_IMAGES);
+        }
+
+        @Test
+        @DisplayName("파일 용량이 제한을 초과하면 예외가 발생한다.")
+        void createMemo_FileTooLarge() {
+            given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
+
+            long overLimit = 10L * 1024 * 1024 + 1;
+            List<MemoCreateRequest.FileRequest> files = List.of(
+                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", overLimit, "pdf", 1)
+            );
+
+            MemoCreateRequest tooLargeFileRequest = new MemoCreateRequest(
+                    "제목",
+                    "내용",
+                    null,
+                    List.of(),
+                    files
+            );
+
+            assertThatThrownBy(() -> memoService.createMemo(user.getId(), tooLargeFileRequest))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FILE_TOO_LARGE);
+        }
+
+        @Test
         @DisplayName("메모 생성 실패 - 사용자가 존재하지 않음")
         void createMemo_fail_userNotFound() {
             // given
@@ -674,6 +724,68 @@ class MemoServiceImplTest {
             // S3Util이 각각 1번씩 호출되었는지 확인
             verify(s3Util, times(1)).createPresignedPutUrl(eq(userId), eq("memo-image"), any(), any(), any());
             verify(s3Util, times(1)).createPresignedPutUrl(eq(userId), eq("memo-file"), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("이미지 개수가 5개를 초과하면 예외가 발생한다.")
+        void issuePresignedUrls_TooManyImages() {
+            List<MemoPresignedUrlRequest.UploadRequest> images = List.of(
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 1),
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 2),
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 3),
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 4),
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 5),
+                    new MemoPresignedUrlRequest.UploadRequest("jpg", 100L, 6)
+            );
+
+            var request = new MemoPresignedUrlRequest(images, List.of());
+
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TOO_MANY_IMAGES);
+        }
+
+        @Test
+        @DisplayName("파일 개수가 5개를 초과하면 예외가 발생한다.")
+        void issuePresignedUrls_TooManyFiles() {
+            List<MemoPresignedUrlRequest.UploadRequest> files = List.of(
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 1),
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 2),
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 3),
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 4),
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 5),
+                    new MemoPresignedUrlRequest.UploadRequest("pdf", 100L, 6)
+            );
+
+            var request = new MemoPresignedUrlRequest(List.of(), files);
+
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TOO_MANY_FILES);
+        }
+
+        @Test
+        @DisplayName("이미지 용량이 제한을 초과하면 예외가 발생한다.")
+        void issuePresignedUrls_ImageTooLarge() {
+            long overLimit = 5L * 1024 * 1024 + 1;
+            var imageUploadReq = new MemoPresignedUrlRequest.UploadRequest("png", overLimit, 1);
+            var request = new MemoPresignedUrlRequest(List.of(imageUploadReq), List.of());
+
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.IMAGE_TOO_LARGE);
+        }
+
+        @Test
+        @DisplayName("파일 용량이 제한을 초과하면 예외가 발생한다.")
+        void issuePresignedUrls_FileTooLarge() {
+            long overLimit = 10L * 1024 * 1024 + 1;
+            var fileUploadReq = new MemoPresignedUrlRequest.UploadRequest("pdf", overLimit, 1);
+            var request = new MemoPresignedUrlRequest(List.of(), List.of(fileUploadReq));
+
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FILE_TOO_LARGE);
         }
     }
 }
