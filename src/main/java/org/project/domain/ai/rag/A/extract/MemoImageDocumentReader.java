@@ -49,10 +49,9 @@ public class MemoImageDocumentReader {
                             .text(ocrText)
                             .metadata(Map.of(
                                     "type", RagDocumentType.MEMO_IMAGE.name(),
-                                    "source", "memo-image-ocr",
                                     "memoId", memoId,
-                                    "imageId", imageId,
                                     "userId", userId,
+                                    "imageId", imageId,
                                     "s3Key", image.s3Key()
                             ))
                             .build();

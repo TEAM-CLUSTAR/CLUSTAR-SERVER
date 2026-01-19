@@ -1,6 +1,5 @@
 package org.project.domain.ai.rag.B.transform;
 
-import org.project.domain.ai.rag.B.transform.file.FileMetadataEnricherTransformer;
 import org.project.domain.ai.rag.B.transform.file.FileTextCleanupTransformer;
 import org.project.domain.ai.rag.B.transform.file.FileTokenTextSplitterTransformer;
 import org.project.domain.ai.rag.B.transform.image.MemoImageChunkTransformer;
@@ -19,10 +18,9 @@ public class RagTransformerConfig {
     @Qualifier("fileTransformers")
     public List<DocumentTransformer> fileTransformers(
             FileTextCleanupTransformer cleanup,
-            FileTokenTextSplitterTransformer splitter,
-            FileMetadataEnricherTransformer metadata
+            FileTokenTextSplitterTransformer splitter
     ) {
-        return List.of(cleanup, splitter, metadata);
+        return List.of(cleanup, splitter);
     }
 
     @Bean

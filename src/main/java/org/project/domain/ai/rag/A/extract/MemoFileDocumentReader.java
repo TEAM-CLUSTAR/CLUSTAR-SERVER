@@ -69,13 +69,14 @@ public class MemoFileDocumentReader {
 
                 doc.getMetadata().putAll(Map.of(
                         "type", RagDocumentType.MEMO_FILE.name(),
-                        "source", "memo-file-tika",
                         "memoId", memoId,
-                        "fileId", fileId,
                         "userId", userId,
+                        "fileId", fileId,
                         "fileName", file.fileName(),
-                        "fileExtension", file.extension()
+                        "fileExtension", file.extension(),
+                        "s3Key", file.s3Key()
                 ));
+                doc.getMetadata().remove("source");
 
                 result.add(doc);
             }
