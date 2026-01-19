@@ -9,7 +9,9 @@ public enum MemoErrorCode implements ErrorCode {
     SOURCE_MEMO_NOT_FOUND(HttpStatus.NOT_FOUND,404,"참고한 메모 ID 중 일부를 찾을 수 없습니다."),
     FORBIDDEN_MEMO(HttpStatus.FORBIDDEN, 403, "해당 메모에 접근할 권한이 없습니다."),
     INVALID_S3_KEY_FORMAT(HttpStatus.BAD_REQUEST, 400, "S3 키 형식이 올바르지 않습니다."),
-    S3_KEY_USER_MISMATCH(HttpStatus.FORBIDDEN, 403, "요청한 사용자와 S3 리소스 소유자가 일치하지 않습니다.");
+    S3_KEY_USER_MISMATCH(HttpStatus.FORBIDDEN, 403, "요청한 사용자와 S3 리소스 소유자가 일치하지 않습니다."),
+    TOO_MANY_IMAGES(HttpStatus.BAD_REQUEST, 400, "이미지는 최대 5개까지 업로드할 수 있습니다."),
+    TOO_MANY_FILES(HttpStatus.BAD_REQUEST, 400, "파일은 최대 5개까지 업로드할 수 있습니다.");
 
     private final HttpStatus status;
     private final int code;

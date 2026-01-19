@@ -60,10 +60,15 @@ public class MemoServiceImpl implements MemoService {
 
     private final ApplicationEventPublisher eventPublisher;
 
+    private static final int MAX_IMAGE_COUNT = 5;
+    private static final int MAX_FILE_COUNT = 5;
+
     public MemoPresignedUrlResponse issuePresignedUrls(
             Long userId,
             MemoPresignedUrlRequest request
     ) {
+        validateImageCount(request.images());
+        validateFileCount(request.files());
 
         List<MemoPresignedUrlResponse.PresignedUrlResponse> imageUrls =
                 request.images().stream()
@@ -96,6 +101,9 @@ public class MemoServiceImpl implements MemoService {
 
         // 사용자 조회
         User user = getUserOrThrow(userId);
+
+        validateImageCount(request.images());
+        validateFileCount(request.files());
 
         // 메모 생성
         Memo memo = Memo.createMemo(
@@ -461,5 +469,17 @@ public class MemoServiceImpl implements MemoService {
                 ))
                 .filter(f -> f.fileUrl() != null)
                 .toList();
+    }
+
+    private void validateImageCount(List<?> images) {
+        if (images != null && images.size() > MAX_IMAGE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_IMAGES);
+        }
+    }
+
+    private void validateFileCount(List<?> files) {
+        if (files != null && files.size() > MAX_FILE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
+        }
     }
 }
