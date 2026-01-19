@@ -12,6 +12,7 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
+import org.project.domain.memo.dto.response.MemoStructureListResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.annotation.BusinessExceptionDescription;
@@ -79,9 +80,9 @@ public class MemoController {
     }
 
     @Operation(
-            summary = "AI 메모 작성",
+            summary = "AI가 만든 메모 저장",
             description = """
-                AI 응답 결과를 기반으로 메모를 작성합니다.
+                AI 응답 결과를 기반으로 메모를 등록요청을 하는 API입니다.
                 제목과 본문을 분리해서 전달해야 합니다.
                 """
     )
@@ -156,6 +157,19 @@ public class MemoController {
         Long userId = userDetails.getUserId();
 
         MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.ok(response));
+
+    }
+
+    @GetMapping("/structure")
+    public ResponseEntity<ApiResponse<MemoStructureListResponse>> getStructureMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ){
+        Long userId = userDetails.getUserId();
+
+        MemoStructureListResponse response = memoService.getStructureMemo(userId);
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.ok(response));
