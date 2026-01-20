@@ -164,7 +164,7 @@ public class MemoController {
     }
 
     @GetMapping("/structure")
-    @Operation(summary = "구조화뷰 메모 조회", description = "구조화뷰를 위한 전체 메모를 조회합니다.")
+    @Operation(summary = "구조화뷰 메모 전체 조회", description = "구조화뷰를 위한 전체 메모를 조회합니다.")
     public ResponseEntity<ApiResponse<MemoStructureListResponse>> getStructureMemo(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ){

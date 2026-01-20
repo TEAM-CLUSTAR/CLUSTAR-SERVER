@@ -4,6 +4,7 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoLabel;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.project.global.util.MemoContentUtils;
 
 import java.util.List;
 
@@ -22,19 +23,13 @@ public record MemoStructureResponse(
 ) {
 
     public static MemoStructureResponse from(
-            Memo memo
-    ) {
-        return from(memo, memo.getContent());
-    }
-
-    public static MemoStructureResponse from(
             Memo memo,
             String content
     ) {
         return new MemoStructureResponse(
                 memo.getId(),
                 memo.getTitle(),
-                content,
+                MemoContentUtils.truncateForDashboard(content),
                 memo.getMemoLabels().stream()
                         .map(MemoLabel::getLabel)
                         .map(MemoListDashboardResponse.LabelResponse::from)
