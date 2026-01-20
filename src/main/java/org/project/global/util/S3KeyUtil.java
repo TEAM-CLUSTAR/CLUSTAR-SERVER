@@ -19,7 +19,7 @@ public class S3KeyUtil {
             String[] parts = s3Key.split("/");
 
             if (parts.length < 2) {
-                throw new IllegalArgumentException();
+                throw new MemoException(MemoErrorCode.INVALID_S3_KEY_FORMAT);
             }
 
             return Long.parseLong(parts[1]); // index 1 = userId

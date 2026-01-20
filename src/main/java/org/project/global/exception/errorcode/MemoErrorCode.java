@@ -13,7 +13,9 @@ public enum MemoErrorCode implements ErrorCode {
     TOO_MANY_IMAGES(HttpStatus.BAD_REQUEST, 400, "이미지는 최대 5개까지 업로드할 수 있습니다."),
     TOO_MANY_FILES(HttpStatus.BAD_REQUEST, 400, "파일은 최대 5개까지 업로드할 수 있습니다."),
     IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, 400, "이미지 용량은 최대 5MB까지 가능합니다."),
-    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, 400, "파일 용량은 최대 10MB까지 가능합니다.");
+    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, 400, "파일 용량은 최대 10MB까지 가능합니다."),
+    MEMO_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 이미지를 찾을 수 없습니다."),
+    MEMO_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 파일을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final int code;
