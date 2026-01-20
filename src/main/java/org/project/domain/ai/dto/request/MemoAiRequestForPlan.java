@@ -16,7 +16,6 @@ public record MemoAiRequestForPlan(
         )
         String userPrompt,
 
-        @NotNull
         @Schema(
                 description = "AI 처리 옵션",
                 example = "MERGE"
@@ -57,14 +56,18 @@ public record MemoAiRequestForPlan(
         Double temperature
 ) {
 
-    public static MemoAiRequestForPlan of(
+        public MemoAiRequestForPlan {
+                option = (option == null) ? MemoAiOptions.DEFAULT : option;
+        }
+
+        public static MemoAiRequestForPlan of(
             String userPrompt,
             MemoAiOptions option,
             List<Long> memoIds,
             String systemPrompt,
             String model,
             Double temperature
-    ) {
+        ) {
         return new MemoAiRequestForPlan(userPrompt, option, memoIds, systemPrompt, model, temperature);
-    }
+        }
 }
