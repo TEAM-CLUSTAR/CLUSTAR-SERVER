@@ -9,6 +9,10 @@ public class SystemPromptResolver {
     public String resolve(MemoAiOptions option) {
 
         return switch (option) {
+            case DEFAULT -> """
+                    그냥 기본값 시스템 프롬프트
+                    """;
+
             case MERGE -> """
                     첫 줄은 제목, 두번째 줄부터 본문이니 제목은 전체를 아우르는 말로 생성해.
                     여러 메모를 하나의 문서로 정리해.
