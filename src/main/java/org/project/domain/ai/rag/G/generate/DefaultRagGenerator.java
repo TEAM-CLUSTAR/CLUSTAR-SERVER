@@ -18,16 +18,16 @@ public class DefaultRagGenerator implements RagGenerator {
 
         return chatClient
                 .prompt()
-                .system(prompt.systemPrompt())
-                .user("""
-                  %s
+                .system("""
+                %s
 
-                  [CONTEXT]
-                  %s
-                  """.formatted(
-                        prompt.userPrompt(),
+                [CONTEXT]
+                %s
+                """.formatted(
+                        prompt.systemPrompt(),
                         prompt.context()
                 ))
+                .user(prompt.userPrompt())
                 .advisors(a -> a.param(
                         ChatMemory.CONVERSATION_ID,
                         prompt.conversationId()
@@ -46,16 +46,16 @@ public class DefaultRagGenerator implements RagGenerator {
                         .temperature(temperature)
                         .build()
                 )
-                .system(prompt.systemPrompt())
-                .user("""
-                  %s
+                .system("""
+                %s
 
-                  [CONTEXT]
-                  %s
-                  """.formatted(
-                        prompt.userPrompt(),
+                [CONTEXT]
+                %s
+                """.formatted(
+                        prompt.systemPrompt(),
                         prompt.context()
                 ))
+                .user(prompt.userPrompt())
                 .advisors(a -> a.param(
                         ChatMemory.CONVERSATION_ID,
                         prompt.conversationId()
