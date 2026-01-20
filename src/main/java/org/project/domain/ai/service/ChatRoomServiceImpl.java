@@ -79,15 +79,15 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(() ->
-                        new AiException(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND)
+                        new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND)
                 );
 
         if (!chatRoom.getUser().getId().equals(userId)) {
-            throw new AiException(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED);
+            throw new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED);
         }
 
         if (Boolean.TRUE.equals(chatRoom.getIsDeleted())) {
-            throw new AiException(ChatRoomErrorCode.CHAT_ROOM_ALREADY_DELETED);
+            throw new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_ALREADY_DELETED);
         }
 
         return chatRoom;
