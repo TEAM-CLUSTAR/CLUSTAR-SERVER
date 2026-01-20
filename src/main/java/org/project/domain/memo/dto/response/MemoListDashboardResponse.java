@@ -9,11 +9,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record MemoListDashboardResponse(
+        long totalCount,
         List<MemoDashboardResponse> memos
 ) {
 
-    public static MemoListDashboardResponse from(List<MemoDashboardResponse> memos) {
-        return new MemoListDashboardResponse(memos);
+    public static MemoListDashboardResponse from(long totalCount, List<MemoDashboardResponse> memos
+                                                 ) {
+        return new MemoListDashboardResponse(totalCount, memos);
     }
 
     /**

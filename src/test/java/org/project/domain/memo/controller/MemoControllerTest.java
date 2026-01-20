@@ -824,7 +824,7 @@ class MemoControllerTest {
                     );
 
             MemoListDashboardResponse expectedResponse =
-                    new MemoListDashboardResponse(List.of(memo1, memo2));
+                    new MemoListDashboardResponse(2L, List.of(memo1, memo2));
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
@@ -880,7 +880,7 @@ class MemoControllerTest {
                     );
 
             MemoListDashboardResponse expectedResponse =
-                    new MemoListDashboardResponse(List.of(memo));
+                    new MemoListDashboardResponse(1L, List.of(memo));
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
@@ -915,7 +915,7 @@ class MemoControllerTest {
             int size = 10;
 
             MemoListDashboardResponse expectedResponse =
-                    new MemoListDashboardResponse(List.of());
+                    new MemoListDashboardResponse(0L, List.of());
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
@@ -948,7 +948,7 @@ class MemoControllerTest {
             int customSize = 5;
 
             MemoListDashboardResponse expectedResponse =
-                    new MemoListDashboardResponse(List.of());
+                    new MemoListDashboardResponse(0L, List.of());
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
@@ -977,7 +977,7 @@ class MemoControllerTest {
             Long userId = 1L;
 
             MemoListDashboardResponse expectedResponse =
-                    new MemoListDashboardResponse(List.of());  // 빈 리스트
+                    new MemoListDashboardResponse(0L, List.of());  // 빈 리스트
 
             when(memoService.getMemosWithMedia(
                     eq(userId),

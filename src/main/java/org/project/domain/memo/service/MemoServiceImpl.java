@@ -182,6 +182,8 @@ public class MemoServiceImpl implements MemoService {
             int size
     ) {
 
+        long totalCount = memoRepository.countMemos(userId, labelIds);
+
         // 메모 조회 (기존 로직 재사용)
         List<Memo> memos = memoRepository.findMemos(
                 userId,
@@ -192,7 +194,7 @@ public class MemoServiceImpl implements MemoService {
         );
 
         if (memos.isEmpty()) {
-            return MemoListDashboardResponse.from(List.of());
+            return MemoListDashboardResponse.from(totalCount, List.of());
         }
 
         // memoId 목록 추출
@@ -221,7 +223,7 @@ public class MemoServiceImpl implements MemoService {
                         .map(memo -> mapToDashboardResponse(memo, imageMap, fileMap))
                         .toList();
 
-        return MemoListDashboardResponse.from(responses);
+        return MemoListDashboardResponse.from(totalCount, responses);
     }
 
     @Override
