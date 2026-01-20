@@ -110,6 +110,10 @@ dependencies {
 
     // test h2
     testImplementation 'com.h2database:h2'
+
+    // retry
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework:spring-aspects'
 }
 
 def querydslDir = "src/main/generated/querydsl"
