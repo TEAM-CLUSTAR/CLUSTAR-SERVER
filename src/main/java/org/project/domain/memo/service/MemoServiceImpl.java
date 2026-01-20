@@ -34,10 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -239,7 +236,22 @@ public class MemoServiceImpl implements MemoService {
         List<MemoDetailResponse.ImageInfo> images = mapToImageInfos(memo.getMemoImages());
         List<MemoDetailResponse.FileInfo> files = mapToFileInfos(memo.getMemoFiles());
 
-        return MemoDetailResponse.from(memo, images, files);
+        List<Memo> sourceMemos = Collections.emptyList();
+
+        if (Boolean.TRUE.equals(memo.getIsAiGenerated())
+                && memo.getSource() != null
+                && !memo.getSource().isBlank()) {
+
+            List<Long> sourceIds = parseSourceIds(memo.getSource());
+            sourceMemos = memoRepository.findAllById(sourceIds);
+        }
+
+        return MemoDetailResponse.from(
+                memo,
+                images,
+                files,
+                sourceMemos
+        );
     }
 
     @Override
@@ -519,4 +531,27 @@ public class MemoServiceImpl implements MemoService {
         }
     }
 
+    private List<Long> parseSourceIds(String source) {
+        if (source == null || source.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        String normalized = source.trim();
+        if (normalized.startsWith("[") && normalized.endsWith("]")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+
+        if (normalized.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        try {
+            return Arrays.stream(normalized.split(","))
+                    .map(String::trim)
+                    .map(Long::parseLong)
+                    .toList();
+        } catch (NumberFormatException e) {
+            return Collections.emptyList();
+        }
+    }
 }
