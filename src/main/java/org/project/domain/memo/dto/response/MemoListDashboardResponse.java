@@ -3,6 +3,7 @@ package org.project.domain.memo.dto.response;
 import org.project.domain.label.entity.Label;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoLabel;
+import org.project.global.util.MemoContentUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -51,7 +52,7 @@ public record MemoListDashboardResponse(
             return new MemoDashboardResponse(
                     memo.getId(),
                     memo.getTitle(),
-                    content,
+                    MemoContentUtils.truncateForDashboard(content),
                     representativeImageUrl,
                     imageCount,
                     fileCount,
