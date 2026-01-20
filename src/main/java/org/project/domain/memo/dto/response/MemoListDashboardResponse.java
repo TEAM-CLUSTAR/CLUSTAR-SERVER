@@ -64,15 +64,6 @@ public record MemoListDashboardResponse(
                             .toList()
             );
         }
-
-        public static MemoDashboardResponse of(
-                Memo memo,
-                String representativeImageUrl,
-                int imageCount,
-                int fileCount
-        ) {
-            return of(memo, memo.getContent(), representativeImageUrl, imageCount, fileCount);
-        }
     }
 
     /**
