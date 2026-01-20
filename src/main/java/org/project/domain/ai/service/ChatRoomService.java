@@ -10,4 +10,6 @@ public interface ChatRoomService {
     ChatRoomListResponse findAllByUser(Long userId);
 
     void delete(Long userId, Long chatRoomId);
+
+    ChatRoom validateAccess(Long userId, Long chatRoomId);
 }

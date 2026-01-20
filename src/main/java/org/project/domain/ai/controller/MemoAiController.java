@@ -11,6 +11,7 @@ import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
 import org.project.domain.ai.service.AiEvaluationService;
+import org.project.domain.ai.service.ChatRoomService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class MemoAiController {
 
     private final RagPipeline ragPipeline;
     private final AiEvaluationService aiEvaluationService;
+    private final ChatRoomService chatRoomService;
 
 
     @Operation(
@@ -51,8 +53,12 @@ public class MemoAiController {
             @Valid @RequestBody MemoAiRequest request
     ) {
 
+        Long userId = userDetails.getUserId();
+
+        chatRoomService.validateAccess(userId, chatRoomId);
+
         MemoAiResponse response = ragPipeline.run(
-                userDetails.getUserId(),
+                userId,
                 chatRoomId,
                 request
         );
@@ -98,8 +104,14 @@ public class MemoAiController {
     @PostMapping("/for-plan")
     public ResponseEntity<ApiResponse<MemoAiResponseForPlan>> generateMemoAiForPlan(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long chatRoomId,
             @Valid @RequestBody MemoAiRequestForPlan request
     ) {
+
+        Long userId = userDetails.getUserId();
+
+        chatRoomService.validateAccess(userId, chatRoomId);
+
         // AI 요청 DTO 구성
         MemoAiRequest memoRequest =
                 MemoAiRequest.of(
@@ -111,7 +123,8 @@ public class MemoAiController {
         // AI 응답 생성
         MemoAiResponse aiResponse =
                 ragPipeline.runForPlan(
-                        userDetails.getUserId(),
+                        userId,
+                        chatRoomId,
                         memoRequest,
                         request.systemPrompt()
                 );
