@@ -1078,8 +1078,8 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
                     .andExpect(jsonPath("$.data.labelList[0].name").value("SOPT"))
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
-                    .andExpect(jsonPath("$.data.sourceList").isArray())
-                    .andExpect(jsonPath("$.data.sourceList.length()").value(0));
+                    .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
+                    .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
 
             verify(memoService, times(1))
                     .getOneMemoDetail(eq(userId), eq(memoId));
@@ -1114,8 +1114,8 @@ class MemoControllerTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
-                    .andExpect(jsonPath("$.data.sourceList").isArray())
-                    .andExpect(jsonPath("$.data.sourceList.length()").value(0));
+                    .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
+                    .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
 
             verify(memoService, times(1))
                     .getOneMemoDetail(eq(userId), eq(memoId));
