@@ -39,7 +39,7 @@ public class DefaultRagPipeline implements RagPipeline {
 
         // 3️⃣ Augment
         RagPrompt prompt = augmenter.augment(query, documents)
-                .withConversationContext(userId, chatRoomId);;
+                .withConversationContext(userId, chatRoomId);
 
         // 4️⃣ Generate
         String content = generator.generate(prompt);
@@ -76,7 +76,7 @@ public class DefaultRagPipeline implements RagPipeline {
         // 🔁 systemPrompt만 planPrompt로 교체
         RagPrompt planPromptApplied =
                 basePrompt.withSystemPrompt(planPrompt)
-                        .withConversationContext(userId, chatRoomId);;
+                        .withConversationContext(userId, chatRoomId);
 
         // 4️⃣ Generate
         String content = generator.generate(planPromptApplied);
