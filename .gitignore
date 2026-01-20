@@ -43,3 +43,6 @@ application.yml
 
 ### q domain ###
 src/main/generated
+
+### codex ###
+AGENTS.md
