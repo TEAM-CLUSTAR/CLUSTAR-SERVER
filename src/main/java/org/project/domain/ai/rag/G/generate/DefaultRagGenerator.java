@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,6 +18,34 @@ public class DefaultRagGenerator implements RagGenerator {
 
         return chatClient
                 .prompt()
+                .system(prompt.systemPrompt())
+                .user("""
+                  %s
+
+                  [CONTEXT]
+                  %s
+                  """.formatted(
+                        prompt.userPrompt(),
+                        prompt.context()
+                ))
+                .advisors(a -> a.param(
+                        ChatMemory.CONVERSATION_ID,
+                        prompt.conversationId()
+                ))
+                .call()
+                .content();
+    }
+
+    @Override
+    public String generateForPlan(RagPrompt prompt, String model, Double temperature) {
+
+        return chatClient
+                .prompt()
+                .options(ChatOptions.builder()
+                        .model(model)
+                        .temperature(temperature)
+                        .build()
+                )
                 .system(prompt.systemPrompt())
                 .user("""
                   %s
