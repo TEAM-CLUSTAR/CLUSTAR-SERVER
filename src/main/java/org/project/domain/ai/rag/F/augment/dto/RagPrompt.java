@@ -62,18 +62,18 @@ public record RagPrompt(
                 [SYSTEM PROMPT]
                 %s
 
-                [USER PROMPT]
+                [CONTEXT]
                 %s
 
-                [CONTEXT]
+                [USER PROMPT]
                 %s
 
                 [CONVERSATION]
                 userId=%s, chatRoomId=%s
                 """.formatted(
                 systemPrompt,
-                userPrompt,
                 context,
+                userPrompt,
                 userId,
                 chatRoomId
         );
