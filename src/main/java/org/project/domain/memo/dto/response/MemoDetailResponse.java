@@ -36,8 +36,11 @@ public record MemoDetailResponse(
         @Schema(description = "AI 생성 여부", example = "false")
         Boolean isAiGenerated,
 
-        @Schema(description = "AI 생성 시 참고한 메모 ID 목록", example = "[1, 2, 3]")
-        List<Long> sourceList
+        @Schema(
+                description = "AI 생성 시 참고한 메모 제목 목록",
+                example = "[\"UX 리서치 정리\", \"시험 대비 요약\"]"
+        )
+        List<String> sourceMemoTitleList
 ) {
 
     @Schema(description = "이미지 정보")
@@ -82,7 +85,8 @@ public record MemoDetailResponse(
     public static MemoDetailResponse from(
             Memo memo,
             List<ImageInfo> images,
-            List<FileInfo> files
+            List<FileInfo> files,
+            List<Memo> sourceMemos
     ) {
 
         return new MemoDetailResponse(
@@ -97,34 +101,19 @@ public record MemoDetailResponse(
                         .toList(),
                 memo.getCreatedAt(),
                 memo.getIsAiGenerated(),
-                memo.getIsAiGenerated() && memo.getSource() != null
-                        ? parseSourceIds(memo.getSource())
+                memo.getIsAiGenerated()
+                        ? extractSourceTitles(sourceMemos)
                         : Collections.emptyList()
         );
     }
 
-    // 소스메모 id 파싱 메서드
-    private static List<Long> parseSourceIds(String source) {
-        if (source == null || source.isEmpty()) {
+    private static List<String> extractSourceTitles(List<Memo> sourceMemos) {
+        if (sourceMemos == null || sourceMemos.isEmpty()) {
             return Collections.emptyList();
         }
 
-        try {
-            String normalized = source.trim();
-            if (normalized.startsWith("[") && normalized.endsWith("]")) {
-                normalized = normalized.substring(1, normalized.length() - 1);
-            }
-
-            if (normalized.isBlank()) {
-                return Collections.emptyList();
-            }
-
-            return Arrays.stream(normalized.split(","))
-                    .map(String::trim)
-                    .map(Long::parseLong)
-                    .toList();
-        } catch (NumberFormatException e) {
-            return Collections.emptyList();
-        }
+        return sourceMemos.stream()
+                .map(Memo::getTitle)
+                .toList();
     }
 }
