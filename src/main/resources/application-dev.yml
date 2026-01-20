@@ -88,8 +88,8 @@ spring:
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
-  expire-length: 3600000 # 60분
-  refresh-expire-length: 3600000 # 1시간
+  expire-length: 86400000 # 60분
+  refresh-expire-length: 86400000 # 1시간
   header: Authorization
 
 app:
