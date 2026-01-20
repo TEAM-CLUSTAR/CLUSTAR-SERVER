@@ -12,12 +12,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiConfig {
 
-//    @Bean
-//    public ChatClient chatClient(ChatModel chatModel) {
-//        return ChatClient.builder(chatModel)
-//                .build();
-//    }
-
     @Bean
     public ChatClient chatClient(ChatModel chatModel, ChatMemory chatMemory) {
         return ChatClient.builder(chatModel)

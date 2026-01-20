@@ -23,6 +23,13 @@ public record MemoAiRequestForPlan(
         )
         MemoAiOptions option,
 
+        @NotEmpty
+        @Schema(
+                description = "AI가 참조할 메모 ID 목록",
+                example = "[43, 44, 45]"
+        )
+        List<@NotNull Long> memoIds,
+
         @NotNull
         @Schema(
                 description = "플랜에서 정의한 System Prompt",
@@ -35,20 +42,29 @@ public record MemoAiRequestForPlan(
         )
         String systemPrompt,
 
-        @NotEmpty
+        @NotNull
         @Schema(
-                description = "AI가 참조할 메모 ID 목록",
-                example = "[43, 44, 45]"
+                description = "모델 정의",
+                example = "gemini-3-flash-preview"
         )
-        List<@NotNull Long> memoIds
+        String model,
+
+        @NotNull
+        @Schema(
+                description = "temperature 정의",
+                example = "0.7"
+        )
+        Double temperature
 ) {
 
     public static MemoAiRequestForPlan of(
             String userPrompt,
             MemoAiOptions option,
+            List<Long> memoIds,
             String systemPrompt,
-            List<Long> memoIds
+            String model,
+            Double temperature
     ) {
-        return new MemoAiRequestForPlan(userPrompt, option, systemPrompt, memoIds);
+        return new MemoAiRequestForPlan(userPrompt, option, memoIds, systemPrompt, model, temperature);
     }
 }

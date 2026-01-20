@@ -99,6 +99,16 @@ public class MemoAiController {
                 - 사용자 요청이 요구한 작업을 제대로 수행했는지를 나타내는 지표
                 - true  : 요청 의도에 맞는 작업 수행
                 - false : 작업 미이행 또는 의도 불일치
+                
+                ---
+                모델 선택 방법
+                    
+                - gemini-3-flash-preview
+                - gemini-2.5-pro
+                - gemini-2.5-flash
+                - gemini-2.5-flash-lite
+                - gemini-2.0-flash
+                - gemini-2.0-flash-lite
                 """
     )
     @PostMapping("/chat-rooms/{chatRoomId}/chat/for-plan")
@@ -126,7 +136,9 @@ public class MemoAiController {
                         userId,
                         chatRoomId,
                         memoRequest,
-                        request.systemPrompt()
+                        request.systemPrompt(),
+                        request.model(),
+                        request.temperature()
                 );
 
         // AI 응답 품질 평가

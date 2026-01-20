@@ -62,7 +62,9 @@ public class DefaultRagPipeline implements RagPipeline {
             Long userId,
             Long chatRoomId,
             MemoAiRequest request,
-            String planPrompt
+            String planPrompt,
+            String model,
+            Double temperature
     ) {
         // 1️⃣ Query
         RagQuery query = queryHandler.handle(userId, request);
@@ -79,7 +81,7 @@ public class DefaultRagPipeline implements RagPipeline {
                         .withConversationContext(userId, chatRoomId);
 
         // 4️⃣ Generate
-        String content = generator.generate(planPromptApplied);
+        String content = generator.generateForPlan(planPromptApplied, model, temperature);
 
         MemoContentParser.ParsedMemoContent parsed =
                 MemoContentParser.parseTitleAndContent(content);

@@ -15,6 +15,8 @@ public interface RagPipeline {
             Long userId,
             Long chatRoomId,
             MemoAiRequest request,
-            String planPrompt
+            String planPrompt,
+            String model,
+            Double temperature
     );
 }
