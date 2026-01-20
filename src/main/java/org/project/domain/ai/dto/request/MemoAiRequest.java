@@ -8,13 +8,17 @@ import java.util.List;
 
 public record MemoAiRequest(
         String userPrompt,
-
-        @NotNull
         MemoAiOptions option,
-
         @NotEmpty
         List<@NotNull Long> memoIds
 ) {
+
+    public MemoAiRequest {
+        if (option == null) {
+            option = MemoAiOptions.DEFAULT;
+        }
+    }
+
     public static MemoAiRequest of(
             String userPrompt,
             MemoAiOptions option,
