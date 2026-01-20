@@ -19,7 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/ai/memo")
+@RequestMapping("/api/v1/")
 @RequiredArgsConstructor
 @Tag(
         name = "AI Memo",
@@ -33,7 +33,7 @@ public class MemoAiController {
 
 
     @Operation(
-            summary = "AI 메모 응답 생성",
+            summary = "AI 채팅 응답 생성",
             description = """
                 선택한 메모들을 기반으로 RAG를 수행하여
                 AI 응답을 생성합니다.
@@ -46,7 +46,7 @@ public class MemoAiController {
                 채팅방(chatRoom) 단위로 대화 컨텍스트가 유지됩니다.
                 """
     )
-    @PostMapping("/chat-rooms/{chatRoomId}/memo")
+    @PostMapping("/chat-rooms/{chatRoomId}/chat")
     public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long chatRoomId,
@@ -101,7 +101,7 @@ public class MemoAiController {
                 - false : 작업 미이행 또는 의도 불일치
                 """
     )
-    @PostMapping("/for-plan")
+    @PostMapping("/chat-rooms/{chatRoomId}/chat/for-plan")
     public ResponseEntity<ApiResponse<MemoAiResponseForPlan>> generateMemoAiForPlan(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long chatRoomId,
