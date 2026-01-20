@@ -7,11 +7,13 @@ public interface RagPipeline {
 
     MemoAiResponse run(
             Long userId,
+            Long chatRoomId,
             MemoAiRequest request
     );
 
     MemoAiResponse runForPlan(
             Long userId,
+            Long chatRoomId,
             MemoAiRequest request,
             String planPrompt
     );

@@ -29,7 +29,7 @@ public class DefaultRagGenerator implements RagGenerator {
                 ))
                 .advisors(a -> a.param(
                         ChatMemory.CONVERSATION_ID,
-                        conversationId
+                        prompt.conversationId()
                 ))
                 .call()
                 .content();
