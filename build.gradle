@@ -88,6 +88,9 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
     implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
 
+    // chat memory - jdbc
+    implementation 'org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc'
+
     // pgvector
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
 
@@ -96,7 +99,6 @@ dependencies {
 
     // TikaDocumentReader
     implementation 'org.springframework.ai:spring-ai-tika-document-reader'
-
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

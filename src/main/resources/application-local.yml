@@ -80,6 +80,12 @@ spring:
         schema-validation: true
         remove-existing-vector-store-table: false
 
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   expire-length: 3600000 # 60분

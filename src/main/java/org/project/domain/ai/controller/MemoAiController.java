@@ -11,17 +11,15 @@ import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
 import org.project.domain.ai.service.AiEvaluationService;
+import org.project.domain.ai.service.ChatRoomService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/ai/memo")
+@RequestMapping("/api/v1/")
 @RequiredArgsConstructor
 @Tag(
         name = "AI Memo",
@@ -31,33 +29,43 @@ public class MemoAiController {
 
     private final RagPipeline ragPipeline;
     private final AiEvaluationService aiEvaluationService;
+    private final ChatRoomService chatRoomService;
+
 
     @Operation(
-            summary = "AI 메모 응답 생성",
+            summary = "AI 채팅 응답 생성",
             description = """
-                    선택한 메모들을 기반으로 RAG를 수행하여
-                    AI 응답을 생성합니다.
-                    
-                    - userPrompt: 사용자의 질문
-                    - option: AI 처리 전략 (MERGE, STRUCTURE, SUMMARY)
-                    - memoIds: 참조할 메모 ID 목록
-                    
-                    기본 AI 채팅/요약/정리 용도로 사용됩니다.
-                    """
+                선택한 메모들을 기반으로 RAG를 수행하여
+                AI 응답을 생성합니다.
+
+                - chatRoomId : AI 대화 세션 ID
+                - userPrompt : 사용자의 질문
+                - option     : AI 처리 전략 (MERGE, STRUCTURE, SUMMARY)
+                - memoIds    : 참조할 메모 ID 목록
+
+                채팅방(chatRoom) 단위로 대화 컨텍스트가 유지됩니다.
+                """
     )
-    @PostMapping
+    @PostMapping("/chat-rooms/{chatRoomId}/chat")
     public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long chatRoomId,
             @Valid @RequestBody MemoAiRequest request
     ) {
 
+        Long userId = userDetails.getUserId();
+
+        chatRoomService.validateAccess(userId, chatRoomId);
+
         MemoAiResponse response = ragPipeline.run(
-                userDetails.getUserId(),
+                userId,
+                chatRoomId,
                 request
         );
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
+
 
     @Operation(
             summary = "[기획 의사결정용] AI 응답 생성 + 품질 지표 평가",
@@ -93,11 +101,17 @@ public class MemoAiController {
                 - false : 작업 미이행 또는 의도 불일치
                 """
     )
-    @PostMapping("/for-plan")
+    @PostMapping("/chat-rooms/{chatRoomId}/chat/for-plan")
     public ResponseEntity<ApiResponse<MemoAiResponseForPlan>> generateMemoAiForPlan(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long chatRoomId,
             @Valid @RequestBody MemoAiRequestForPlan request
     ) {
+
+        Long userId = userDetails.getUserId();
+
+        chatRoomService.validateAccess(userId, chatRoomId);
+
         // AI 요청 DTO 구성
         MemoAiRequest memoRequest =
                 MemoAiRequest.of(
@@ -109,7 +123,8 @@ public class MemoAiController {
         // AI 응답 생성
         MemoAiResponse aiResponse =
                 ragPipeline.runForPlan(
-                        userDetails.getUserId(),
+                        userId,
+                        chatRoomId,
                         memoRequest,
                         request.systemPrompt()
                 );

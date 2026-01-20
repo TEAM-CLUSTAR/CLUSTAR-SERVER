@@ -27,6 +27,7 @@ public class DefaultRagPipeline implements RagPipeline {
     @Override
     public MemoAiResponse run(
             Long userId,
+            Long chatRoomId,
             MemoAiRequest request
     ) {
 
@@ -37,10 +38,12 @@ public class DefaultRagPipeline implements RagPipeline {
         List<Document> documents = retriever.retrieve(query);
 
         // 3️⃣ Augment
-        RagPrompt prompt = augmenter.augment(query, documents);
+        RagPrompt prompt = augmenter.augment(query, documents)
+                .withConversationContext(userId, chatRoomId);
 
         // 4️⃣ Generate
         String content = generator.generate(prompt);
+
         MemoContentParser.ParsedMemoContent parsed =
                 MemoContentParser.parseTitleAndContent(content);
 
@@ -55,7 +58,12 @@ public class DefaultRagPipeline implements RagPipeline {
     }
 
     @Override
-    public MemoAiResponse runForPlan(Long userId, MemoAiRequest request, String planPrompt) {
+    public MemoAiResponse runForPlan(
+            Long userId,
+            Long chatRoomId,
+            MemoAiRequest request,
+            String planPrompt
+    ) {
         // 1️⃣ Query
         RagQuery query = queryHandler.handle(userId, request);
 
@@ -67,10 +75,12 @@ public class DefaultRagPipeline implements RagPipeline {
 
         // 🔁 systemPrompt만 planPrompt로 교체
         RagPrompt planPromptApplied =
-                basePrompt.withSystemPrompt(planPrompt);
+                basePrompt.withSystemPrompt(planPrompt)
+                        .withConversationContext(userId, chatRoomId);
 
         // 4️⃣ Generate
         String content = generator.generate(planPromptApplied);
+
         MemoContentParser.ParsedMemoContent parsed =
                 MemoContentParser.parseTitleAndContent(content);
 

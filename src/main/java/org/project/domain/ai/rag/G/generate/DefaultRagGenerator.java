@@ -3,6 +3,7 @@ package org.project.domain.ai.rag.G.generate;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,6 +26,10 @@ public class DefaultRagGenerator implements RagGenerator {
                   """.formatted(
                         prompt.userPrompt(),
                         prompt.context()
+                ))
+                .advisors(a -> a.param(
+                        ChatMemory.CONVERSATION_ID,
+                        prompt.conversationId()
                 ))
                 .call()
                 .content();
