@@ -14,9 +14,7 @@ public record MemoAiRequest(
 ) {
 
     public MemoAiRequest {
-        if (option == null) {
-            option = MemoAiOptions.DEFAULT;
-        }
+        option = (option == null) ? MemoAiOptions.DEFAULT : option;
     }
 
     public static MemoAiRequest of(
