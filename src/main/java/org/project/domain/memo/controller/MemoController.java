@@ -102,7 +102,7 @@ public class MemoController {
     }
 
     @Operation(
-            summary = "메모 전체 조회",
+            summary = "대시보드 메모 전체 조회",
             description = """
                 메모를 전체 조회합니다.
                 - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
@@ -164,7 +164,7 @@ public class MemoController {
     }
 
     @GetMapping("/structure")
-    @Operation(summary = "구조화뷰 메모 조회", description = "구조화뷰를 위한 전체 메모를 조회합니다.")
+    @Operation(summary = "구조화뷰 메모 전체 조회", description = "구조화뷰를 위한 전체 메모를 조회합니다.")
     public ResponseEntity<ApiResponse<MemoStructureListResponse>> getStructureMemo(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ){
