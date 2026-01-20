@@ -51,6 +51,20 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     @Transactional
     public void delete(Long userId, Long chatRoomId) {
 
+        ChatRoom chatRoom = validateAccess(userId, chatRoomId);
+
+        chatRoom.markDeleted(); // isDeleted = true
+    }
+
+
+    /**
+     * 공통 검증 메서드
+     * @param userId
+     * @param chatRoomId
+     * @return
+     */
+    public ChatRoom validateAccess(Long userId, Long chatRoomId) {
+
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(() ->
                         new AiException(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND)
@@ -64,6 +78,6 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             throw new AiException(ChatRoomErrorCode.CHAT_ROOM_ALREADY_DELETED);
         }
 
-        chatRoom.markDeleted(); // isDeleted = true
+        return chatRoom;
     }
 }
