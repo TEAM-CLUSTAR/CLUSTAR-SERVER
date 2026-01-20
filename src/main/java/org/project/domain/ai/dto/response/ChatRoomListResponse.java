@@ -1,5 +1,7 @@
 package org.project.domain.ai.dto.response;
 
+import org.project.domain.ai.entity.ChatRoom;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,6 +19,10 @@ public record ChatRoomListResponse(
     ) {
         public static ChatRoomResponse of(Long chatRoomId, LocalDateTime createdAt) {
             return new ChatRoomResponse(chatRoomId, createdAt);
+        }
+
+        public static ChatRoomResponse from(ChatRoom chatRoom) {
+            return new ChatRoomResponse(chatRoom.getId(), chatRoom.getCreatedAt());
         }
     }
 }

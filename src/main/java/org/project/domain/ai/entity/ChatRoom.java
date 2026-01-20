@@ -2,9 +2,11 @@ package org.project.domain.ai.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Where;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
+@Where(clause = "is_deleted = false")
 @Entity
 @Getter
 @Builder

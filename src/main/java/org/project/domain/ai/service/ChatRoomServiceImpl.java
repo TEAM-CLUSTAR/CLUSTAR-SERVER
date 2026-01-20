@@ -7,6 +7,7 @@ import org.project.domain.ai.repository.ChatRoomRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.AiException;
+import org.project.global.exception.domainException.ChatRoomException;
 import org.project.global.exception.errorcode.ChatRoomErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,19 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                         )
                         .toList()
         );
+    }
+
+
+    @Override
+    public ChatRoomListResponse.ChatRoomResponse findLatestChatRoomByUser(Long userId) {
+
+        ChatRoom chatRoom = chatRoomRepository
+                .findTopByUserIdOrderByCreatedAtDesc(userId)
+                .orElseThrow(() -> new ChatRoomException(
+                        ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND
+                ));
+
+        return ChatRoomListResponse.ChatRoomResponse.from(chatRoom);
     }
 
 

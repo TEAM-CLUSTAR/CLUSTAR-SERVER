@@ -14,7 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/ai/chat-rooms")
+@RequestMapping("/api/v1/chat-rooms")
 @RequiredArgsConstructor
 @Tag(
         name = "AI Chat Room",
@@ -55,6 +55,20 @@ public class ChatRoomController {
                         chatRoomService.findAllByUser(userDetails.getUserId())
                 )
         );
+    }
+
+    @Operation(
+            summary = "최근 AI 채팅방 단일 조회",
+            description = "로그인한 사용자의 최근 AI 채팅방을 조회합니다."
+    )
+    @GetMapping("/latest")
+    public ResponseEntity<ApiResponse<ChatRoomListResponse.ChatRoomResponse>> findLatestChatRoomByUser(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+
+        ChatRoomListResponse.ChatRoomResponse response = chatRoomService.findLatestChatRoomByUser(userDetails.getUserId());
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
 
