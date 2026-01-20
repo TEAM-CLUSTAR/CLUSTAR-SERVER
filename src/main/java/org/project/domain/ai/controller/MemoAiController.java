@@ -126,7 +126,9 @@ public class MemoAiController {
                         userId,
                         chatRoomId,
                         memoRequest,
-                        request.systemPrompt()
+                        request.systemPrompt(),
+                        request.model(),
+                        request.temperature()
                 );
 
         // AI 응답 품질 평가
