@@ -15,17 +15,13 @@ import org.project.domain.ai.rag.F.augment.RagAugmenter;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 import org.project.domain.ai.rag.G.generate.RagGenerator;
 import org.project.domain.ai.rag.pipeline.DefaultRagPipeline;
-import org.project.global.config.chatModel.TestChatModelConfig;
 import org.project.global.config.chatModel.YesChatModel;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.evaluation.RelevancyEvaluator;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationRequest;
 import org.springframework.ai.evaluation.EvaluationResponse;
-import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ContextConfiguration;
 
 import java.util.List;
 
