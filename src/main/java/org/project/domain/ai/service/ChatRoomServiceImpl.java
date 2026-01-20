@@ -5,6 +5,8 @@ import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.repository.ChatRoomRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
+import org.project.global.exception.domainException.AiException;
+import org.project.global.exception.errorcode.ChatRoomErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +30,18 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     @Transactional
     public void delete(Long userId, Long chatRoomId) {
+
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방이 존재하지 않습니다."));
+                .orElseThrow(() ->
+                        new AiException(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND)
+                );
 
         if (!chatRoom.getUser().getId().equals(userId)) {
-            throw new IllegalStateException("채팅방 삭제 권한이 없습니다.");
+            throw new AiException(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED);
         }
 
         if (Boolean.TRUE.equals(chatRoom.getIsDeleted())) {
-            return; // 또는 예외
+            throw new AiException(ChatRoomErrorCode.CHAT_ROOM_ALREADY_DELETED);
         }
 
         chatRoom.markDeleted(); // isDeleted = true
