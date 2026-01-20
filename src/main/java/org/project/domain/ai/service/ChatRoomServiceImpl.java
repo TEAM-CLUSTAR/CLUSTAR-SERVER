@@ -1,6 +1,7 @@
 package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.dto.response.ChatRoomListResponse;
 import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.repository.ChatRoomRepository;
 import org.project.domain.user.entity.User;
@@ -10,8 +11,11 @@ import org.project.global.exception.errorcode.ChatRoomErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ChatRoomServiceImpl implements ChatRoomService {
 
     private final ChatRoomRepository chatRoomRepository;
@@ -27,6 +31,22 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
         return chatRoomRepository.save(chatRoom);
     }
+
+
+    public ChatRoomListResponse findAllByUser(Long userId) {
+        return ChatRoomListResponse.of(
+                chatRoomRepository.findAllByUserIdAndIsDeletedFalse(userId)
+                        .stream()
+                        .map(chatRoom ->
+                                ChatRoomListResponse.ChatRoomResponse.of(
+                                        chatRoom.getId(),
+                                        chatRoom.getCreatedAt()
+                                )
+                        )
+                        .toList()
+        );
+    }
+
 
     @Transactional
     public void delete(Long userId, Long chatRoomId) {

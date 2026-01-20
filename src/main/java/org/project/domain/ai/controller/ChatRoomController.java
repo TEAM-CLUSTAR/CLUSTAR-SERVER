@@ -3,6 +3,7 @@ package org.project.domain.ai.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.project.domain.ai.dto.response.ChatRoomListResponse;
 import org.project.domain.ai.dto.response.CreateChatRoomResponse;
 import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.service.ChatRoomService;
@@ -40,15 +41,26 @@ public class ChatRoomController {
         );
     }
 
+
+    @Operation(
+            summary = "AI 채팅방 전체 조회",
+            description = "로그인한 사용자의 AI 채팅방 목록을 조회합니다."
+    )
+    @GetMapping
+    public ResponseEntity<ApiResponse<ChatRoomListResponse>> getChatRooms(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        chatRoomService.findAllByUser(userDetails.getUserId())
+                )
+        );
+    }
+
+
     @Operation(
             summary = "AI 채팅방 삭제",
-            description = """
-                    AI 채팅방을 삭제합니다. (Soft Delete)
-                    
-                    - 실제 데이터는 삭제되지 않고 isDeleted = true 처리됩니다.
-                    - 삭제된 채팅방은 더 이상 AI 요청에 사용할 수 없습니다.
-                    - 본인의 채팅방만 삭제할 수 있습니다.
-                    """
+            description = "AI 채팅방을 삭제합니다. (Soft Delete)"
     )
     @DeleteMapping("/{chatRoomId}")
     public ResponseEntity<ApiResponse<Void>> deleteChatRoom(
@@ -57,7 +69,7 @@ public class ChatRoomController {
     ) {
         chatRoomService.delete(userDetails.getUserId(), chatRoomId);
 
-        return ResponseEntity.ok(ApiResponse.ok());
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 }
 
