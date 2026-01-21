@@ -14,4 +14,12 @@ public interface MemoRepositoryCustom {
             Long cursorMemoId,
             Pageable pageable
     );
+
+    List<Memo> findAiMemos(
+            Long userId,
+            List<Long> labelIds,
+            LocalDateTime cursorCreatedAt,
+            Long cursorMemoId,
+            Pageable pageable
+    );
 }
