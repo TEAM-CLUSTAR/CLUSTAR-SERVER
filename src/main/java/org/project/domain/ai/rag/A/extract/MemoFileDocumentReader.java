@@ -9,6 +9,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +75,8 @@ public class MemoFileDocumentReader {
                         "fileId", fileId,
                         "fileName", file.fileName(),
                         "fileExtension", file.extension(),
-                        "s3Key", file.s3Key()
+                        "s3Key", file.s3Key(),
+                        "createdAt", Instant.now().toString()
                 ));
                 doc.getMetadata().remove("source");
 

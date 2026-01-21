@@ -7,6 +7,7 @@ import org.project.domain.ai.rag.A.extract.imageExtractor.MemoImageBinaryLoader;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +53,8 @@ public class MemoImageDocumentReader {
                                     "memoId", memoId,
                                     "userId", userId,
                                     "imageId", imageId,
-                                    "s3Key", image.s3Key()
+                                    "s3Key", image.s3Key(),
+                                    "createdAt", Instant.now().toString()
                             ))
                             .build();
                 })
