@@ -38,7 +38,7 @@ public class Memo extends BaseEntity {
 
     @Column(name = "is_new", nullable = false)
     @Builder.Default
-    private Boolean isNew = true;
+    private Boolean isNew = false;
 
     @Column(name = "source")
     private String source;
@@ -87,6 +87,7 @@ public class Memo extends BaseEntity {
                 .content(content)
                 .user(user)
                 .isAiGenerated(true)
+                .isNew(true)
                 .source(formatSource(sourceMemoIds))
                 .build();
 
