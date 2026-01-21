@@ -802,6 +802,7 @@ class MemoControllerTest {
                             1,  // 파일 개수
                             false,  // isPinned
                             false,  // isAiGenerated
+                            true,
                             LocalDateTime.now(),
                             List.of(
                                     new MemoListDashboardResponse.LabelResponse(1L, "SOPT"),
@@ -819,6 +820,7 @@ class MemoControllerTest {
                             0,
                             true,  // isPinned
                             false,
+                            true,
                             LocalDateTime.now(),
                             List.of()  // 라벨 없음
                     );
@@ -873,6 +875,7 @@ class MemoControllerTest {
                             0,
                             false,
                             false,
+                            true,
                             LocalDateTime.now(),
                             List.of(
                                     new MemoListDashboardResponse.LabelResponse(1L, "SOPT")
