@@ -26,7 +26,7 @@ public class MemoDocumentReader {
                         "memoId", memo.getId(),
                         "userId", memo.getUser().getId(),
                         "title", memo.getTitle(),
-                        "createdAt", Instant.now().toString()
+                        "createdAt", memo.getCreatedAt().toString()
                 )
         );
 
