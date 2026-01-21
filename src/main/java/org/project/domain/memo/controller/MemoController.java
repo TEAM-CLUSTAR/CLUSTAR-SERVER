@@ -103,7 +103,7 @@ public class MemoController {
     }
 
     @Operation(
-            summary = "대시보드 메모 전체 조회",
+            summary = "메모 전체 조회(대시보드)",
             description = """
                 메모를 전체 조회합니다.
                 - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
@@ -143,9 +143,9 @@ public class MemoController {
     }
 
     @Operation(
-            summary = "대시보드 메모 전체 조회",
+            summary = "AI가 생성한 메모 전체 조회(대시보드)",
             description = """
-                메모를 전체 조회합니다.
+                AI가 생성한 메모를 전체 조회합니다. 
                 - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
                 - 커서 기반 페이지네이션을 지원합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
@@ -183,7 +183,7 @@ public class MemoController {
     }
 
     @GetMapping("/{memoId}")
-    @Operation(summary = "메모 상세조회(모달창)", description = """
+    @Operation(summary = "메모 전체 조회(모달창)", description = """
             하나의 메모를 상세조회 합니다.
             AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
             AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
