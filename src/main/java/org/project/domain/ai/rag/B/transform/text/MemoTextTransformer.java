@@ -15,8 +15,8 @@ public class MemoTextTransformer implements DocumentTransformer {
     private final TokenTextSplitter textSplitter =
             new TokenTextSplitter(
                     800,   // chunk size (tokens)
-                    200,   // min chunk chars
-                    50,    // min length to embed
+                    1,   // min chunk chars
+                    1,    // min length to embed
                     1000,  // max chunks
                     true   // keep separator (문맥 유지)
             );
