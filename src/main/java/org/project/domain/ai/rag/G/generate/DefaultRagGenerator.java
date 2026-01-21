@@ -27,24 +27,32 @@ public class DefaultRagGenerator implements RagGenerator {
     @Override
     public String generate(RagPrompt prompt) {
 
-        return chatClient
-                .prompt()
-                .system("""
+        try {
+            var response = chatClient
+                    .prompt()
+                    .system("""
                 %s
 
                 [CONTEXT]
                 %s
                 """.formatted(
-                        prompt.systemPrompt(),
-                        prompt.context()
-                ))
-                .user(prompt.userPrompt())
-                .advisors(a -> a.param(
-                        ChatMemory.CONVERSATION_ID,
-                        prompt.conversationId()
-                ))
-                .call()
-                .content();
+                            prompt.systemPrompt(),
+                            prompt.context()
+                    ))
+                    .user(prompt.userPrompt())
+                    .advisors(a -> a.param(
+                            ChatMemory.CONVERSATION_ID,
+                            prompt.conversationId()
+                    ))
+                    .call()
+                    .chatClientResponse();
+
+            log.debug("Advisor context: {}", response.context());
+            return response.chatResponse().getResult().getOutput().getText();
+        } catch (Exception e) {
+            log.error("AI 호출 실패", e);
+            throw e;
+        }
     }
 
     @Recover
