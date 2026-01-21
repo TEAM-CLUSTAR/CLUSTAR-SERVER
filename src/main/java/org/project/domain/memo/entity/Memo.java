@@ -36,6 +36,10 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private Boolean isAiGenerated = false;
 
+    @Column(name = "is_new", nullable = false)
+    @Builder.Default
+    private Boolean isNew = true;
+
     @Column(name = "source")
     private String source;
 
@@ -119,30 +123,7 @@ public class Memo extends BaseEntity {
         this.isDeleted = true;
     }
 
-//    // 이미지 추가
-//    public void addImage(String imageS3Key, Long imageBytes, String imageExtension, Integer imagePriority) {
-//        MemoImage memoImage = MemoImage.builder()
-//                .memo(this)
-//                .imageS3Key(imageS3Key)
-//                .imageBytes(imageBytes)
-//                .imageExtension(imageExtension)
-//                .imagePriority(imagePriority)
-//                .build();
-//
-//        this.memoImages.add(memoImage);
-//    }
-
-//    // 파일 추가
-//    public void addFile(String fileS3Key, Long fileBytes, String fileExtension, Integer filePriority) {
-//        MemoFile memoFile = MemoFile.builder()
-//                .memo(this)
-//                .fileS3Key(fileS3Key)
-//                .fileBytes(fileBytes)
-//                .fileExtension(fileExtension)
-//                .filePriority(filePriority)
-//                .build();
-//
-//        this.memoFiles.add(memoFile);
-//    }
-
+    public void markAsRead() {
+        this.isNew = false;
+    }
 }

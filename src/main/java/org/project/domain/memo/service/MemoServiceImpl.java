@@ -233,6 +233,7 @@ public class MemoServiceImpl implements MemoService {
     }
 
     @Override
+    @Transactional
     public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
 
         Memo memo = getMemoOrThrow(memoId);
@@ -253,6 +254,8 @@ public class MemoServiceImpl implements MemoService {
             List<Long> sourceIds = parseSourceIds(memo.getSource());
             sourceMemos = memoRepository.findAllById(sourceIds);
         }
+
+        memo.markAsRead();
 
         return MemoDetailResponse.from(
                 memo,
