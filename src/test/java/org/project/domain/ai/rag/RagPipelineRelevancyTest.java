@@ -83,8 +83,12 @@ class RagPipelineRelevancyTest {
                         )
                 );
 
+        // 🔥 여기 수정
         given(ragGenerator.generate(any()))
-                .willReturn("이 문서는 메모의 핵심을 요약한 내용입니다.");
+                .willReturn("""
+                    메모 요약
+                    이 문서는 메모의 핵심을 요약한 내용입니다.
+                    """);
 
         // when
         MemoAiResponse response = ragPipeline.run(1L, 1L, request);
