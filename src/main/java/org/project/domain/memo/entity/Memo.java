@@ -36,6 +36,10 @@ public class Memo extends BaseEntity {
     @Builder.Default
     private Boolean isAiGenerated = false;
 
+    @Column(name = "is_new", nullable = false)
+    @Builder.Default
+    private Boolean isNew = true;
+
     @Column(name = "source")
     private String source;
 
