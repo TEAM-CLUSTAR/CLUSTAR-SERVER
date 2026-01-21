@@ -126,5 +126,4 @@ public class Memo extends BaseEntity {
     public void markAsRead() {
         this.isNew = false;
     }
-
 }

@@ -233,6 +233,7 @@ public class MemoServiceImpl implements MemoService {
     }
 
     @Override
+    @Transactional
     public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
 
         Memo memo = getMemoOrThrow(memoId);
