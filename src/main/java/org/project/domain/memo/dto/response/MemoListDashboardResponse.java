@@ -35,6 +35,7 @@ public record MemoListDashboardResponse(
 
             Boolean isPinned,
             Boolean isAiGenerated,
+            Boolean isNew,
             LocalDateTime createdAt,
 
             List<LabelResponse> labelList
@@ -60,6 +61,7 @@ public record MemoListDashboardResponse(
                     fileCount,
                     memo.getIsPinned(),
                     memo.getIsAiGenerated(),
+                    memo.getIsNew(),
                     memo.getCreatedAt(),
                     memo.getMemoLabels().stream()
                             .map(MemoLabel::getLabel)
