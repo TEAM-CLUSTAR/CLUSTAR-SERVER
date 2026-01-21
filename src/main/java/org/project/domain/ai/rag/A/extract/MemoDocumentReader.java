@@ -5,6 +5,7 @@ import org.project.domain.memo.entity.Memo;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -24,11 +25,11 @@ public class MemoDocumentReader {
                         "type", RagDocumentType.MEMO_TEXT.name(),
                         "memoId", memo.getId(),
                         "userId", memo.getUser().getId(),
-                        "title", memo.getTitle()
+                        "title", memo.getTitle(),
+                        "createdAt", memo.getCreatedAt().toString()
                 )
         );
 
         return List.of(document);
     }
 }
-

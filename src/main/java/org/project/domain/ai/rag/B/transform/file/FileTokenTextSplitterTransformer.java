@@ -17,8 +17,8 @@ public class FileTokenTextSplitterTransformer implements DocumentTransformer {
     private final TokenTextSplitter splitter =
             new TokenTextSplitter(
                     800,   // chunk size (tokens)
-                    300,   // min chars
-                    50,    // min length to embed
+                    1,   // min chars
+                    1,    // min length to embed
                     10_000,
                     true
             );

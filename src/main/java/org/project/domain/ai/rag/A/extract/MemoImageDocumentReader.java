@@ -4,9 +4,15 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.event.dto.ImageBinary;
 import org.project.domain.ai.rag.A.extract.imageExtractor.ImageOcrProcessor;
 import org.project.domain.ai.rag.A.extract.imageExtractor.MemoImageBinaryLoader;
+import org.project.domain.memo.entity.Memo;
+import org.project.domain.memo.repository.MemoRepository;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -18,12 +24,17 @@ public class MemoImageDocumentReader {
 
     private final ImageOcrProcessor ocrProcessor;
     private final MemoImageBinaryLoader memoImageBinaryLoader;
+    private final MemoRepository memoRepository;
 
     public List<Document> read(
             Long memoId,
             List<Long> memoImageIds,
             Long userId
     ) {
+
+        Memo memo = memoRepository.findById(memoId)
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+        LocalDateTime memoCreatedAt = memo.getCreatedAt();
 
         return memoImageIds.stream()
                 .map(imageId -> {
@@ -52,7 +63,8 @@ public class MemoImageDocumentReader {
                                     "memoId", memoId,
                                     "userId", userId,
                                     "imageId", imageId,
-                                    "s3Key", image.s3Key()
+                                    "s3Key", image.s3Key(),
+                                    "createdAt", memoCreatedAt.toString()
                             ))
                             .build();
                 })

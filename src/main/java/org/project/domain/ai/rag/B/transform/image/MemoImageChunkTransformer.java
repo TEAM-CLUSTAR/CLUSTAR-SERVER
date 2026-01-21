@@ -13,8 +13,8 @@ public class MemoImageChunkTransformer implements DocumentTransformer {
     private final TokenTextSplitter splitter =
             new TokenTextSplitter(
                     600,  // chunk size
-                    200,  // min chars
-                    50,   // min embed length
+                    1,  // min chars
+                    1,   // min embed length
                     20,   // max chunks
                     true
             );
