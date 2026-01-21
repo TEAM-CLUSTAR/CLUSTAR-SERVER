@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import okhttp3.Request;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -131,6 +132,46 @@ public class MemoController {
 
         MemoListDashboardResponse response =
                 memoService.getMemosWithMedia(
+                        userDetails.getUserId(),
+                        labelIds,
+                        cursorCreatedAt,
+                        cursorMemoId,
+                        size
+                );
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "대시보드 메모 전체 조회",
+            description = """
+                메모를 전체 조회합니다.
+                - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
+                - 커서 기반 페이지네이션을 지원합니다.
+                - 각 메모는 대표 이미지 1개(presigned URL)와
+                  이미지/파일 개수 정보를 포함합니다.
+                """
+    )
+    @GetMapping("/ai")
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_MEMOS)
+    public ResponseEntity<ApiResponse<MemoListDashboardResponse>> getAiMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+
+            @RequestParam(required = false)
+            List<Long> labelIds,
+
+            @RequestParam(required = false)
+            LocalDateTime cursorCreatedAt,
+
+            @RequestParam(required = false)
+            Long cursorMemoId,
+
+            @RequestParam(defaultValue = "20")
+            int size
+    ) {
+
+        MemoListDashboardResponse response =
+                memoService.getAiMemosWithMedia(
                         userDetails.getUserId(),
                         labelIds,
                         cursorCreatedAt,
