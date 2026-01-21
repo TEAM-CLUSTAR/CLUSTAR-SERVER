@@ -27,24 +27,44 @@ public class DefaultRagGenerator implements RagGenerator {
     @Override
     public String generate(RagPrompt prompt) {
 
-        return chatClient
-                .prompt()
-                .system("""
+        try {
+            var response = chatClient
+                    .prompt()
+                    .system("""
                 %s
 
                 [CONTEXT]
                 %s
                 """.formatted(
-                        prompt.systemPrompt(),
-                        prompt.context()
-                ))
-                .user(prompt.userPrompt())
-                .advisors(a -> a.param(
-                        ChatMemory.CONVERSATION_ID,
-                        prompt.conversationId()
-                ))
-                .call()
-                .content();
+                            prompt.systemPrompt(),
+                            prompt.context()
+                    ))
+                    .user(prompt.userPrompt())
+                    .advisors(a -> a.param(
+                            ChatMemory.CONVERSATION_ID,
+                            prompt.conversationId()
+                    ))
+                    .call()
+                    .chatClientResponse();
+
+            log.debug("Advisor context: {}", response.context());
+            var chatResponse = response.chatResponse();
+            var result = chatResponse != null ? chatResponse.getResult() : null;
+            var output = result != null ? result.getOutput() : null;
+            var text = output != null ? output.getText() : null;
+            if (text == null || text.isBlank()) {
+                log.warn("AI 응답 text가 비어 있습니다. contextKeys={}",
+                        response.context() != null ? response.context().keySet() : "null");
+                throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+            }
+            return text;
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            log.error("AI 호출 실패", e);
+            throw e;
+        }
     }
 
     @Recover

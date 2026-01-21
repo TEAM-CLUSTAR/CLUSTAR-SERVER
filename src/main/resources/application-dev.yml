@@ -116,3 +116,9 @@ cloud:
   aws:
     s3:
       bucket: clustar-bucket-01
+
+logging:
+  level:
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG
