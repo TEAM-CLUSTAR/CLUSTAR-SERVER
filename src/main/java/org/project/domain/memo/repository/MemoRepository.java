@@ -46,10 +46,18 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
         LEFT JOIN m.memoLabels ml
         WHERE m.user.id = :userId
         AND m.isDeleted = false
-        AND (:labelIds IS NULL OR ml.label.id IN :labelIds)
+        AND ml.label.id IN :labelIds
         """)
-    long countMemos(
+    long countMemosByLabels(
             @Param("userId") Long userId,
             @Param("labelIds") List<Long> labelIds
     );
+
+    @Query("""
+        SELECT COUNT(m)
+        FROM Memo m
+        WHERE m.user.id = :userId
+        AND m.isDeleted = false
+        """)
+    long countAllMemos(@Param("userId") Long userId);
 }

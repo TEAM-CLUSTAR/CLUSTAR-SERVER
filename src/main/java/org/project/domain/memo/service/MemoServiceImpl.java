@@ -182,7 +182,13 @@ public class MemoServiceImpl implements MemoService {
             int size
     ) {
 
-        long totalCount = memoRepository.countMemos(userId, labelIds);
+        long totalCount;
+
+        if(labelIds == null || labelIds.isEmpty()) {
+            totalCount = memoRepository.countAllMemos(userId);
+        } else {
+            totalCount = memoRepository.countMemosByLabels(userId, labelIds);
+        }
 
         // 메모 조회 (기존 로직 재사용)
         List<Memo> memos = memoRepository.findMemos(
