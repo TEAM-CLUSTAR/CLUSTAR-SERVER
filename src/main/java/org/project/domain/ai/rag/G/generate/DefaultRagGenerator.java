@@ -48,8 +48,20 @@ public class DefaultRagGenerator implements RagGenerator {
                     .chatClientResponse();
 
             log.debug("Advisor context: {}", response.context());
-            return response.chatResponse().getResult().getOutput().getText();
+            var chatResponse = response.chatResponse();
+            var result = chatResponse != null ? chatResponse.getResult() : null;
+            var output = result != null ? result.getOutput() : null;
+            var text = output != null ? output.getText() : null;
+            if (text == null || text.isBlank()) {
+                log.warn("AI 응답 text가 비어 있습니다. contextKeys={}",
+                        response.context() != null ? response.context().keySet() : "null");
+                throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+            }
+            return text;
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("AI 호출 실패", e);
             throw e;
         }
