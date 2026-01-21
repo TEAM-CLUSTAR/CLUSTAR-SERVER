@@ -254,6 +254,8 @@ public class MemoServiceImpl implements MemoService {
             sourceMemos = memoRepository.findAllById(sourceIds);
         }
 
+        memo.markAsRead();
+
         return MemoDetailResponse.from(
                 memo,
                 images,
