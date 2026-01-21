@@ -232,6 +232,66 @@ public class MemoServiceImpl implements MemoService {
         return MemoListDashboardResponse.from(totalCount, responses);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public MemoListDashboardResponse getAiMemosWithMedia(
+            Long userId,
+            List<Long> labelIds,
+            LocalDateTime cursorCreatedAt,
+            Long cursorMemoId,
+            int size
+    ) {
+
+        long totalCount;
+
+        if(labelIds == null || labelIds.isEmpty()) {
+            totalCount = memoRepository.countAllMemos(userId);
+        } else {
+            totalCount = memoRepository.countMemosByLabels(userId, labelIds);
+        }
+
+        // 메모 조회 (기존 로직 재사용)
+        List<Memo> memos = memoRepository.findAiMemos(
+                userId,
+                labelIds,
+                cursorCreatedAt,
+                cursorMemoId,
+                PageRequest.of(0, size)
+        );
+
+        if (memos.isEmpty()) {
+            return MemoListDashboardResponse.from(totalCount, List.of());
+        }
+
+        // memoId 목록 추출
+        List<Long> memoIds = memos.stream()
+                .map(Memo::getId)
+                .toList();
+
+        // 이미지 / 파일 조회
+        List<MemoImage> images = memoImageRepository.findByMemoIdIn(memoIds);
+        List<MemoFile> files = memoFileRepository.findByMemoIdIn(memoIds);
+
+        // memoId 기준 그룹핑
+        Map<Long, List<MemoImage>> imageMap = images.stream()
+                .collect(Collectors.groupingBy(
+                        image -> image.getMemo().getId()
+                ));
+
+        Map<Long, List<MemoFile>> fileMap = files.stream()
+                .collect(Collectors.groupingBy(
+                        file -> file.getMemo().getId()
+                ));
+
+        // 응답 조립
+        List<MemoListDashboardResponse.MemoDashboardResponse> responses =
+                memos.stream()
+                        .map(memo -> mapToDashboardResponse(memo, imageMap, fileMap))
+                        .toList();
+
+        return MemoListDashboardResponse.from(totalCount, responses);
+    }
+
     @Override
     @Transactional
     public MemoDetailResponse getOneMemoDetail(Long userId, Long memoId) {
