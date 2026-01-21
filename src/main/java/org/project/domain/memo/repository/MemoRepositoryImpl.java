@@ -68,6 +68,59 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .fetch();
     }
 
+
+    @Override
+    public List<Memo> findAiMemos(
+            Long userId,
+            List<Long> labelIds,
+            LocalDateTime cursorCreatedAt,
+            Long cursorMemoId,
+            Pageable pageable
+    ) {
+
+        QMemo memo = QMemo.memo;
+        QMemoLabel memoLabel = QMemoLabel.memoLabel;
+        QLabel label = QLabel.label;
+
+        // 전체조회가 아닌 필요한 만큼 조회
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .leftJoin(memo.memoLabels, memoLabel)
+                .leftJoin(memoLabel.label, label)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
+                        memo.isAiGenerated.eq(true),
+                        labelIn(labelIds),
+                        cursorCondition(cursorCreatedAt, cursorMemoId)
+                )
+                .groupBy(memo.id)
+                .orderBy(
+                        memo.createdAt.desc(),
+                        memo.id.desc()
+                )
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 조회된 id로 실제 메모 페치조인하여 N+1 해결
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
+                .leftJoin(memoLabel.label, label).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(
+                        memo.createdAt.desc(),
+                        memo.id.desc()
+                )
+                .fetch();
+    }
+
     /**
      * labelIds가 있을 때
      */

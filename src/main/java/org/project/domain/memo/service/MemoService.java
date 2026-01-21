@@ -32,4 +32,12 @@ public interface MemoService {
     MemoStructureListResponse getStructureMemo(Long userId);
 
     void deleteMemo(Long userId, Long memoId);
+
+    MemoListDashboardResponse getAiMemosWithMedia(
+            Long userId,
+            List<Long> labelIds,
+            LocalDateTime cursorCreatedAt,
+            Long cursorMemoId,
+            int size
+    );
 }
