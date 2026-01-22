@@ -1,12 +1,10 @@
 package org.project.domain.memo.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.project.domain.label.entity.Label;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoLabel;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 

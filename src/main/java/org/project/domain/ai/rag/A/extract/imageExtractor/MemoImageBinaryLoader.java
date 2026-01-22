@@ -4,6 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.event.dto.ImageBinary;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.repository.MemoImageRepository;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.domainException.S3CustomException;
+import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.exception.errorcode.S3ErrorCode;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,7 +31,7 @@ public class MemoImageBinaryLoader {
     public ImageBinary load(Long imageId) {
 
         MemoImage image = memoImageRepository.findById(imageId)
-                .orElseThrow(() -> new IllegalArgumentException("Image not found: " + imageId));
+                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_IMAGE_NOT_FOUND));
 
         byte[] bytes;
         try (ResponseInputStream<GetObjectResponse> s3Object =
@@ -39,7 +43,7 @@ public class MemoImageBinaryLoader {
             bytes = s3Object.readAllBytes();
 
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to load image from S3", e);
+            throw new S3CustomException(S3ErrorCode.FILE_DOWNLOAD_FAILED);
         }
 
         MimeType mimeType = toMediaFormat(image.getImageExtension());

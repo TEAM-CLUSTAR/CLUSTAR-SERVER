@@ -2,11 +2,9 @@ package org.project.domain.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.dto.response.UserInfoResponse;
-import org.project.domain.user.entity.User;
 import org.project.domain.user.service.UserService;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;

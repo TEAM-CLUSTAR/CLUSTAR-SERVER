@@ -13,13 +13,10 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.project.domain.memo.entity.QMemoFile.memoFile;
 
 @Component
 @RequiredArgsConstructor

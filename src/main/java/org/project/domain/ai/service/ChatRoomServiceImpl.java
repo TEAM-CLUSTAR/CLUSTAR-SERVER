@@ -6,7 +6,6 @@ import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.repository.ChatRoomRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
-import org.project.global.exception.domainException.AiException;
 import org.project.global.exception.domainException.ChatRoomException;
 import org.project.global.exception.errorcode.ChatRoomErrorCode;
 import org.springframework.stereotype.Service;
