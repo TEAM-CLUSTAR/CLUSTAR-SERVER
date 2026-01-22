@@ -2,13 +2,16 @@ package org.project.domain.ai.rag.G.generate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
+import org.project.domain.ai.rag.history.JpaAiCallHistoryWriter;
 import org.project.global.exception.domainException.AiException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -25,7 +28,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 @DisplayName("DefaultRagGenerator 재시도 테스트")
-@org.junit.jupiter.api.extension.ExtendWith(SpringExtension.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = DefaultRagGeneratorRetryTest.TestConfig.class)
 class DefaultRagGeneratorRetryTest {
 
@@ -84,6 +87,11 @@ class DefaultRagGeneratorRetryTest {
         @Bean
         ChatClient chatClient(ChatModel chatModel) {
             return ChatClient.builder(chatModel).build();
+        }
+
+        @Bean
+        JpaAiCallHistoryWriter historyWriter() {
+            return mock(JpaAiCallHistoryWriter.class);
         }
     }
 
