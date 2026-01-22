@@ -1,9 +1,8 @@
 package org.project.domain.memo.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoLabel;
-
-import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.global.util.MemoContentUtils;
 
 import java.util.List;

@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.dto.request.MemoAiRequest;
 import org.project.domain.ai.dto.request.MemoAiRequestForPlan;
-import org.project.domain.ai.dto.response.AiEvaluationResult;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
