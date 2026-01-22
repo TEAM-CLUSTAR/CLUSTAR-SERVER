@@ -106,36 +106,85 @@ public class DefaultRagGenerator implements RagGenerator {
     )
     public String generateForPlan(RagPrompt prompt, String model, Double temperature) {
 
-        return chatClient
-                .prompt()
-                .options(ChatOptions.builder()
-                        .model(model)
-                        .temperature(temperature)
-                        .build()
-                )
-                .system("""
-                %s
+        String fullPrompt = buildFullPrompt(prompt);
+        long startTime = System.currentTimeMillis();
 
-                [CONTEXT]
-                %s
-                """.formatted(
-                        prompt.systemPrompt(),
-                        prompt.context()
-                ))
-                .user(prompt.userPrompt())
-                .advisors(a -> a.param(
-                        ChatMemory.CONVERSATION_ID,
-                        prompt.conversationId()
-                ))
-                .call()
-                .content();
+        try {
+            var response = chatClient
+                    .prompt()
+                    .options(ChatOptions.builder()
+                            .model(model)
+                            .temperature(temperature)
+                            .build()
+                    )
+                    .system("""
+                    %s
+
+                    [CONTEXT]
+                    %s
+                    """.formatted(
+                            prompt.systemPrompt(),
+                            prompt.context()
+                    ))
+                    .user(prompt.userPrompt())
+                    .advisors(a -> a.param(
+                            ChatMemory.CONVERSATION_ID,
+                            prompt.conversationId()
+                    ))
+                    .call()
+                    .chatClientResponse();
+
+            String text = extractText(response);
+
+            long latency = System.currentTimeMillis() - startTime;
+
+            historyWriter.saveSuccess(
+                    prompt,
+                    fullPrompt,
+                    text,
+                    latency
+            );
+
+            log.info(
+                    "Plan AI generation success [conversationId={}, model={}, temperature={}, latency={}ms]",
+                    prompt.conversationId(),
+                    model,
+                    temperature,
+                    latency
+            );
+
+            return text;
+
+        } catch (Exception e) {
+            throw e;
+        }
     }
+
 
     @Recover
     public String recoverForPlan(Exception e, RagPrompt prompt, String model, Double temperature) {
-        log.error("Plan AI 생성 최종 실패 after 3 attempts: {}", e.getMessage(), e);
+
+        String fullPrompt = buildFullPrompt(prompt);
+
+        historyWriter.saveFailure(
+                prompt,
+                fullPrompt,
+                e
+        );
+
+        log.error(
+                "Plan AI generation failed after retries " +
+                        "[conversationId={}, model={}, temperature={}, error={}]",
+                prompt.conversationId(),
+                model,
+                temperature,
+                e.getMessage(),
+                e
+        );
+
         throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
     }
+
 
 
     /* =========================
