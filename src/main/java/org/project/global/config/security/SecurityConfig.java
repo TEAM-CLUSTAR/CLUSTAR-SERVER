@@ -81,7 +81,8 @@ public class SecurityConfig {
                 "http://localhost:5173", // 웹 로컬
                 "https://dev.clustar.cloud",
                 "https://www.clustar.cloud",
-                "https://clustar.vercel.app"
+                "https://clustar.vercel.app",
+                "http://15.164.115.35:8083"
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Collections.singletonList("*"));
