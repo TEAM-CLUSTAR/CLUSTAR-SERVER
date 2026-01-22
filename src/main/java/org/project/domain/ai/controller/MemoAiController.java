@@ -12,6 +12,7 @@ import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
 import org.project.domain.ai.service.AiEvaluationService;
 import org.project.domain.ai.service.ChatRoomService;
+import org.project.domain.ai.service.MemoAiService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,8 @@ public class MemoAiController {
     private final RagPipeline ragPipeline;
     private final AiEvaluationService aiEvaluationService;
     private final ChatRoomService chatRoomService;
+
+    private final MemoAiService memoAiService;
 
 
     @Operation(
@@ -53,12 +56,8 @@ public class MemoAiController {
             @Valid @RequestBody MemoAiRequest request
     ) {
 
-        Long userId = userDetails.getUserId();
-
-        chatRoomService.validateAccess(userId, chatRoomId);
-
-        MemoAiResponse response = ragPipeline.run(
-                userId,
+        MemoAiResponse response = memoAiService.generate(
+                userDetails.getUserId(),
                 chatRoomId,
                 request
         );
