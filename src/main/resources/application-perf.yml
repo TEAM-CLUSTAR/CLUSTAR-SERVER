@@ -1,0 +1,125 @@
+spring:
+  application:
+    name: cluSTAR
+
+  config:
+    activate:
+      on-profile: perf  # 성능 테스트
+
+  datasource:
+    url: ${PERF_DB_URL}
+    username: ${PERF_DB_USERNAME}
+    password: ${PERF_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create   # perf DB에 dev와 동일 스키마 자동 생성(최초 1회)
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false  # perf에서는 SQL 포맷팅/로그 최소화
+    show-sql: false        # perf에서는 로그로 성능 오염 방지
+
+  web:
+    resources:
+      add-mappings: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
+            authorization-grant-type: authorization_code
+            scope:
+              - profile
+              - email
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+
+  ai:
+    model:
+      embedding:
+        text: google-genai
+
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY}
+
+        chat:
+          options:
+            model: gemini-2.5-flash
+            temperature: 0.7
+            candidate-count: 1
+
+        embedding:
+          api-key: ${GOOGLE_AI_API_KEY}
+          text:
+            options:
+              model: text-embedding-004
+
+    vectorstore:
+      pgvector:
+        schema-name: public
+        table-name: vector_store
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
+        initialize-schema: false
+        schema-validation: true
+        remove-existing-vector-store-table: false
+
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  expire-length: 86400000
+  refresh-expire-length: 86400000
+  header: Authorization
+
+app:
+  cookie:
+    domain: ".clustar.cloud"
+    same-site: None
+    secure: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  health:
+    redis:
+      enabled: false
+
+cloud:
+  aws:
+    s3:
+      bucket: clustar-bucket-01
+
+logging:
+  level:
+    org.springframework.ai: INFO
+    org.springframework.web.client: WARN
+    org.springframework.web.reactive.function.client: WARN
