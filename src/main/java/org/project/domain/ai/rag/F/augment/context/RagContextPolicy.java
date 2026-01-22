@@ -8,14 +8,14 @@ public final class RagContextPolicy {
 
     public static final int MIN_CONTEXT_LENGTH = 200;
 
-    public static void validateContext(String context) {
-        if (context == null || context.isBlank()) {
+    public static void validateContext(int pureTextLength) {
+        if (pureTextLength <= 0) {
             throw new InsufficientRagContextException(
                     "선택된 메모에 유효한 내용이 없습니다."
             );
         }
 
-        if (context.length() < RagContextPolicy.MIN_CONTEXT_LENGTH) {
+        if (pureTextLength < MIN_CONTEXT_LENGTH) {
             throw new InsufficientRagContextException(
                     "선택된 메모의 길이가 너무 짧아\n" +
                     "의미 있는 답변을 생성할 수 없습니다."
