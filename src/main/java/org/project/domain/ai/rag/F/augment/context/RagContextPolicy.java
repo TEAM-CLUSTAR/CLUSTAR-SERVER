@@ -17,8 +17,8 @@ public final class RagContextPolicy {
 
         if (context.length() < RagContextPolicy.MIN_CONTEXT_LENGTH) {
             throw new InsufficientRagContextException(
-                    "선택된 메모의 길이가 너무 짧아 " +
-                            "의미 있는 답변을 생성할 수 없습니다."
+                    "선택된 메모의 길이가 너무 짧아\n" +
+                    "의미 있는 답변을 생성할 수 없습니다."
             );
         }
     }

@@ -7,6 +7,7 @@ import org.project.domain.ai.dto.response.AiEvaluationResult;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
+import org.project.global.exception.InsufficientRagContextException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -28,12 +29,24 @@ public class MemoAiServiceImpl implements MemoAiService {
         // 접근 검증
         chatRoomService.validateAccess(userId, chatRoomId);
 
-        // 파이프라인 실행
-        return ragPipeline.run(
-                userId,
-                chatRoomId,
-                request
-        );
+        try {
+            // 정상 RAG 파이프라인 실행
+            return ragPipeline.run(
+                    userId,
+                    chatRoomId,
+                    request
+            );
+
+        } catch (InsufficientRagContextException e) {
+
+            return MemoAiResponse.of(
+                    /* title */ "AI 응답을 생성할 수 없습니다",
+                    /* content */ e.getMessage(),
+                    /* option */ request.option(),
+                    /* memoIds */ request.memoIds(),
+                    /* debug */ null   // or "CONTEXT_TOO_SHORT"
+            );
+        }
     }
 
     @Override
@@ -53,27 +66,54 @@ public class MemoAiServiceImpl implements MemoAiService {
                 request.memoIds()
         );
 
-        // AI 응답 생성
-        MemoAiResponse aiResponse = ragPipeline.runForPlan(
-                userId,
-                chatRoomId,
-                memoRequest,
-                request.systemPrompt(),
-                request.model(),
-                request.temperature()
-        );
+        try {
+            // AI 응답 생성
+            MemoAiResponse aiResponse = ragPipeline.runForPlan(
+                    userId,
+                    chatRoomId,
+                    memoRequest,
+                    request.systemPrompt(),
+                    request.model(),
+                    request.temperature()
+            );
 
-        // AI 응답 품질 평가
-        AiEvaluationResult evaluationResult =
-                aiEvaluationService.evaluate(
-                        request.userPrompt(),
-                        aiResponse
-                );
+            // AI 응답 품질 평가
+            AiEvaluationResult evaluationResult =
+                    aiEvaluationService.evaluate(
+                            request.userPrompt(),
+                            aiResponse
+                    );
 
-        // 응답 조립
-        return MemoAiResponseForPlan.of(
-                aiResponse,
-                evaluationResult
-        );
+            // 정상 응답
+            return MemoAiResponseForPlan.of(
+                    aiResponse,
+                    evaluationResult
+            );
+
+        } catch (InsufficientRagContextException e) {
+            // 컨텍스트 부족 → AI 응답처럼 치환
+
+            MemoAiResponse fallbackResponse = MemoAiResponse.of(
+                    "AI 응답을 생성할 수 없습니다",
+                    e.getMessage(),
+                    request.option(),
+                    request.memoIds(),
+                    null
+            );
+
+            // 컨텍스트 부족은 "평가 대상 아님"
+            AiEvaluationResult emptyEvaluation =
+                    AiEvaluationResult.of(
+                            0.0,
+                            0.0,
+                            0.0,
+                            false
+                    );
+
+            return MemoAiResponseForPlan.of(
+                    fallbackResponse,
+                    emptyEvaluation
+            );
+        }
     }
 }
