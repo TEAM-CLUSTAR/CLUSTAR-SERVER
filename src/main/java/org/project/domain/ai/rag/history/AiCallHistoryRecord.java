@@ -20,25 +20,26 @@ public class AiCallHistoryRecord {
 
     private String conversationId;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String systemPrompt;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String context;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String userPrompt;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String fullPrompt;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String responseText;
 
     private boolean success;
 
     private Long latencyMs;
 
+    @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
     private LocalDateTime createdAt;
@@ -87,4 +88,3 @@ public class AiCallHistoryRecord {
                 : e.getMessage();
     }
 }
-
