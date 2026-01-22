@@ -16,41 +16,24 @@ public class RagContextBuilder {
 
         return documents.stream()
                 .map(this::formatDocument)
+                .filter(s -> !s.isBlank())
                 .collect(Collectors.joining("\n\n"));
     }
 
     private String formatDocument(Document document) {
 
-        String type = String.valueOf(
-                document.getMetadata().get("type")
-        );
+        String type = String.valueOf(document.getMetadata().get("type"));
 
+        // 메모 계열만 허용
         if (!type.startsWith("MEMO_")) {
             return "";
         }
 
-        String source = String.valueOf(
-                document.getMetadata().getOrDefault("rag_source", "unknown")
-        );
-
-        String fileName = String.valueOf(
-                document.getMetadata().getOrDefault("fileName", "")
-        );
-
-        String memoId = String.valueOf(
-                document.getMetadata().getOrDefault("memoId", "")
-        );
-
-        String sourceLabel = fileName.isBlank()
-                ? source + " | memoId=" + memoId
-                : source + " | " + fileName + " | memoId=" + memoId;
-
         return """
-        [SOURCE: %s]
+        [SOURCE]
         %s
         """.formatted(
-                sourceLabel,
-                document.getText()
+                document.getText().trim()
         );
     }
 }
