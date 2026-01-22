@@ -3,7 +3,7 @@ package org.project.domain.label.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.project.domain.label.dto.reponse.LabelListResponse;
+import org.project.domain.label.dto.response.LabelListResponse;
 import org.project.domain.label.service.LabelService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;

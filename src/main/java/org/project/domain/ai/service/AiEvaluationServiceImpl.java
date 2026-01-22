@@ -110,17 +110,17 @@ public class AiEvaluationServiceImpl implements AiEvaluationService {
      * 헬퍼 메서드
      */
     private List<String> extractRagContexts(String usedPrompt) {
-        if (!usedPrompt.contains("[CONTEXT]")) return List.of();
+        if (usedPrompt == null || !usedPrompt.contains("[CONTEXT]")) {
+            return List.of();
+        }
 
         String contextPart =
-                usedPrompt.substring(usedPrompt.indexOf("[CONTEXT]"));
+                usedPrompt.substring(
+                        usedPrompt.indexOf("[CONTEXT]") + "[CONTEXT]".length()
+                );
 
-        return Arrays.stream(contextPart.split("\\[SOURCE:"))
-                .skip(1)
-                .map(s -> {
-                    int idx = s.indexOf("]");
-                    return idx >= 0 ? s.substring(idx + 1).trim() : s.trim();
-                    })
+        return Arrays.stream(contextPart.split("\\[MEMO\\]"))
+                .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList();
     }

@@ -2,7 +2,11 @@ package org.project.domain.ai.rag.F.augment;
 
 import lombok.RequiredArgsConstructor;
 import org.project.domain.ai.rag.D.query.dto.RagQuery;
+import org.project.domain.ai.rag.F.augment.context.RagContextBuilder;
+import org.project.domain.ai.rag.F.augment.context.RagContextPolicy;
+import org.project.domain.ai.rag.F.augment.dto.RagContextResult;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
+import org.project.domain.ai.rag.F.augment.system.SystemPromptResolver;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
@@ -25,14 +29,17 @@ public class DefaultRagAugmenter implements RagAugmenter {
                 systemPromptResolver.resolve(query.option());
 
         // Context 생성 (retrieved documents)
-        String context =
+        RagContextResult contextResult =
                 contextBuilder.build(documents);
+
+        // 메모 컨텍스트 검증
+        RagContextPolicy.validateContext(contextResult.pureTextLength());
 
         // RagPrompt 생성
         return RagPrompt.of(
                 systemPrompt,
                 query.userPrompt(),
-                context
+                contextResult.context()
         );
     }
 }

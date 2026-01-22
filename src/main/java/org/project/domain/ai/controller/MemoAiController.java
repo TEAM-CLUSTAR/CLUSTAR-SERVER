@@ -12,6 +12,7 @@ import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
 import org.project.domain.ai.service.AiEvaluationService;
 import org.project.domain.ai.service.ChatRoomService;
+import org.project.domain.ai.service.MemoAiService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,8 @@ public class MemoAiController {
     private final RagPipeline ragPipeline;
     private final AiEvaluationService aiEvaluationService;
     private final ChatRoomService chatRoomService;
+
+    private final MemoAiService memoAiService;
 
 
     @Operation(
@@ -53,12 +56,8 @@ public class MemoAiController {
             @Valid @RequestBody MemoAiRequest request
     ) {
 
-        Long userId = userDetails.getUserId();
-
-        chatRoomService.validateAccess(userId, chatRoomId);
-
-        MemoAiResponse response = ragPipeline.run(
-                userId,
+        MemoAiResponse response = memoAiService.generate(
+                userDetails.getUserId(),
                 chatRoomId,
                 request
         );
@@ -118,44 +117,13 @@ public class MemoAiController {
             @Valid @RequestBody MemoAiRequestForPlan request
     ) {
 
-        Long userId = userDetails.getUserId();
-
-        chatRoomService.validateAccess(userId, chatRoomId);
-
-        // AI 요청 DTO 구성
-        MemoAiRequest memoRequest =
-                MemoAiRequest.of(
-                        request.userPrompt(),
-                        request.option(),
-                        request.memoIds()
-                );
-
-        // AI 응답 생성
-        MemoAiResponse aiResponse =
-                ragPipeline.runForPlan(
-                        userId,
-                        chatRoomId,
-                        memoRequest,
-                        request.systemPrompt(),
-                        request.model(),
-                        request.temperature()
-                );
-
-        // AI 응답 품질 평가
-        AiEvaluationResult evaluationResult =
-                aiEvaluationService.evaluate(
-                        request.userPrompt(),
-                        aiResponse
-                );
-
-        // 응답 결합
         MemoAiResponseForPlan response =
-                MemoAiResponseForPlan.of(
-                        aiResponse,
-                        evaluationResult
+                memoAiService.generateForPlan(
+                        userDetails.getUserId(),
+                        chatRoomId,
+                        request
                 );
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
-
 }
