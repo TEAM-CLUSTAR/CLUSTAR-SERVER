@@ -21,7 +21,7 @@ public class SystemPromptResolver {
                     - The entire response MUST be written in Korean. Do NOT use any other language.
                     
                     [CONTENT UNDERSTANDING RULES]
-                    - All content provided after [CONTEXT] and each [SOURCE] is written by the user.
+                    - All content provided after [CONTEXT] and each [MEMO] is written by the user.
                     - Treat the content as factual notes.
                     - Treat the content as factual notes. As a general rule, do not add external knowledge, unless the provided content is too thin and requires enrichment as specified in the [CONTENT HANDLING] section.
                     
@@ -60,7 +60,7 @@ public class SystemPromptResolver {
                     - Keep explanations concise and aligned with the memo content.
                     
                     [CONTENT HANDLING & ERROR PREVENTION]
-                    - **Focus Rule**: Ignore any conversational inputs, greetings (e.g., "Hello", "Hi", "안녕"), or irrelevant remarks. Focus strictly on the content in [CONTEXT] and [SOURCE].
+                    - **Focus Rule**: Ignore any conversational inputs, greetings (e.g., "Hello", "Hi", "안녕"), or irrelevant remarks. Focus strictly on the content in [CONTEXT] and [MEMO].
                     - **Insufficient Content**:
                       - If the memo content is thin but a clear topic exists, enrich the document using your internal knowledge while staying as faithful as possible to the original intent to ensure high information value.
                       - If the content is severely lacking (e.g., less than 20-30 characters or nonsensical), do NOT attempt to organize it into a full document. Instead, you MUST follow the [STRICT OUTPUT RULES] structure (Title and Body) to inform the user.
@@ -110,11 +110,11 @@ public class SystemPromptResolver {
                     - When explaining concepts, use a definition list structure.
 
                     [CONTEXT HANDLING RULE]
-                    - Treat all content under [CONTEXT] and [SOURCE] as factual user-written notes.
+                    - Treat all content under [CONTEXT] and [MEMO] as factual user-written notes.
                     - Do NOT add assumptions beyond the given context.
                     
                     [CONTENT HANDLING & ERROR PREVENTION]
-                    - Focus Rule: Ignore any conversational inputs, greetings (e.g., "Hello", "Hi", "안녕"), or irrelevant remarks. Focus strictly on the content in [CONTEXT] and [SOURCE].
+                    - Focus Rule: Ignore any conversational inputs, greetings (e.g., "Hello", "Hi", "안녕"), or irrelevant remarks. Focus strictly on the content in [CONTEXT] and [MEMO].
                     - Insufficient Content:
                       - If the memo content is thin but a clear topic exists, enrich the document using your internal knowledge while staying as faithful as possible to the original intent to ensure high information value.
                       - If the content is severely lacking (e.g., less than 20-30 characters or nonsensical), do NOT attempt to organize it into a full document. Instead, you MUST follow the [STRICT OUTPUT RULES] structure (Title and Body) to inform the user.
@@ -136,7 +136,7 @@ public class SystemPromptResolver {
                     - The entire response MUST be written in Korean. Do NOT use any other language.
                     
                     [CONTEXT RULE]
-                    - All content appearing after [CONTEXT] and each [SOURCE] is written by the user.
+                    - All content appearing after [CONTEXT] and each [MEMO] is written by the user.
                     - Treat the content as factual notes.
                     - Do NOT add assumptions or external knowledge beyond the given context.
 
@@ -193,7 +193,7 @@ public class SystemPromptResolver {
                     - The entire response MUST be written in Korean. Do NOT use any other language.
 
                     [CONTEXT RULE]
-                    - All content appearing after [CONTEXT] and each [SOURCE] is written by the user.
+                    - All content appearing after [CONTEXT] and each [MEMO] is written by the user.
                     - Treat the content as factual notes.
                     - Do NOT add assumptions, interpretations, or external knowledge beyond the given context.
 
