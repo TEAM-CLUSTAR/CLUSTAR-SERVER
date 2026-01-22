@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.checkerframework.checker.units.qual.C;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ public class AiCallHistoryRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ai_call_history_id")
     private Long id;
 
     private String conversationId;
