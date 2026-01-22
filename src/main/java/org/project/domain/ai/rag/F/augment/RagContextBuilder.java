@@ -30,7 +30,7 @@ public class RagContextBuilder {
         }
 
         return """
-        [SOURCE]
+        [MEMO]
         %s
         """.formatted(
                 document.getText().trim()
