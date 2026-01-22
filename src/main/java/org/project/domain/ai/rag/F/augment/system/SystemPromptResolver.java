@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.F.augment;
+package org.project.domain.ai.rag.F.augment.system;
 
 import org.project.domain.ai.dto.MemoAiOptions;
 import org.springframework.stereotype.Component;

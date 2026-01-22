@@ -1,4 +1,4 @@
-package org.project.domain.ai.rag.F.augment;
+package org.project.domain.ai.rag.F.augment.context;
 
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
