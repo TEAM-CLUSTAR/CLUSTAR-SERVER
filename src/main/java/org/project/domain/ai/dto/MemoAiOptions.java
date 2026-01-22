@@ -4,6 +4,5 @@ public enum MemoAiOptions {
     MERGE,
     STRUCTURE,
     SUMMARY,
-    DEFAULT,
-    CREATIVE
+    DEFAULT
 }
