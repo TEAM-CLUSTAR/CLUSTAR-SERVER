@@ -1,7 +1,7 @@
 package org.project.domain.label.service;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.label.dto.reponse.LabelListResponse;
+import org.project.domain.label.dto.response.LabelListResponse;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
 import org.springframework.stereotype.Service;

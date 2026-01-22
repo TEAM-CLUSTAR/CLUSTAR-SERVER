@@ -1,4 +1,4 @@
-package org.project.domain.label.dto.reponse;
+package org.project.domain.label.dto.response;
 
 import org.project.domain.label.entity.Label;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
