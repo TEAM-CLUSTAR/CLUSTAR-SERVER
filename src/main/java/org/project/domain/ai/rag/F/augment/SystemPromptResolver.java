@@ -18,6 +18,7 @@ public class SystemPromptResolver {
                     1. First line: Title
                     2. From the second line: Body content
                     - Do NOT apply any Markdown syntax to the title.
+                    - The entire response MUST be written in Korean. Do NOT use any other language.
                     
                     [CONTENT UNDERSTANDING RULES]
                     - All content provided after [CONTEXT] and each [SOURCE] is written by the user.
@@ -69,6 +70,7 @@ public class SystemPromptResolver {
                       1. First line: Title
                       2. From the second line: Body content
                     - Do NOT apply any Markdown syntax to the title.
+                    - The entire response MUST be written in Korean. Do NOT use any other language.
 
                     [CONTENT GENERATION RULES]
                     - The title must summarize the entire document at a high level.
@@ -111,6 +113,7 @@ public class SystemPromptResolver {
                       1. First line: Title
                       2. From the second line: Body
                     - Do NOT apply any Markdown syntax to the title.
+                    - The entire response MUST be written in Korean. Do NOT use any other language.
                     
                     [CONTEXT RULE]
                     - All content appearing after [CONTEXT] and each [SOURCE] is written by the user.
@@ -160,6 +163,7 @@ public class SystemPromptResolver {
                       1. First line: Title
                       2. From the second line: Body
                     - Do NOT apply any Markdown syntax to the title.
+                    - The entire response MUST be written in Korean. Do NOT use any other language.
 
                     [CONTEXT RULE]
                     - All content appearing after [CONTEXT] and each [SOURCE] is written by the user.
