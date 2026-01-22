@@ -3,9 +3,11 @@ package org.project.domain.ai.rag.G.generate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.ai.rag.F.augment.dto.RagPrompt;
+import org.project.domain.ai.rag.history.JpaAiCallHistoryWriter;
 import org.project.global.exception.domainException.AiException;
 import org.project.global.exception.errorcode.AiErrorCode;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.retry.annotation.Backoff;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class DefaultRagGenerator implements RagGenerator {
 
     private final ChatClient chatClient;
+    private final JpaAiCallHistoryWriter historyWriter;
 
     @Retryable(
             maxAttempts = 3,
@@ -27,15 +30,18 @@ public class DefaultRagGenerator implements RagGenerator {
     @Override
     public String generate(RagPrompt prompt) {
 
+        String fullPrompt = buildFullPrompt(prompt);
+        long startTime = System.currentTimeMillis();
+
         try {
-            var response = chatClient
+            var responseSpec = chatClient
                     .prompt()
                     .system("""
-                %s
+                        %s
 
-                [CONTEXT]
-                %s
-                """.formatted(
+                        [CONTEXT]
+                        %s
+                        """.formatted(
                             prompt.systemPrompt(),
                             prompt.context()
                     ))
@@ -47,29 +53,49 @@ public class DefaultRagGenerator implements RagGenerator {
                     .call()
                     .chatClientResponse();
 
-            log.debug("Advisor context: {}", response.context());
-            var chatResponse = response.chatResponse();
-            var result = chatResponse != null ? chatResponse.getResult() : null;
-            var output = result != null ? result.getOutput() : null;
-            var text = output != null ? output.getText() : null;
-            if (text == null || text.isBlank()) {
-                log.warn("AI 응답 text가 비어 있습니다. contextKeys={}",
-                        response.context() != null ? response.context().keySet() : "null");
-                throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
-            }
+            String text = extractText(responseSpec);
+
+            long latency = System.currentTimeMillis() - startTime;
+
+            historyWriter.saveSuccess(
+                    prompt,
+                    fullPrompt,
+                    text,
+                    latency
+            );
+
+            log.info(
+                    "AI generation success [conversationId={}, latency={}ms, responseLength={}]",
+                    prompt.conversationId(),
+                    latency,
+                    text.length()
+            );
+
             return text;
+
         } catch (Exception e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            log.error("AI 호출 실패", e);
             throw e;
         }
     }
 
     @Recover
     public String recover(Exception e, RagPrompt prompt) {
-        log.error("AI 생성 최종 실패 after 3 attempts: {}", e.getMessage(), e);
+
+        String fullPrompt = buildFullPrompt(prompt);
+
+        historyWriter.saveFailure(
+                prompt,
+                fullPrompt,
+                e
+        );
+
+        log.error(
+                "AI generation failed after retries [conversationId={}, error={}]",
+                prompt.conversationId(),
+                e.getMessage(),
+                e
+        );
+
         throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
     }
 
@@ -109,5 +135,46 @@ public class DefaultRagGenerator implements RagGenerator {
     public String recoverForPlan(Exception e, RagPrompt prompt, String model, Double temperature) {
         log.error("Plan AI 생성 최종 실패 after 3 attempts: {}", e.getMessage(), e);
         throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+    }
+
+
+    /* =========================
+       Helper Methods
+       ========================= */
+
+    private String buildFullPrompt(RagPrompt prompt) {
+        return """
+            [SYSTEM]
+            %s
+
+            [CONTEXT]
+            %s
+
+            [USER]
+            %s
+            """.formatted(
+                prompt.systemPrompt(),
+                prompt.context(),
+                prompt.userPrompt()
+        );
+    }
+
+    private String extractText(ChatClientResponse response) {
+
+        if (response == null || response.chatResponse() == null) {
+            throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+        }
+
+        var result = response.chatResponse().getResult();
+        if (result == null || result.getOutput() == null) {
+            throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+        }
+
+        String text = result.getOutput().getText();
+        if (text == null || text.isBlank()) {
+            throw new AiException(AiErrorCode.AI_GENERATION_FAILED);
+        }
+
+        return text;
     }
 }
