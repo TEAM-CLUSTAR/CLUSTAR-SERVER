@@ -33,7 +33,7 @@ public class DefaultRagAugmenter implements RagAugmenter {
                 contextBuilder.build(documents);
 
         // 메모 컨텍스트 검증
-        RagContextPolicy.validateContext(contextResult.pureTextLength());
+        // RagContextPolicy.validateContext(contextResult.pureTextLength());
 
         // RagPrompt 생성
         return RagPrompt.of(
