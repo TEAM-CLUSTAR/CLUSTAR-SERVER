@@ -117,44 +117,13 @@ public class MemoAiController {
             @Valid @RequestBody MemoAiRequestForPlan request
     ) {
 
-        Long userId = userDetails.getUserId();
-
-        chatRoomService.validateAccess(userId, chatRoomId);
-
-        // AI 요청 DTO 구성
-        MemoAiRequest memoRequest =
-                MemoAiRequest.of(
-                        request.userPrompt(),
-                        request.option(),
-                        request.memoIds()
-                );
-
-        // AI 응답 생성
-        MemoAiResponse aiResponse =
-                ragPipeline.runForPlan(
-                        userId,
-                        chatRoomId,
-                        memoRequest,
-                        request.systemPrompt(),
-                        request.model(),
-                        request.temperature()
-                );
-
-        // AI 응답 품질 평가
-        AiEvaluationResult evaluationResult =
-                aiEvaluationService.evaluate(
-                        request.userPrompt(),
-                        aiResponse
-                );
-
-        // 응답 결합
         MemoAiResponseForPlan response =
-                MemoAiResponseForPlan.of(
-                        aiResponse,
-                        evaluationResult
+                memoAiService.generateForPlan(
+                        userDetails.getUserId(),
+                        chatRoomId,
+                        request
                 );
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
-
 }
