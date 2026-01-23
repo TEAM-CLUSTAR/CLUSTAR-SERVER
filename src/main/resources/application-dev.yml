@@ -122,3 +122,8 @@ logging:
     org.springframework.ai: DEBUG
     org.springframework.web.client: DEBUG
     org.springframework.web.reactive.function.client: DEBUG
+
+swagger:
+  auth:
+    username: ${SWAGGER_USERNAME}
+    password: ${SWAGGER_PASSWORD}

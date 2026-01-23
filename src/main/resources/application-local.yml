@@ -102,3 +102,8 @@ cloud:
   aws:
     s3:
       bucket: clustar-bucket-01
+
+swagger:
+  auth:
+    username: ${SWAGGER_USERNAME}
+    password: ${SWAGGER_PASSWORD}
