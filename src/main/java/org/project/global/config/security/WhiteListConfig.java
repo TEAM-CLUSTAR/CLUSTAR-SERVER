@@ -14,9 +14,6 @@ public class WhiteListConfig {
                 "/oauth/google/**",  // 구글 로그인
                 "/oauth/reissue",  // 토큰 재발급
                 "/access",  // 테스트용 엑세스 토큰
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html",
                 "/actuator/health",
                 "/actuator/health/**",
                 "/actuator/prometheus"
