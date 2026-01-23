@@ -95,8 +95,8 @@ jobs:
             echo "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" >> .env
             echo "GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" >> .env
             echo "GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}" >> .env
-            echo "GOOGLE_AI_API_KEY=${SWAGGER_USERNAME}" >> .env
-            echo "GOOGLE_AI_API_KEY=${SWAGGER_PASSWORD}" >> .env
+            echo "SWAGGER_USERNAME=${SWAGGER_USERNAME}" >> .env
+            echo "SWAGGER_PASSWORD=${SWAGGER_PASSWORD}" >> .env
             
             # 배포 스크립트 실행권한 부여
             sudo chmod +x deploy.sh
