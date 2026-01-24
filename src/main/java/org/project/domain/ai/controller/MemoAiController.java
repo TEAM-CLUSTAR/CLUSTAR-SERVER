@@ -37,40 +37,19 @@ public class MemoAiController {
     private final DummyService dummyService;
 
 
-    @Operation(
-            summary = "AI 채팅 응답 생성",
-            description = """
-                선택한 메모들을 기반으로 RAG를 수행하여
-                AI 응답을 생성합니다.
-
-                - chatRoomId : AI 대화 세션 ID
-                - userPrompt : 사용자의 질문
-                - option     : AI 처리 전략 (MERGE, STRUCTURE, SUMMARY)
-                - memoIds    : 참조할 메모 ID 목록
-
-                채팅방(chatRoom) 단위로 대화 컨텍스트가 유지됩니다.
-                """
-    )
-    @PostMapping("/chat-rooms/{chatRoomId}/chat")
-    public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long chatRoomId,
-            @Valid @RequestBody MemoAiRequest request
-    ) {
-
-        MemoAiResponse response = memoAiService.generate(
-                userDetails.getUserId(),
-                chatRoomId,
-                request
-        );
-
-        return ResponseEntity.ok(ApiResponse.ok(response));
-    }
-
-
 //    @Operation(
-//            summary = "[시연용 더미 API] AI 채팅 더미 응답 생성",
-//            description = "시연용 더미 API"
+//            summary = "AI 채팅 응답 생성",
+//            description = """
+//                선택한 메모들을 기반으로 RAG를 수행하여
+//                AI 응답을 생성합니다.
+//
+//                - chatRoomId : AI 대화 세션 ID
+//                - userPrompt : 사용자의 질문
+//                - option     : AI 처리 전략 (MERGE, STRUCTURE, SUMMARY)
+//                - memoIds    : 참조할 메모 ID 목록
+//
+//                채팅방(chatRoom) 단위로 대화 컨텍스트가 유지됩니다.
+//                """
 //    )
 //    @PostMapping("/chat-rooms/{chatRoomId}/chat")
 //    public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
@@ -79,10 +58,31 @@ public class MemoAiController {
 //            @Valid @RequestBody MemoAiRequest request
 //    ) {
 //
-//        MemoAiResponse response = dummyService.generate(request);
+//        MemoAiResponse response = memoAiService.generate(
+//                userDetails.getUserId(),
+//                chatRoomId,
+//                request
+//        );
 //
-//        return ResponseEnt2ity.ok(ApiResponse.ok(response));
+//        return ResponseEntity.ok(ApiResponse.ok(response));
 //    }
+
+
+    @Operation(
+            summary = "[시연용 더미 API] AI 채팅 더미 응답 생성",
+            description = "시연용 더미 API"
+    )
+    @PostMapping("/chat-rooms/{chatRoomId}/chat")
+    public ResponseEntity<ApiResponse<MemoAiResponse>> generateMemoAi(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long chatRoomId,
+            @Valid @RequestBody MemoAiRequest request
+    ) {
+
+        MemoAiResponse response = dummyService.generate(request);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
 
 
     @Operation(
