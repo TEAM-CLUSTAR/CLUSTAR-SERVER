@@ -5,7 +5,7 @@
 > 흩어진 메모를 빛나는 결과물로
 
 <br/>
-<table>
+<table align="center">
   <tr>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/9fcd5070-16ea-4227-a430-90bd46dd6028" width="420"/>
