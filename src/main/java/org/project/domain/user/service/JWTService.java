@@ -12,9 +12,9 @@ public class JWTService {
     private final JWTUtil jwtUtil;
 
     // 토큰 발급기를 위한 메서드입니다
-//    public void createToken(HttpServletResponse response) {
-//
-//        String access = jwtUtil.generateAccessToken(1L);
-//        response.setHeader("access-token", access);
-//    }
+    public void createToken(HttpServletResponse response) {
+
+        String access = jwtUtil.generateAccessToken(1L);
+        response.setHeader("access-token", access);
+    }
 }
