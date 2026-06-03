@@ -46,3 +46,8 @@ src/main/generated
 
 ### codex ###
 AGENTS.md
+
+## claude ##
+PROJECT.md
+.claude/
+CLAUDE.md
