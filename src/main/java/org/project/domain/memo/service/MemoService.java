@@ -40,4 +40,6 @@ public interface MemoService {
             Long cursorMemoId,
             int size
     );
+
+    MemoSearchResponse searchMemos(Long userId, String query);
 }

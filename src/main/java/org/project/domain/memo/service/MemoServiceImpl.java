@@ -18,6 +18,7 @@ import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.MemoException;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -55,6 +57,7 @@ public class MemoServiceImpl implements MemoService {
     private final S3Util s3Util;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final MemoSearchVectorRetriever memoSearchVectorRetriever;
 
     private static final int MAX_IMAGE_COUNT = 5;
     private static final int MAX_FILE_COUNT = 5;
@@ -364,6 +367,46 @@ public class MemoServiceImpl implements MemoService {
         eventPublisher.publishEvent(new MemoDeletedEvent(memoId, imageKeys, fileKeys));
     }
 
+
+    @Override
+    public MemoSearchResponse searchMemos(Long userId, String query) {
+        if (query == null || query.isBlank()) {
+            throw new MemoException(MemoErrorCode.EMPTY_SEARCH_QUERY);
+        }
+
+        // 텍스트 검색 (병렬)
+        CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
+                () -> memoRepository.searchByText(userId, query, 3)
+        );
+
+        // 의미 기반 벡터 검색 (병렬)
+        CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
+                () -> memoSearchVectorRetriever.retrieve(userId, query)
+        );
+
+        CompletableFuture.allOf(textFuture, vectorFuture).join();
+
+        List<Memo> textResults = textFuture.join();
+        List<Memo> vectorResults = vectorFuture.join();
+
+        // 텍스트 결과 먼저, 중복 memoId 제거하며 벡터 결과 추가
+        Set<Long> seenIds = new LinkedHashSet<>();
+        List<MemoSearchItemResponse> results = new ArrayList<>();
+
+        textResults.forEach(memo -> {
+            if (seenIds.add(memo.getId())) {
+                results.add(MemoSearchItemResponse.from(memo, "TEXT"));
+            }
+        });
+
+        vectorResults.forEach(memo -> {
+            if (seenIds.add(memo.getId())) {
+                results.add(MemoSearchItemResponse.from(memo, "SEMANTIC"));
+            }
+        });
+
+        return MemoSearchResponse.from(results);
+    }
 
     // == 내부 헬퍼 메서드들== //
 
