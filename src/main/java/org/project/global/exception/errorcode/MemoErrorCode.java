@@ -15,7 +15,8 @@ public enum MemoErrorCode implements ErrorCode {
     IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, 400, "이미지 용량은 최대 5MB까지 가능합니다."),
     FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, 400, "파일 용량은 최대 10MB까지 가능합니다."),
     MEMO_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 이미지를 찾을 수 없습니다."),
-    MEMO_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 파일을 찾을 수 없습니다.");
+    MEMO_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 파일을 찾을 수 없습니다."),
+    EMPTY_SEARCH_QUERY(HttpStatus.BAD_REQUEST, 400, "검색어를 입력해주세요.");
 
     private final HttpStatus status;
     private final int code;
