@@ -213,6 +213,20 @@ public class MemoController {
 
     }
 
+    @GetMapping("/search")
+    @Operation(summary = "메모 검색", description = """
+            검색어를 입력하면 최대 5개의 메모를 반환합니다.
+            - 텍스트 매칭(제목/본문/라벨) 최대 3개
+            - 의미 기반 벡터 검색 최대 2개
+            """)
+    public ResponseEntity<ApiResponse<MemoSearchResponse>> searchMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam String query
+    ) {
+        MemoSearchResponse response = memoService.searchMemos(userDetails.getUserId(), query);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
     @DeleteMapping("/{memoId}")
     @Operation(summary = "메모 삭제", description = "특정 메모를 삭제합니다.")
     @BusinessExceptionDescription(SwaggerResponseDescription.DELETE_MEMO)
