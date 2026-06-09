@@ -29,6 +29,8 @@ import org.project.global.util.FileSizeUtil;
 import org.project.global.util.MarkdownUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -58,6 +61,10 @@ public class MemoServiceImpl implements MemoService {
 
     private final ApplicationEventPublisher eventPublisher;
     private final MemoSearchVectorRetriever memoSearchVectorRetriever;
+
+    @Autowired
+    @Qualifier("ioExecutor")
+    private Executor ioExecutor;
 
     private static final int MAX_IMAGE_COUNT = 5;
     private static final int MAX_FILE_COUNT = 5;
@@ -376,12 +383,12 @@ public class MemoServiceImpl implements MemoService {
 
         // 텍스트 검색 (병렬)
         CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
-                () -> memoRepository.searchByText(userId, query, 3)
+                () -> memoRepository.searchByText(userId, query, 3), ioExecutor
         );
 
         // 의미 기반 벡터 검색 (병렬)
         CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
-                () -> memoSearchVectorRetriever.retrieve(userId, query)
+                () -> memoSearchVectorRetriever.retrieve(userId, query), ioExecutor
         );
 
         CompletableFuture.allOf(textFuture, vectorFuture).join();
@@ -395,13 +402,13 @@ public class MemoServiceImpl implements MemoService {
 
         textResults.forEach(memo -> {
             if (seenIds.add(memo.getId())) {
-                results.add(MemoSearchItemResponse.from(memo, "TEXT"));
+                results.add(MemoSearchItemResponse.from(memo, SearchType.TEXT));
             }
         });
 
         vectorResults.forEach(memo -> {
             if (seenIds.add(memo.getId())) {
-                results.add(MemoSearchItemResponse.from(memo, "SEMANTIC"));
+                results.add(MemoSearchItemResponse.from(memo, SearchType.SEMANTIC));
             }
         });
 

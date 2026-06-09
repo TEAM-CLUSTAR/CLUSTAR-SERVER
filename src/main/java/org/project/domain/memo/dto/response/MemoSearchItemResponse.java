@@ -14,9 +14,9 @@ public record MemoSearchItemResponse(
         String content,
         List<MemoListDashboardResponse.LabelResponse> labelList,
         LocalDateTime createdAt,
-        String searchType
+        SearchType searchType
 ) {
-    public static MemoSearchItemResponse from(Memo memo, String searchType) {
+    public static MemoSearchItemResponse from(Memo memo, SearchType searchType) {
         return new MemoSearchItemResponse(
                 memo.getId(),
                 memo.getTitle(),
