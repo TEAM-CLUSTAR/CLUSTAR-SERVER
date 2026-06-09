@@ -19,6 +19,10 @@ import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
+import org.project.domain.memo.dto.request.MemoRecommendationRequest;
+import org.project.domain.memo.dto.response.MemoRecommendationItemResponse;
+import org.project.domain.memo.dto.response.MemoRecommendationResponse;
+import org.project.domain.memo.repository.VectorStoreRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.MemoException;
@@ -61,6 +65,7 @@ public class MemoServiceImpl implements MemoService {
 
     private final ApplicationEventPublisher eventPublisher;
     private final MemoSearchVectorRetriever memoSearchVectorRetriever;
+    private final VectorStoreRepository vectorStoreRepository;
 
     @Autowired
     @Qualifier("ioExecutor")
@@ -413,6 +418,25 @@ public class MemoServiceImpl implements MemoService {
         });
 
         return MemoSearchResponse.from(results);
+    }
+
+    @Override
+    public MemoRecommendationResponse recommendMemos(Long userId, MemoRecommendationRequest request) {
+        List<Long> recommendedIds = vectorStoreRepository.findRecommendedMemoIds(userId, request.memoIds());
+
+        if (recommendedIds.isEmpty()) {
+            return MemoRecommendationResponse.of(List.of());
+        }
+
+        List<Long> top3Ids = recommendedIds.stream().limit(3).toList();
+
+        List<Memo> memos = memoRepository.findByIdInWithLabelsAndNotDeleted(userId, top3Ids);
+
+        List<MemoRecommendationItemResponse> items = memos.stream()
+                .map(MemoRecommendationItemResponse::from)
+                .toList();
+
+        return MemoRecommendationResponse.of(items);
     }
 
     // == 내부 헬퍼 메서드들== //
