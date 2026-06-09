@@ -127,8 +127,6 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         QMemoLabel memoLabel = QMemoLabel.memoLabel;
         QLabel label = QLabel.label;
 
-        String likeQuery = "%" + query + "%";
-
         List<Long> memoIds = queryFactory
                 .select(memo.id)
                 .from(memo)
