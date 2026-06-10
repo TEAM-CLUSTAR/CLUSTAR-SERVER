@@ -432,7 +432,12 @@ public class MemoServiceImpl implements MemoService {
 
         List<Memo> memos = memoRepository.findByIdInWithLabelsAndNotDeleted(userId, top3Ids);
 
-        List<MemoRecommendationItemResponse> items = memos.stream()
+        Map<Long, Memo> memoById = memos.stream()
+                .collect(Collectors.toMap(Memo::getId, Function.identity()));
+
+        List<MemoRecommendationItemResponse> items = top3Ids.stream()
+                .map(memoById::get)
+                .filter(Objects::nonNull)
                 .map(MemoRecommendationItemResponse::from)
                 .toList();
 

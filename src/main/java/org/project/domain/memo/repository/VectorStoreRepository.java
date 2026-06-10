@@ -28,14 +28,19 @@ public class VectorStoreRepository {
                     WHERE CAST(metadata->>'memoId' AS BIGINT) IN (%s)
                       AND CAST(metadata->>'userId' AS BIGINT) = ?
                     HAVING COUNT(*) > 0
+                ), scored AS (
+                    SELECT CAST(vs.metadata->>'memoId' AS BIGINT) AS memo_id,
+                           MIN(vs.embedding <=> avg_vec.vec) AS min_distance
+                    FROM vector_store vs
+                    JOIN avg_vec ON TRUE
+                    WHERE CAST(vs.metadata->>'userId' AS BIGINT) = ?
+                      AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (%s)
+                    GROUP BY CAST(vs.metadata->>'memoId' AS BIGINT)
                 )
-                SELECT DISTINCT CAST(vs.metadata->>'memoId' AS BIGINT)
-                FROM vector_store vs
-                JOIN avg_vec ON TRUE
-                WHERE CAST(vs.metadata->>'userId' AS BIGINT) = ?
-                  AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (%s)
-                  AND 1 - (vs.embedding <=> avg_vec.vec) >= %s
-                ORDER BY vs.embedding <=> avg_vec.vec ASC
+                SELECT memo_id
+                FROM scored
+                WHERE 1 - min_distance >= %s
+                ORDER BY min_distance ASC
                 LIMIT %d
                 """, ids, ids, SIMILARITY_THRESHOLD, FETCH_LIMIT);
 
