@@ -40,8 +40,8 @@ public class MemoSearchVectorRetriever {
 
             vectorStore.similaritySearch(searchRequest).forEach(doc -> {
                 Object memoIdObj = doc.getMetadata().get("memoId");
-                if (memoIdObj instanceof Long memoId) {
-                    seenMemoIds.putIfAbsent(memoId, memoId);
+                if (memoIdObj instanceof Number memoId) {
+                    seenMemoIds.putIfAbsent(memoId.longValue(), memoId.longValue());
                 }
             });
 
