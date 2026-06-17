@@ -98,6 +98,8 @@ app:
     domain: ".clustar.cloud"
     same-site: None
     secure: true
+  oauth:
+    frontend-callback-url: ${FRONTEND_OAUTH_CALLBACK_URL:http://localhost:5173/oauth/callback}
 
 management:
   endpoint:
