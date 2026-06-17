@@ -9,13 +9,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.label.repository.LabelRepository;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.request.MemoRecommendationRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
+import org.project.domain.memo.dto.response.MemoRecommendationResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
+import org.project.domain.memo.dto.response.MemoSearchResponse;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
@@ -24,6 +28,7 @@ import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.memo.repository.VectorStoreRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.MemoException;
@@ -37,6 +42,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +69,8 @@ class MemoServiceImplTest {
     @Mock private S3Util s3Util;
 
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private MemoSearchVectorRetriever memoSearchVectorRetriever;
+    @Mock private VectorStoreRepository vectorStoreRepository;
 
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
@@ -786,6 +794,155 @@ class MemoServiceImplTest {
             assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
                     .isInstanceOf(MemoException.class)
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FILE_TOO_LARGE);
+        }
+    }
+
+    @Nested
+    @DisplayName("메모 검색 테스트")
+    class SearchMemos {
+
+        @BeforeEach
+        void setUp() {
+            // ioExecutor는 final이 아니라 @Autowired 필드라 직접 주입
+            ReflectionTestUtils.setField(memoService, "ioExecutor", Executors.newSingleThreadExecutor());
+        }
+
+        @Test
+        @DisplayName("빈 검색어이면 EMPTY_SEARCH_QUERY 예외가 발생한다")
+        void searchMemos_emptyQuery_throwsException() {
+            assertThatThrownBy(() -> memoService.searchMemos(userId, "  "))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.EMPTY_SEARCH_QUERY);
+        }
+
+        @Test
+        @DisplayName("텍스트 검색과 벡터 검색 결과를 병합해서 반환한다")
+        void searchMemos_mergesTextAndVectorResults() {
+            // given
+            User user = User.builder().id(userId).build();
+            Memo textMemo = Memo.builder().id(1L).title("텍스트 메모").content("내용").user(user).isDeleted(false).build();
+            Memo vectorMemo = Memo.builder().id(2L).title("벡터 메모").content("내용").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), eq(3)))
+                    .willReturn(List.of(textMemo));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링")))
+                    .willReturn(List.of(vectorMemo));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            // then
+            assertThat(response.results()).hasSize(2);
+            assertThat(response.results().get(0).memoId()).isEqualTo(1L);
+            assertThat(response.results().get(1).memoId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("텍스트와 벡터 결과에 같은 메모가 있으면 중복 제거된다")
+        void searchMemos_deduplicatesDuplicateMemoIds() {
+            // given
+            User user = User.builder().id(userId).build();
+            Memo sameMemo = Memo.builder().id(1L).title("중복 메모").content("내용").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("중복"), eq(3)))
+                    .willReturn(List.of(sameMemo));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("중복")))
+                    .willReturn(List.of(sameMemo));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "중복");
+
+            // then
+            assertThat(response.results()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("검색 결과가 없으면 빈 리스트를 반환한다")
+        void searchMemos_noResults_returnsEmpty() {
+            // given
+            given(memoRepository.searchByText(eq(userId), eq("없는내용"), eq(3)))
+                    .willReturn(List.of());
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("없는내용")))
+                    .willReturn(List.of());
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "없는내용");
+
+            // then
+            assertThat(response.results()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("메모 추천 테스트")
+    class RecommendMemos {
+
+        private User user;
+
+        @BeforeEach
+        void setUp() {
+            user = User.builder().id(userId).build();
+        }
+
+        @Test
+        @DisplayName("유사한 메모가 있으면 results를 반환하고 message는 null이다")
+        void recommendMemos_hasResults_returnsResultsWithNullMessage() {
+            // given
+            Memo memo = Memo.builder().id(5L).title("추천 메모").content("내용").user(user).isDeleted(false).build();
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
+
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L))))
+                    .willReturn(List.of(5L));
+            given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(5L))))
+                    .willReturn(List.of(memo));
+
+            // when
+            MemoRecommendationResponse response = memoService.recommendMemos(userId, request);
+
+            // then
+            assertThat(response.results()).hasSize(1);
+            assertThat(response.results().get(0).memoId()).isEqualTo(5L);
+            assertThat(response.results().get(0).title()).isEqualTo("추천 메모");
+            assertThat(response.message()).isNull();
+        }
+
+        @Test
+        @DisplayName("유사도 임계값 미만이면 빈 results와 안내 메시지를 반환한다")
+        void recommendMemos_noResults_returnsMessageWithEmptyResults() {
+            // given
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
+
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L))))
+                    .willReturn(List.of());
+
+            // when
+            MemoRecommendationResponse response = memoService.recommendMemos(userId, request);
+
+            // then
+            assertThat(response.results()).isEmpty();
+            assertThat(response.message()).isEqualTo("선택한 메모와 관련된 메모를 찾지 못했어요.");
+        }
+
+        @Test
+        @DisplayName("추천 결과가 3개를 초과해도 최대 3개만 반환한다")
+        void recommendMemos_moreThanThree_returnsOnlyTop3() {
+            // given
+            Memo memo1 = Memo.builder().id(10L).title("추천1").content("내용").user(user).isDeleted(false).build();
+            Memo memo2 = Memo.builder().id(11L).title("추천2").content("내용").user(user).isDeleted(false).build();
+            Memo memo3 = Memo.builder().id(12L).title("추천3").content("내용").user(user).isDeleted(false).build();
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L));
+
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L))))
+                    .willReturn(List.of(10L, 11L, 12L, 13L, 14L)); // 5개 반환
+            given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L))))
+                    .willReturn(List.of(memo1, memo2, memo3));
+
+            // when
+            MemoRecommendationResponse response = memoService.recommendMemos(userId, request);
+
+            // then
+            assertThat(response.results()).hasSize(3);
+            verify(memoRepository).findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L)));
         }
     }
 }

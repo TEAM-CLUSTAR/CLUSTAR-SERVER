@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.request.MemoRecommendationRequest;
 import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
@@ -211,6 +212,33 @@ public class MemoController {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.ok(response));
 
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "메모 검색", description = """
+            검색어를 입력하면 최대 5개의 메모를 반환합니다.
+            - 텍스트 매칭(제목/본문/라벨) 최대 3개
+            - 의미 기반 벡터 검색 최대 2개
+            """)
+    public ResponseEntity<ApiResponse<MemoSearchResponse>> searchMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam String query
+    ) {
+        MemoSearchResponse response = memoService.searchMemos(userDetails.getUserId(), query);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PostMapping("/recommendations")
+    @Operation(summary = "AI 추천 메모", description = """
+            선택한 메모들과 의미적으로 유사한 메모를 최대 3개 추천합니다.
+            유사한 메모가 없을 경우 빈 결과와 안내 메시지를 반환합니다.
+            """)
+    public ResponseEntity<ApiResponse<MemoRecommendationResponse>> recommendMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MemoRecommendationRequest request
+    ) {
+        MemoRecommendationResponse response = memoService.recommendMemos(userDetails.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @DeleteMapping("/{memoId}")

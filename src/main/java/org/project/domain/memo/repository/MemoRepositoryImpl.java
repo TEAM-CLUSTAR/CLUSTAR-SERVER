@@ -121,6 +121,43 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .fetch();
     }
 
+    @Override
+    public List<Memo> searchByText(Long userId, String query, int limit) {
+        QMemo memo = QMemo.memo;
+        QMemoLabel memoLabel = QMemoLabel.memoLabel;
+        QLabel label = QLabel.label;
+
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .leftJoin(memo.memoLabels, memoLabel)
+                .leftJoin(memoLabel.label, label)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
+                        memo.title.containsIgnoreCase(query)
+                                .or(memo.content.containsIgnoreCase(query))
+                                .or(label.name.containsIgnoreCase(query))
+                )
+                .groupBy(memo.id)
+                .orderBy(memo.createdAt.desc(), memo.id.desc())
+                .limit(limit)
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
+                .leftJoin(memoLabel.label, label).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(memo.createdAt.desc(), memo.id.desc())
+                .fetch();
+    }
+
     /**
      * labelIds가 있을 때
      */

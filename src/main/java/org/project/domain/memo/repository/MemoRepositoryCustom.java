@@ -22,4 +22,6 @@ public interface MemoRepositoryCustom {
             Long cursorMemoId,
             Pageable pageable
     );
+
+    List<Memo> searchByText(Long userId, String query, int limit);
 }

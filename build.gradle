@@ -79,6 +79,7 @@ dependencies {
 
     // monitoring
     implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'io.prometheus:prometheus-metrics-exposition-formats'
 
     // S3
     implementation platform("software.amazon.awssdk:bom:2.31.68")
