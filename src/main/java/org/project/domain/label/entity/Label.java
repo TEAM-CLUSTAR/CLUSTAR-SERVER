@@ -2,13 +2,13 @@ package org.project.domain.label.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.label.util.LabelColorPalette;
 import org.project.domain.memo.entity.MemoLabel;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Entity
 @Getter
@@ -17,14 +17,6 @@ import java.util.concurrent.ThreadLocalRandom;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "label")
 public class Label extends BaseEntity {
-
-    private static final List<String> COLOR_PALETTE = List.of(
-            "#ABDEE6", "#CBAACB", "#FFFFB5", "#FFCCB6", "#F3B0C3",
-            "#C6DBDA", "#FEE1E8", "#FED7C3", "#F6EAC2", "#ECD5E3",
-            "#FF968A", "#FFAEA5", "#FFC5BF", "#FFD8BE", "#FFC8A2",
-            "#D4F0F0", "#8FCACA", "#CCE2CB", "#B6CFB6", "#97C1A9",
-            "#FCB9AA", "#FFDBCC", "#ECEAE4", "#A2E1DB", "#55CBCD"
-    );
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,7 +48,7 @@ public class Label extends BaseEntity {
     public static Label create(String name, User user) {
         return Label.builder()
                 .name(name)
-                .colorHex(generateRandomColorHex())
+                .colorHex(LabelColorPalette.randomColor())
                 .user(user)
                 .build();
     }
@@ -64,7 +56,7 @@ public class Label extends BaseEntity {
     public static Label create(String name, User user, Label parent) {
         return Label.builder()
                 .name(name)
-                .colorHex(generateRandomColorHex())
+                .colorHex(LabelColorPalette.randomColor())
                 .user(user)
                 .parent(parent)
                 .build();
@@ -76,7 +68,7 @@ public class Label extends BaseEntity {
 
     public String getColorHex() {
         if (colorHex == null) {
-            colorHex = generateRandomColorHex();
+            colorHex = LabelColorPalette.randomColor();
         }
         return colorHex;
     }
@@ -85,12 +77,8 @@ public class Label extends BaseEntity {
     @PreUpdate
     private void applyColorHex() {
         if (colorHex == null) {
-            colorHex = generateRandomColorHex();
+            colorHex = LabelColorPalette.randomColor();
         }
-    }
-
-    private static String generateRandomColorHex() {
-        return COLOR_PALETTE.get(ThreadLocalRandom.current().nextInt(COLOR_PALETTE.size()));
     }
 
     /**

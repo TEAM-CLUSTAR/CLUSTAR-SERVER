@@ -13,6 +13,7 @@ import org.project.domain.label.dto.response.LabelParentListResponse;
 import org.project.domain.label.dto.response.LabelSummaryResponse;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.label.util.LabelColorPalette;
 import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
@@ -35,14 +36,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LabelService 테스트")
 class LabelServiceTest {
-
-    private static final List<String> COLOR_PALETTE = List.of(
-            "#ABDEE6", "#CBAACB", "#FFFFB5", "#FFCCB6", "#F3B0C3",
-            "#C6DBDA", "#FEE1E8", "#FED7C3", "#F6EAC2", "#ECD5E3",
-            "#FF968A", "#FFAEA5", "#FFC5BF", "#FFD8BE", "#FFC8A2",
-            "#D4F0F0", "#8FCACA", "#CCE2CB", "#B6CFB6", "#97C1A9",
-            "#FCB9AA", "#FFDBCC", "#ECEAE4", "#A2E1DB", "#55CBCD"
-    );
 
     @InjectMocks
     private LabelServiceImpl labelService;
@@ -73,7 +66,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labels()).hasSize(2);
         assertThat(response.labels().get(0).name()).isEqualTo("parent-2");
-        assertThat(response.labels().get(0).colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.labels().get(0).colorHex()).isIn(LabelColorPalette.colors());
     }
 
     @Test
@@ -105,10 +98,10 @@ class LabelServiceTest {
 
         // then
         assertThat(response.parentLabel().name()).isEqualTo("parent");
-        assertThat(response.parentLabel().colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.parentLabel().colorHex()).isIn(LabelColorPalette.colors());
         assertThat(response.childLabels()).hasSize(2);
         assertThat(response.childLabels().get(0).name()).isEqualTo("child-2");
-        assertThat(response.childLabels().get(0).colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.childLabels().get(0).colorHex()).isIn(LabelColorPalette.colors());
         assertThat(response.childLabels().get(0).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
                 .containsExactly("grand-2");
         assertThat(response.childLabels().get(1).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
@@ -145,7 +138,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(100L);
         assertThat(response.name()).isEqualTo("parent");
-        assertThat(response.colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
     }
 
     @Test
@@ -170,7 +163,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(101L);
         assertThat(response.name()).isEqualTo("child");
-        assertThat(response.colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
     }
 
     @Test
@@ -190,7 +183,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(10L);
         assertThat(response.name()).isEqualTo("new");
-        assertThat(response.colorHex()).isIn(COLOR_PALETTE);
+        assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
     }
 
     @Test
