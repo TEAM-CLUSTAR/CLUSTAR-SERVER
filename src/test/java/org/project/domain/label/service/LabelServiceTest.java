@@ -6,11 +6,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.project.domain.label.dto.request.LabelCreateRequest;
+import org.project.domain.label.dto.request.LabelUpdateRequest;
 import org.project.domain.label.dto.response.LabelHierarchyResponse;
 import org.project.domain.label.dto.response.LabelParentListResponse;
+import org.project.domain.label.dto.response.LabelSummaryResponse;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.user.entity.User;
+import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.LabelException;
 import org.project.global.exception.errorcode.LabelErrorCode;
 
@@ -20,8 +25,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 import org.springframework.test.util.ReflectionTestUtils;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LabelService 테스트")
@@ -32,6 +41,12 @@ class LabelServiceTest {
 
     @Mock
     private LabelRepository labelRepository;
+
+    @Mock
+    private MemoLabelRepository memoLabelRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Test
     @DisplayName("부모 태그 목록을 조회한다")
@@ -100,6 +115,110 @@ class LabelServiceTest {
         assertThatThrownBy(() -> labelService.getChildAndGrandChildLabels(1L, 10L))
                 .isInstanceOf(LabelException.class)
                 .hasMessageContaining(LabelErrorCode.PARENT_LABEL_NOT_FOUND.getMsg());
+    }
+
+    @Test
+    @DisplayName("부모 태그를 생성한다")
+    void createLabel_parent_success() {
+        // given
+        User user = createUser();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(labelRepository.findByNameAndUserId("parent", 1L)).thenReturn(Optional.empty());
+        Label saved = Label.create("parent", user);
+        ReflectionTestUtils.setField(saved, "id", 100L);
+        when(labelRepository.save(any(Label.class))).thenReturn(saved);
+
+        // when
+        LabelSummaryResponse response = labelService.createLabel(1L, new LabelCreateRequest("parent", null));
+
+        // then
+        assertThat(response.labelId()).isEqualTo(100L);
+        assertThat(response.name()).isEqualTo("parent");
+    }
+
+    @Test
+    @DisplayName("자식 태그를 생성한다")
+    void createLabel_child_success() {
+        // given
+        User user = createUser();
+        Label parent = Label.create("parent", user);
+        ReflectionTestUtils.setField(parent, "id", 10L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(labelRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
+        when(labelRepository.findByNameAndUserId("child", 1L)).thenReturn(Optional.empty());
+
+        Label saved = Label.create("child", user, parent);
+        ReflectionTestUtils.setField(saved, "id", 101L);
+        when(labelRepository.save(any(Label.class))).thenReturn(saved);
+
+        // when
+        LabelSummaryResponse response = labelService.createLabel(1L, new LabelCreateRequest("child", 10L));
+
+        // then
+        assertThat(response.labelId()).isEqualTo(101L);
+        assertThat(response.name()).isEqualTo("child");
+    }
+
+    @Test
+    @DisplayName("태그 이름을 수정한다")
+    void updateLabel_success() {
+        // given
+        User user = createUser();
+        Label label = Label.create("old", user);
+        ReflectionTestUtils.setField(label, "id", 10L);
+
+        when(labelRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(label));
+        when(labelRepository.findByNameAndUserId("new", 1L)).thenReturn(Optional.empty());
+
+        // when
+        LabelSummaryResponse response = labelService.updateLabel(1L, 10L, new LabelUpdateRequest("new"));
+
+        // then
+        assertThat(response.labelId()).isEqualTo(10L);
+        assertThat(response.name()).isEqualTo("new");
+    }
+
+    @Test
+    @DisplayName("태그를 삭제하면 연관 메모 태그도 삭제한다")
+    void deleteLabel_success() {
+        // given
+        User user = createUser();
+        Label parent = Label.create("parent", user);
+        ReflectionTestUtils.setField(parent, "id", 10L);
+
+        Label child = Label.create("child", user, parent);
+        ReflectionTestUtils.setField(child, "id", 11L);
+
+        when(labelRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
+        when(labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
+                .thenReturn(List.of(child));
+        when(labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 11L))
+                .thenReturn(List.of());
+
+        // when
+        labelService.deleteLabel(1L, 10L);
+
+        // then
+        verify(memoLabelRepository).deleteByLabelIds(List.of(11L, 10L));
+        verify(labelRepository).delete(child);
+        verify(labelRepository).delete(parent);
+    }
+
+    @Test
+    @DisplayName("중복된 태그 이름이면 예외를 던진다")
+    void createLabel_duplicateName_fail() {
+        // given
+        User user = createUser();
+        Label existing = Label.create("parent", user);
+        ReflectionTestUtils.setField(existing, "id", 10L);
+
+        when(labelRepository.findByNameAndUserId("parent", 1L)).thenReturn(Optional.of(existing));
+
+        // when & then
+        assertThatThrownBy(() -> labelService.createLabel(1L, new LabelCreateRequest("parent", null)))
+                .isInstanceOf(LabelException.class)
+                .hasMessageContaining(LabelErrorCode.LABEL_ALREADY_EXISTS.getMsg());
     }
 
     private User createUser() {

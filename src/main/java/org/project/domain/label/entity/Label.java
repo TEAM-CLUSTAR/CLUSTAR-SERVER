@@ -56,6 +56,10 @@ public class Label extends BaseEntity {
                 .build();
     }
 
+    public void rename(String name) {
+        this.name = name;
+    }
+
     /**
      * 기본 라벨 목록 생성
      * - 최초 회원가입 시 사용
