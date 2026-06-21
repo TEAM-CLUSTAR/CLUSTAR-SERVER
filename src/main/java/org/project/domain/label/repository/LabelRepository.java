@@ -11,4 +11,12 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
     Optional<Label> findByNameAndUser(String name, User user);
 
     List<Label> findAllByUserId(Long userId);
+
+    List<Label> findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(Long userId);
+
+    Optional<Label> findByIdAndUserIdAndParentIsNull(Long id, Long userId);
+
+    List<Label> findByUserIdAndParentIdOrderByCreatedAtDesc(Long userId, Long parentId);
+
+    List<Label> findByUserIdAndParentParentIdOrderByCreatedAtDesc(Long userId, Long parentId);
 }

@@ -3,7 +3,9 @@ package org.project.domain.label.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.project.domain.label.dto.response.LabelHierarchyResponse;
 import org.project.domain.label.dto.response.LabelListResponse;
+import org.project.domain.label.dto.response.LabelParentListResponse;
 import org.project.domain.label.service.LabelService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
@@ -11,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,6 +40,41 @@ public class LabelController {
 
         LabelListResponse response =
                 labelService.getAllLabels(userId);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "부모 태그 전체 조회",
+            description = """
+            사용자의 부모 태그 최대 10개를 생성일 내림차순으로 조회합니다.
+            """
+    )
+    @GetMapping("/parents")
+    public ResponseEntity<ApiResponse<LabelParentListResponse>> getParentLabels(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails.getUserId();
+
+        LabelParentListResponse response = labelService.getParentLabels(userId);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "부모 태그 기반 하위 태그 조회",
+            description = """
+            부모 태그를 기준으로 자식 태그와 손자 태그를 계층 구조로 조회합니다.
+            """
+    )
+    @GetMapping("/parents/{parentLabelId}/children")
+    public ResponseEntity<ApiResponse<LabelHierarchyResponse>> getChildAndGrandChildLabels(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long parentLabelId
+    ) {
+        Long userId = userDetails.getUserId();
+
+        LabelHierarchyResponse response = labelService.getChildAndGrandChildLabels(userId, parentLabelId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
