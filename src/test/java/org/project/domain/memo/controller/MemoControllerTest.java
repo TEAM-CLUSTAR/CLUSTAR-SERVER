@@ -849,6 +849,12 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos[0].fileCount").value(1))
                     .andExpect(jsonPath("$.data.memos[0].isPinned").value(false))
                     .andExpect(jsonPath("$.data.memos[0].labelList.length()").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0].labelId").value(1L))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0].colorHex").value("#FF5722"))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[1].labelId").value(2L))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[1].name").value("교양"))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[1].colorHex").value("#4CAF50"))
                     .andExpect(jsonPath("$.data.memos[1].memoId").value(2L))
                     .andExpect(jsonPath("$.data.memos[1].isPinned").value(true));
 
@@ -900,7 +906,8 @@ class MemoControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.memos.length()").value(1))
                     .andExpect(jsonPath("$.data.memos[0].labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].name").value("SOPT"));
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.memos[0].labelList[0].colorHex").value("#FF5722"));
 
             verify(memoService, times(1))
                     .getMemosWithMedia(eq(userId), eq(labelIds), eq(null), eq(null), eq(20));
@@ -1079,6 +1086,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.labelList.length()").value(3))
                     .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
                     .andExpect(jsonPath("$.data.labelList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#FF5722"))
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
@@ -1116,6 +1124,9 @@ class MemoControllerTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
+                    .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
+                    .andExpect(jsonPath("$.data.labelList[0].name").value("개인"))
+                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#9C27B0"))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
 
@@ -1155,7 +1166,10 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.images").isArray())
                     .andExpect(jsonPath("$.data.images.length()").value(0))
                     .andExpect(jsonPath("$.data.files").isArray())
-                    .andExpect(jsonPath("$.data.files.length()").value(0));
+                    .andExpect(jsonPath("$.data.files.length()").value(0))
+                    .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
+                    .andExpect(jsonPath("$.data.labelList[0].name").value("메모"))
+                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#795548"));
 
             verify(memoService, times(1))
                     .getOneMemoDetail(eq(userId), eq(memoId));
