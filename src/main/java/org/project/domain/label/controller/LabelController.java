@@ -45,7 +45,7 @@ public class LabelController {
     }
 
     @Operation(
-            summary = "부모 태그 전체 조회",
+            summary = "부모 태그 최대 10개 조회",
             description = """
             사용자의 부모 태그 최대 10개를 생성일 내림차순으로 조회합니다.
             """
