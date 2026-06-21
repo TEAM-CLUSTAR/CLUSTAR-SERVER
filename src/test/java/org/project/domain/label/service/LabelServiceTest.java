@@ -18,7 +18,9 @@ import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.LabelException;
+import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.LabelErrorCode;
+import org.project.global.exception.errorcode.UserErrorCode;
 
 import java.util.List;
 import java.util.Optional;
@@ -226,6 +228,27 @@ class LabelServiceTest {
         assertThatThrownBy(() -> labelService.createLabel(1L, new LabelCreateRequest("parent", null)))
                 .isInstanceOf(LabelException.class)
                 .hasMessageContaining(LabelErrorCode.LABEL_ALREADY_EXISTS.getMsg());
+    }
+
+    @Test
+    @DisplayName("사용자가 없으면 사용자 예외를 던진다")
+    void createLabel_userNotFound_fail() {
+        // given
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> labelService.createLabel(1L, new LabelCreateRequest("parent", null)))
+                .isInstanceOf(UserException.class)
+                .hasMessageContaining(UserErrorCode.NOT_FOUND_USER.getMsg());
+    }
+
+    @Test
+    @DisplayName("부모 태그 ID가 0 이하이면 예외를 던진다")
+    void createLabel_invalidParentId_fail() {
+        // when & then
+        assertThatThrownBy(() -> labelService.createLabel(1L, new LabelCreateRequest("child", 0L)))
+                .isInstanceOf(LabelException.class)
+                .hasMessageContaining(LabelErrorCode.INVALID_PARENT_LABEL_ID.getMsg());
     }
 
     private User createUser() {

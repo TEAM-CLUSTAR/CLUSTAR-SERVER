@@ -13,7 +13,9 @@ import org.project.domain.memo.repository.MemoLabelRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.exception.domainException.LabelException;
+import org.project.global.exception.domainException.UserException;
 import org.project.global.exception.errorcode.LabelErrorCode;
+import org.project.global.exception.errorcode.UserErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +69,7 @@ public class LabelServiceImpl implements LabelService{
         Label parentLabel = null;
 
         if (request.parentLabelId() != null) {
+            validateParentLabelId(request.parentLabelId());
             parentLabel = getLabelOrThrow(userId, request.parentLabelId());
             validateLabelDepth(parentLabel);
         }
@@ -137,8 +140,14 @@ public class LabelServiceImpl implements LabelService{
         }
     }
 
+    private void validateParentLabelId(Long parentLabelId) {
+        if (parentLabelId <= 0) {
+            throw new LabelException(LabelErrorCode.INVALID_PARENT_LABEL_ID);
+        }
+    }
+
     private User getUserOrThrow(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new LabelException(LabelErrorCode.LABEL_NOT_FOUND));
+                .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
     }
 }

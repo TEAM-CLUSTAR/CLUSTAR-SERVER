@@ -15,7 +15,10 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "label")
+@Table(
+        name = "label",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "name"})
+)
 public class Label extends BaseEntity {
 
     @Id
@@ -26,7 +29,7 @@ public class Label extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "color_hex", length = 7)
+    @Column(name = "color_hex", nullable = false, length = 7)
     private String colorHex;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -67,9 +70,6 @@ public class Label extends BaseEntity {
     }
 
     public String getColorHex() {
-        if (colorHex == null) {
-            colorHex = LabelColorPalette.randomColor();
-        }
         return colorHex;
     }
 
