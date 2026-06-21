@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.project.domain.memo.entity.MemoLabel;
 import org.project.domain.user.entity.User;
+import org.project.global.entity.BaseEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "label")
-public class Label {
+public class Label extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,6 +29,14 @@ public class Label {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_label_id")
+    private Label parent;
+
+    @OneToMany(mappedBy = "parent")
+    @Builder.Default
+    private List<Label> children = new ArrayList<>();
+
     @OneToMany(mappedBy = "label", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MemoLabel> memoLabels = new ArrayList<>();
@@ -36,6 +45,14 @@ public class Label {
         return Label.builder()
                 .name(name)
                 .user(user)
+                .build();
+    }
+
+    public static Label create(String name, User user, Label parent) {
+        return Label.builder()
+                .name(name)
+                .user(user)
+                .parent(parent)
                 .build();
     }
 
