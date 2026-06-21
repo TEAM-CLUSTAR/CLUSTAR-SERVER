@@ -9,6 +9,8 @@ import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.service.GoogleAuthService;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
+import org.project.global.exception.domainException.LoginException;
+import org.project.global.exception.errorcode.LoginErrorCode;
 import org.project.global.response.ApiResponse;
 import org.project.global.security.properties.GoogleOAuthProperties;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -26,6 +32,8 @@ public class GoogleOAuthController {
 
     private final GoogleOAuthProperties googleOAuthProperties;
     private final GoogleAuthService googleAuthService;
+    @org.springframework.beans.factory.annotation.Value("${app.oauth.frontend-callback-url:http://localhost:5173/oauth/callback}")
+    private String frontendCallbackUrl;
 
     @GetMapping("/oauth/google")
     @Operation(summary = "구글 소셜로그인 API",
@@ -51,15 +59,31 @@ public class GoogleOAuthController {
     }
 
     @Operation(summary = "구글 인증서버 토큰 검증 API",
-            description = "리다이렉트에서 AccessCode를 가지고 서버로 돌아오기 위한 엔드포인트입니다\n" +
-                    "해당 코드를 이용해서 사용자 정보를 파싱하고 액세스 토큰는 헤더에, 리프레시 토큰은 쿠키에 담아 반환합니다")
+            description = "구글 콜백에서 받은 인가코드로 로그인 처리를 한 뒤\n" +
+                    "프론트엔드의 콜백 URL로 code만 전달해 리다이렉트합니다.")
     @GetMapping("/oauth/google/callback")
     @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN_CALLBACK)
-    public ResponseEntity<ApiResponse<Void>> callback(
-            @RequestParam String code,
+    public ResponseEntity<Void> callback(
+            @RequestParam Map<String, String> params,
             HttpServletResponse response
     ) {
-        return googleAuthService.loginOrRegisterWithResponse(code, response);
+        String code = params.get("code");
+
+        if (code == null || code.isBlank()) {
+            throw new LoginException(LoginErrorCode.AUTH_SOCIAL_LOGIN_FAIL);
+        }
+
+        googleAuthService.loginOrRegisterWithResponse(code, response);
+
+        URI redirectUri = UriComponentsBuilder
+                .fromUriString(frontendCallbackUrl)
+                .queryParam("code", code)
+                .build(true)
+                .toUri();
+
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(redirectUri)
+                .build();
     }
 
     @Operation(summary = "로그아웃 API")
