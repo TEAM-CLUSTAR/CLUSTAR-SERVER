@@ -19,12 +19,14 @@ public record LabelListResponse(
 
     public record LabelResponse(
             Long labelId,
-            String name
+            String name,
+            String colorHex
     ) {
         public static LabelResponse from(Label label) {
             return new LabelResponse(
                     label.getId(),
-                    label.getName()
+                    label.getName(),
+                    label.getColorHex()
             );
         }
     }

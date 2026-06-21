@@ -24,16 +24,19 @@ public record LabelHierarchyResponse(
     public record LabelTreeResponse(
             Long labelId,
             String name,
+            String colorHex,
             List<LabelTreeResponse> childLabels
     ) {
         public static LabelTreeResponse from(Label label, List<Label> childLabels) {
             return new LabelTreeResponse(
                     label.getId(),
                     label.getName(),
+                    label.getColorHex(),
                     childLabels.stream()
                             .map(child -> new LabelTreeResponse(
                                     child.getId(),
                                     child.getName(),
+                                    child.getColorHex(),
                                     List.of()
                             ))
                             .toList()

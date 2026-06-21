@@ -10,7 +10,11 @@ import java.util.Optional;
 public interface LabelRepository extends JpaRepository<Label, Long> {
     Optional<Label> findByNameAndUser(String name, User user);
 
+    Optional<Label> findByNameAndUserId(String name, Long userId);
+
     List<Label> findAllByUserId(Long userId);
+
+    Optional<Label> findByIdAndUserId(Long id, Long userId);
 
     List<Label> findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(Long userId);
 
