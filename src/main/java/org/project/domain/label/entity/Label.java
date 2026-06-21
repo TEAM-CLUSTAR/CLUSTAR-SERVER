@@ -8,6 +8,7 @@ import org.project.global.entity.BaseEntity;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Entity
 @Getter
@@ -24,6 +25,9 @@ public class Label extends BaseEntity {
 
     @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "color_hex", length = 7)
+    private String colorHex;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -44,6 +48,7 @@ public class Label extends BaseEntity {
     public static Label create(String name, User user) {
         return Label.builder()
                 .name(name)
+                .colorHex(generateRandomColorHex())
                 .user(user)
                 .build();
     }
@@ -51,6 +56,7 @@ public class Label extends BaseEntity {
     public static Label create(String name, User user, Label parent) {
         return Label.builder()
                 .name(name)
+                .colorHex(generateRandomColorHex())
                 .user(user)
                 .parent(parent)
                 .build();
@@ -58,6 +64,25 @@ public class Label extends BaseEntity {
 
     public void rename(String name) {
         this.name = name;
+    }
+
+    public String getColorHex() {
+        if (colorHex == null) {
+            colorHex = generateRandomColorHex();
+        }
+        return colorHex;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void applyColorHex() {
+        if (colorHex == null) {
+            colorHex = generateRandomColorHex();
+        }
+    }
+
+    private static String generateRandomColorHex() {
+        return String.format("#%06X", ThreadLocalRandom.current().nextInt(0x1000000));
     }
 
     /**

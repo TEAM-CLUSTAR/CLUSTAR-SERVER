@@ -65,6 +65,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labels()).hasSize(2);
         assertThat(response.labels().get(0).name()).isEqualTo("parent-2");
+        assertThat(response.labels().get(0).colorHex()).matches("^#[0-9A-F]{6}$");
     }
 
     @Test
@@ -96,8 +97,10 @@ class LabelServiceTest {
 
         // then
         assertThat(response.parentLabel().name()).isEqualTo("parent");
+        assertThat(response.parentLabel().colorHex()).matches("^#[0-9A-F]{6}$");
         assertThat(response.childLabels()).hasSize(2);
         assertThat(response.childLabels().get(0).name()).isEqualTo("child-2");
+        assertThat(response.childLabels().get(0).colorHex()).matches("^#[0-9A-F]{6}$");
         assertThat(response.childLabels().get(0).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
                 .containsExactly("grand-2");
         assertThat(response.childLabels().get(1).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
@@ -134,6 +137,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(100L);
         assertThat(response.name()).isEqualTo("parent");
+        assertThat(response.colorHex()).matches("^#[0-9A-F]{6}$");
     }
 
     @Test
@@ -158,6 +162,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(101L);
         assertThat(response.name()).isEqualTo("child");
+        assertThat(response.colorHex()).matches("^#[0-9A-F]{6}$");
     }
 
     @Test
@@ -177,6 +182,7 @@ class LabelServiceTest {
         // then
         assertThat(response.labelId()).isEqualTo(10L);
         assertThat(response.name()).isEqualTo("new");
+        assertThat(response.colorHex()).matches("^#[0-9A-F]{6}$");
     }
 
     @Test
