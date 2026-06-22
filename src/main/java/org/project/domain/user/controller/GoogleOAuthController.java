@@ -63,8 +63,9 @@ public class GoogleOAuthController {
                     "프론트엔드의 콜백 URL로 code만 전달해 리다이렉트합니다.")
     @GetMapping("/oauth/google/callback")
     @BusinessExceptionDescription(SwaggerResponseDescription.GOOGLE_LOGIN_CALLBACK)
-    public ResponseEntity<Void> callback(
+    public ResponseEntity<?> callback(
             @RequestParam Map<String, String> params,
+            HttpServletRequest request,
             HttpServletResponse response
     ) {
         String code = params.get("code");
@@ -73,7 +74,9 @@ public class GoogleOAuthController {
             throw new LoginException(LoginErrorCode.AUTH_SOCIAL_LOGIN_FAIL);
         }
 
-        googleAuthService.loginOrRegisterWithResponse(code, response);
+        if (isFrontendLoginRequest(request)) {
+            return googleAuthService.loginOrRegisterWithResponse(code, response);
+        }
 
         URI redirectUri = UriComponentsBuilder
                 .fromUriString(frontendCallbackUrl)
@@ -84,6 +87,26 @@ public class GoogleOAuthController {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(redirectUri)
                 .build();
+    }
+
+    private boolean isFrontendLoginRequest(HttpServletRequest request) {
+        String frontendOrigin = extractOrigin(frontendCallbackUrl);
+        String origin = request.getHeader("Origin");
+        if (origin != null && origin.equals(frontendOrigin)) {
+            return true;
+        }
+
+        String referer = request.getHeader("Referer");
+        return referer != null && referer.startsWith(frontendOrigin);
+    }
+
+    private String extractOrigin(String url) {
+        try {
+            URI uri = URI.create(url);
+            return uri.getScheme() + "://" + uri.getAuthority();
+        } catch (Exception e) {
+            throw new IllegalStateException("frontend-callback-url 설정값이 올바르지 않습니다.", e);
+        }
     }
 
     @Operation(summary = "로그아웃 API")
