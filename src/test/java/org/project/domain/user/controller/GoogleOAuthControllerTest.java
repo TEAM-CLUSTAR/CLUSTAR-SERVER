@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -42,8 +43,6 @@ class GoogleOAuthControllerTest {
     @Test
     @DisplayName("Google 콜백은 code만 프론트 callback으로 전달한다")
     void callback_redirects_only_code() throws Exception {
-        when(googleAuthService.loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class)))
-                .thenReturn(ResponseEntity.ok(ApiResponse.ok(null)));
 
         mockMvc.perform(get("/oauth/google/callback")
                         .queryParam("iss", "https://accounts.google.com")
@@ -51,6 +50,32 @@ class GoogleOAuthControllerTest {
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "http://localhost:5173/oauth/callback?code=abc123"));
 
+        verify(googleAuthService, never()).loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class));
+    }
+
+    @Test
+    @DisplayName("프론트에서 전달한 code는 백엔드 로그인 처리에 사용한다")
+    void callback_processes_frontend_login_request() throws Exception {
+        when(googleAuthService.loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class)))
+                .thenReturn(ResponseEntity.ok(ApiResponse.ok(null)));
+
+        mockMvc.perform(get("/oauth/google/callback")
+                        .queryParam("code", "abc123")
+                        .header("Origin", "http://localhost:5173"))
+                .andExpect(status().isOk());
+
         verify(googleAuthService).loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class));
+    }
+
+    @Test
+    @DisplayName("악성 Referer는 프론트 요청으로 인정하지 않는다")
+    void callback_does_not_accept_spoofed_referer() throws Exception {
+        mockMvc.perform(get("/oauth/google/callback")
+                        .queryParam("code", "abc123")
+                        .header("Referer", "http://localhost:5173.evil.com/oauth/callback"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "http://localhost:5173/oauth/callback?code=abc123"));
+
+        verify(googleAuthService, never()).loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class));
     }
 }
