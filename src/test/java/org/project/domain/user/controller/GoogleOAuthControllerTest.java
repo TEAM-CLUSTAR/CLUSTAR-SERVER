@@ -66,4 +66,16 @@ class GoogleOAuthControllerTest {
 
         verify(googleAuthService).loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class));
     }
+
+    @Test
+    @DisplayName("악성 Referer는 프론트 요청으로 인정하지 않는다")
+    void callback_does_not_accept_spoofed_referer() throws Exception {
+        mockMvc.perform(get("/oauth/google/callback")
+                        .queryParam("code", "abc123")
+                        .header("Referer", "http://localhost:5173.evil.com/oauth/callback"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "http://localhost:5173/oauth/callback?code=abc123"));
+
+        verify(googleAuthService, never()).loginOrRegisterWithResponse(eq("abc123"), any(HttpServletResponse.class));
+    }
 }

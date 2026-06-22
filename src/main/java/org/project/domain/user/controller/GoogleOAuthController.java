@@ -97,7 +97,7 @@ public class GoogleOAuthController {
         }
 
         String referer = request.getHeader("Referer");
-        return referer != null && referer.startsWith(frontendOrigin);
+        return referer != null && frontendOrigin.equals(extractOrigin(referer));
     }
 
     private String extractOrigin(String url) {
