@@ -34,7 +34,7 @@ public class LabelController {
     private final LabelService labelService;
 
     @Operation(
-            summary = "라벨 전체 조회",
+            summary = "[Legacy] 라벨 전체 조회",
             description = """
             사용자가 생성한 모든 라벨 목록을 조회합니다.
             메모에 사용된 라벨과 미사용 라벨을 모두 포함합니다.
