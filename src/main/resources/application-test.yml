@@ -72,6 +72,12 @@ spring:
               model: gemini-embedding-001
               dimensions: 768
 
+memo:
+  recommendation:
+    cohesion-threshold: 0.57
+    candidate-similarity-threshold: 0.63
+    single-selection-similarity-threshold: 0.58
+
 jwt:
   secret-key: test-secret-key-test-secret-key-test-secret-key
   expire-length: 3600000 # 60분

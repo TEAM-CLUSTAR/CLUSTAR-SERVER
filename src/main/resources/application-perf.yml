@@ -88,6 +88,12 @@ spring:
           jdbc:
             initialize-schema: never
 
+memo:
+  recommendation:
+    cohesion-threshold: 0.57
+    candidate-similarity-threshold: 0.63
+    single-selection-similarity-threshold: 0.58
+
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   expire-length: 86400000
