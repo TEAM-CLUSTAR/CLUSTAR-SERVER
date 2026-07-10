@@ -428,7 +428,7 @@ public class MemoServiceImpl implements MemoService {
         // Gate 1: 선택된 메모들 자체가 서로 응집돼 있지 않으면(평균 벡터가 대표성이 없으면) 후보 검색 없이 바로 종료
         Double cohesion = vectorStoreRepository.computeSelectionCohesion(userId, request.memoIds());
         if (cohesion != null && cohesion < memoRecommendationProperties.getCohesionThreshold()) {
-            return MemoRecommendationResponse.of(List.of());
+            return MemoRecommendationResponse.empty("선택한 메모들끼리 연관성이 없어요.");
         }
 
         // Gate 2: 응집된 선택 기준으로 유사 후보 검색
