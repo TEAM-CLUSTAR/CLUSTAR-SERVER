@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
@@ -71,6 +72,7 @@ class MemoServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private MemoSearchVectorRetriever memoSearchVectorRetriever;
     @Mock private VectorStoreRepository vectorStoreRepository;
+    @Mock private MemoRecommendationProperties memoRecommendationProperties;
 
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
@@ -891,7 +893,9 @@ class MemoServiceImplTest {
             Memo memo = Memo.builder().id(5L).title("추천 메모").content("내용").user(user).isDeleted(false).build();
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
 
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L))))
+            given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L, 2L, 3L))))
+                    .willReturn(null);
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), anyDouble()))
                     .willReturn(List.of(5L));
             given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(5L))))
                     .willReturn(List.of(memo));
@@ -912,7 +916,9 @@ class MemoServiceImplTest {
             // given
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
 
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L))))
+            given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L, 2L, 3L))))
+                    .willReturn(null);
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), anyDouble()))
                     .willReturn(List.of());
 
             // when
@@ -932,8 +938,12 @@ class MemoServiceImplTest {
             Memo memo3 = Memo.builder().id(12L).title("추천3").content("내용").user(user).isDeleted(false).build();
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L));
 
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L))))
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L)), anyDouble()))
                     .willReturn(List.of(10L, 11L, 12L, 13L, 14L)); // 5개 반환
+            // 단일 선택은 실제 리포지토리에서도 항상 null(응집도 정의 불가)이라 스텁 불필요하지만
+            // 기본 목 동작(0.0)과 무관하게 Gate1을 확실히 건너뛰도록 명시한다.
+            given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L))))
+                    .willReturn(null);
             given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L))))
                     .willReturn(List.of(memo1, memo2, memo3));
 
