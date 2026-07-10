@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.springframework.ai.document.DocumentMetadata;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
@@ -43,6 +44,13 @@ public class MemoSearchVectorRetriever {
 
             vectorStore.similaritySearch(searchRequest).forEach(doc -> {
                 Object memoIdObj = doc.getMetadata().get("memoId");
+                Object distanceObj = doc.getMetadata().get(DocumentMetadata.DISTANCE.value());
+                // 향후 threshold 재조정을 위해 실제 유사도 분포를 남겨둔다 (임시값이라 실사용 데이터로 재산정 예정)
+                if (distanceObj instanceof Number distance) {
+                    log.info("[Search][Semantic] userId={} query=\"{}\" memoId={} similarity={} threshold={}",
+                            userId, query, memoIdObj, 1 - distance.doubleValue(),
+                            memoSearchProperties.getSemanticSimilarityThreshold());
+                }
                 if (memoIdObj instanceof Number memoId) {
                     seenMemoIds.putIfAbsent(memoId.longValue(), memoId.longValue());
                 }

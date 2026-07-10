@@ -1,6 +1,7 @@
 package org.project.domain.memo.repository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class VectorStoreRepository {
@@ -37,14 +39,24 @@ public class VectorStoreRepository {
                       AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (%s)
                     GROUP BY CAST(vs.metadata->>'memoId' AS BIGINT)
                 )
-                SELECT memo_id
+                SELECT memo_id, 1 - min_distance AS similarity
                 FROM scored
                 WHERE 1 - min_distance >= %s
                 ORDER BY min_distance ASC
                 LIMIT %d
                 """, ids, ids, similarityThreshold, FETCH_LIMIT);
 
-        return jdbcTemplate.queryForList(sql, Long.class, userId, userId);
+        List<Object[]> rows = jdbcTemplate.query(sql,
+                (rs, rowNum) -> new Object[]{rs.getLong("memo_id"), rs.getDouble("similarity")},
+                userId, userId);
+
+        // 향후 threshold 재조정을 위해 실제 유사도 분포를 남겨둔다 (임시값이라 실사용 데이터로 재산정 예정)
+        rows.forEach(row -> log.info(
+                "[Recommendation][Gate2] userId={} selected={} candidateMemoId={} similarity={} threshold={}",
+                userId, memoIds, row[0], row[1], similarityThreshold
+        ));
+
+        return rows.stream().map(row -> (Long) row[0]).toList();
     }
 
     /**
@@ -76,6 +88,8 @@ public class VectorStoreRepository {
                 SELECT AVG(similarity) FROM pairs
                 """, ids);
 
-        return jdbcTemplate.queryForObject(sql, Double.class, userId);
+        Double cohesion = jdbcTemplate.queryForObject(sql, Double.class, userId);
+        log.info("[Recommendation][Gate1] userId={} selected={} cohesion={}", userId, memoIds, cohesion);
+        return cohesion;
     }
 }
