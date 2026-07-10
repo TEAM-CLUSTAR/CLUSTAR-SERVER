@@ -78,7 +78,7 @@ memo:
     candidate-similarity-threshold: 0.63
     single-selection-similarity-threshold: 0.58
   search:
-    semantic-similarity-threshold: 0.55
+    semantic-similarity-threshold: 0.52
 
 jwt:
   secret-key: test-secret-key-test-secret-key-test-secret-key
