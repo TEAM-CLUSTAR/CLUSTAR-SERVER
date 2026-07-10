@@ -419,7 +419,8 @@ public class MemoServiceImpl implements MemoService {
             }
         });
 
-        return MemoSearchResponse.from(results);
+         String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
+        return MemoSearchResponse.of(results, message);
     }
 
     @Override

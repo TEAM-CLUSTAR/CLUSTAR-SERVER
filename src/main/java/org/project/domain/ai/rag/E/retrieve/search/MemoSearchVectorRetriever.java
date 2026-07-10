@@ -2,6 +2,7 @@ package org.project.domain.ai.rag.E.retrieve.search;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -21,6 +22,7 @@ public class MemoSearchVectorRetriever {
 
     private final VectorStore vectorStore;
     private final MemoRepository memoRepository;
+    private final MemoSearchProperties memoSearchProperties;
 
     private static final int VECTOR_TOP_K = 10;
     private static final int MAX_MEMO_RESULTS = 2;
@@ -32,6 +34,7 @@ public class MemoSearchVectorRetriever {
             var searchRequest = SearchRequest.builder()
                     .query(query)
                     .topK(VECTOR_TOP_K)
+                    .similarityThreshold(memoSearchProperties.getSemanticSimilarityThreshold())
                     .filterExpression(b.eq("userId", userId).build())
                     .build();
 
