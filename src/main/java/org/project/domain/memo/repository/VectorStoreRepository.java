@@ -2,56 +2,55 @@ package org.project.domain.memo.repository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Repository
 @RequiredArgsConstructor
 public class VectorStoreRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate jdbcTemplate;
 
     private static final int FETCH_LIMIT = 9;
 
     public List<Long> findRecommendedMemoIds(Long userId, List<Long> memoIds, double similarityThreshold) {
-        String ids = memoIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-
         // threshold는 SQL에서 걸지 않고 가장 가까운 후보 FETCH_LIMIT개를 전부 받아서 애플리케이션 레벨에서 거른다.
         // (SQL WHERE로 걸러버리면 컷된 후보는 아예 안 돌아와서, 로그로도 못 남기고
         //  나중에 threshold를 재조정할 때 "얼마나 아깝게 컷됐는지"를 알 수 없게 된다.)
-        String sql = String.format(Locale.US, """
+        String sql = """
                 WITH avg_vec AS (
                     SELECT AVG(embedding) AS vec
                     FROM vector_store
-                    WHERE CAST(metadata->>'memoId' AS BIGINT) IN (%s)
-                      AND CAST(metadata->>'userId' AS BIGINT) = ?
+                    WHERE CAST(metadata->>'memoId' AS BIGINT) IN (:memoIds)
+                      AND CAST(metadata->>'userId' AS BIGINT) = :userId
                     HAVING COUNT(*) > 0
                 ), scored AS (
                     SELECT CAST(vs.metadata->>'memoId' AS BIGINT) AS memo_id,
                            MIN(vs.embedding <=> avg_vec.vec) AS min_distance
                     FROM vector_store vs
                     JOIN avg_vec ON TRUE
-                    WHERE CAST(vs.metadata->>'userId' AS BIGINT) = ?
-                      AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (%s)
+                    WHERE CAST(vs.metadata->>'userId' AS BIGINT) = :userId
+                      AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (:memoIds)
                     GROUP BY CAST(vs.metadata->>'memoId' AS BIGINT)
                 )
                 SELECT memo_id, 1 - min_distance AS similarity
                 FROM scored
                 ORDER BY min_distance ASC
-                LIMIT %d
-                """, ids, ids, FETCH_LIMIT);
+                LIMIT :fetchLimit
+                """;
 
-        List<Object[]> rows = jdbcTemplate.query(sql,
-                (rs, rowNum) -> new Object[]{rs.getLong("memo_id"), rs.getDouble("similarity")},
-                userId, userId);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("memoIds", memoIds)
+                .addValue("userId", userId)
+                .addValue("fetchLimit", FETCH_LIMIT);
+
+        List<Object[]> rows = jdbcTemplate.query(sql, params,
+                (rs, rowNum) -> new Object[]{rs.getLong("memo_id"), rs.getDouble("similarity")});
 
         List<Long> passedMemoIds = new ArrayList<>();
         for (Object[] row : rows) {
@@ -80,16 +79,12 @@ public class VectorStoreRepository {
             return null;
         }
 
-        String ids = memoIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-
-        String sql = String.format(Locale.US, """
+        String sql = """
                 WITH selected AS (
                     SELECT CAST(metadata->>'memoId' AS BIGINT) AS memo_id, embedding
                     FROM vector_store
-                    WHERE CAST(metadata->>'memoId' AS BIGINT) IN (%s)
-                      AND CAST(metadata->>'userId' AS BIGINT) = ?
+                    WHERE CAST(metadata->>'memoId' AS BIGINT) IN (:memoIds)
+                      AND CAST(metadata->>'userId' AS BIGINT) = :userId
                 ), pairs AS (
                     SELECT a.memo_id AS a_id, b.memo_id AS b_id,
                            MAX(1 - (a.embedding <=> b.embedding)) AS similarity
@@ -98,9 +93,13 @@ public class VectorStoreRepository {
                     GROUP BY a.memo_id, b.memo_id
                 )
                 SELECT AVG(similarity) FROM pairs
-                """, ids);
+                """;
 
-        Double cohesion = jdbcTemplate.queryForObject(sql, Double.class, userId);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("memoIds", memoIds)
+                .addValue("userId", userId);
+
+        Double cohesion = jdbcTemplate.queryForObject(sql, params, Double.class);
         log.info("[Recommendation][Gate1] userId={} selected={} cohesion={}", userId, memoIds, cohesion);
         return cohesion;
     }

@@ -12,9 +12,13 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -44,8 +48,8 @@ public class MemoSearchVectorRetriever {
 
             double threshold = memoSearchProperties.getSemanticSimilarityThreshold();
 
-            // memoId 기준 중복 제거 (LinkedHashMap으로 유사도 순서 유지)
-            Map<Long, Long> seenMemoIds = new LinkedHashMap<>();
+            // memoId 기준 중복 제거 (LinkedHashSet으로 유사도 순서 유지)
+            Set<Long> seenMemoIds = new LinkedHashSet<>();
 
             vectorStore.similaritySearch(searchRequest).forEach(doc -> {
                 Object memoIdObj = doc.getMetadata().get("memoId");
@@ -58,18 +62,25 @@ public class MemoSearchVectorRetriever {
                         userId, query, memoIdObj, similarity, threshold, passed);
 
                 if (passed && memoIdObj instanceof Number memoId) {
-                    seenMemoIds.putIfAbsent(memoId.longValue(), memoId.longValue());
+                    seenMemoIds.add(memoId.longValue());
                 }
             });
 
-            List<Long> topMemoIds = new ArrayList<>(seenMemoIds.keySet())
+            List<Long> topMemoIds = new ArrayList<>(seenMemoIds)
                     .subList(0, Math.min(MAX_MEMO_RESULTS, seenMemoIds.size()));
 
             if (topMemoIds.isEmpty()) {
                 return List.of();
             }
 
-            return memoRepository.findByIdInWithLabelsAndNotDeleted(userId, topMemoIds);
+            // findByIdInWithLabelsAndNotDeleted는 IN 조회라 반환 순서가 보장되지 않으므로 유사도 순서(topMemoIds)로 재정렬한다.
+            Map<Long, Memo> memoById = memoRepository.findByIdInWithLabelsAndNotDeleted(userId, topMemoIds).stream()
+                    .collect(Collectors.toMap(Memo::getId, Function.identity()));
+
+            return topMemoIds.stream()
+                    .map(memoById::get)
+                    .filter(Objects::nonNull)
+                    .toList();
 
         } catch (Exception e) {
             log.warn("[MemoSearchVectorRetriever] 벡터 검색 실패: {}", e.getMessage());
