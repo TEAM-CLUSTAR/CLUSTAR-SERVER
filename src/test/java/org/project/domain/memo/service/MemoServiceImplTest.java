@@ -892,10 +892,12 @@ class MemoServiceImplTest {
             // given
             Memo memo = Memo.builder().id(5L).title("추천 메모").content("내용").user(user).isDeleted(false).build();
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
+            double candidateThreshold = 0.7;
 
+            given(memoRecommendationProperties.getCandidateSimilarityThreshold()).willReturn(candidateThreshold);
             given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L, 2L, 3L))))
                     .willReturn(null);
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), anyDouble()))
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), eq(candidateThreshold)))
                     .willReturn(List.of(5L));
             given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(5L))))
                     .willReturn(List.of(memo));
@@ -908,6 +910,8 @@ class MemoServiceImplTest {
             assertThat(response.results().get(0).memoId()).isEqualTo(5L);
             assertThat(response.results().get(0).title()).isEqualTo("추천 메모");
             assertThat(response.message()).isNull();
+            verify(memoRecommendationProperties).getCandidateSimilarityThreshold();
+            verify(memoRecommendationProperties, never()).getSingleSelectionSimilarityThreshold();
         }
 
         @Test
@@ -915,10 +919,12 @@ class MemoServiceImplTest {
         void recommendMemos_noResults_returnsMessageWithEmptyResults() {
             // given
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
+            double candidateThreshold = 0.7;
 
+            given(memoRecommendationProperties.getCandidateSimilarityThreshold()).willReturn(candidateThreshold);
             given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L, 2L, 3L))))
                     .willReturn(null);
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), anyDouble()))
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), eq(candidateThreshold)))
                     .willReturn(List.of());
 
             // when
@@ -937,8 +943,10 @@ class MemoServiceImplTest {
             Memo memo2 = Memo.builder().id(11L).title("추천2").content("내용").user(user).isDeleted(false).build();
             Memo memo3 = Memo.builder().id(12L).title("추천3").content("내용").user(user).isDeleted(false).build();
             MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L));
+            double singleThreshold = 0.5;
 
-            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L)), anyDouble()))
+            given(memoRecommendationProperties.getSingleSelectionSimilarityThreshold()).willReturn(singleThreshold);
+            given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L)), eq(singleThreshold)))
                     .willReturn(List.of(10L, 11L, 12L, 13L, 14L)); // 5개 반환
             // 단일 선택은 실제 리포지토리에서도 항상 null(응집도 정의 불가)이라 스텁 불필요하지만
             // 기본 목 동작(0.0)과 무관하게 Gate1을 확실히 건너뛰도록 명시한다.
@@ -953,6 +961,28 @@ class MemoServiceImplTest {
             // then
             assertThat(response.results()).hasSize(3);
             verify(memoRepository).findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L)));
+            verify(memoRecommendationProperties).getSingleSelectionSimilarityThreshold();
+            verify(memoRecommendationProperties, never()).getCandidateSimilarityThreshold();
+        }
+
+        @Test
+        @DisplayName("선택한 메모들의 응집도가 임계값 미만이면 후보 검색 없이 빈 results와 안내 메시지를 반환한다")
+        void recommendMemos_lowCohesion_returnsMessageWithEmptyResultsWithoutCandidateSearch() {
+            // given
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L, 3L));
+            double cohesionThreshold = 0.3;
+
+            given(memoRecommendationProperties.getCohesionThreshold()).willReturn(cohesionThreshold);
+            given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L, 2L, 3L))))
+                    .willReturn(0.1);
+
+            // when
+            MemoRecommendationResponse response = memoService.recommendMemos(userId, request);
+
+            // then
+            assertThat(response.results()).isEmpty();
+            assertThat(response.message()).isEqualTo("선택한 메모들끼리 연관성이 없어요.");
+            verify(vectorStoreRepository, never()).findRecommendedMemoIds(any(), any(), anyDouble());
         }
     }
 }
