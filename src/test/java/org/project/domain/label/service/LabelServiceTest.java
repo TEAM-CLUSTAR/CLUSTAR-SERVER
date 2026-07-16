@@ -66,9 +66,10 @@ class LabelServiceTest {
         LabelParentListResponse response = labelService.getParentLabels(1L);
 
         // then
-        assertThat(response.labels()).hasSize(2);
-        assertThat(response.labels().get(0).name()).isEqualTo("parent-2");
-        assertThat(response.labels().get(0).colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.tags()).hasSize(2);
+        assertThat(response.tags().get(0).name()).isEqualTo("parent-2");
+        assertThat(response.tags().get(0).colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.tags().get(0).parentId()).isNull();
     }
 
     @Test
@@ -99,14 +100,17 @@ class LabelServiceTest {
         LabelHierarchyResponse response = labelService.getChildAndGrandChildLabels(1L, 10L);
 
         // then
-        assertThat(response.parentLabel().name()).isEqualTo("parent");
-        assertThat(response.parentLabel().colorHex()).isIn(LabelColorPalette.colors());
-        assertThat(response.childLabels()).hasSize(2);
-        assertThat(response.childLabels().get(0).name()).isEqualTo("child-2");
-        assertThat(response.childLabels().get(0).colorHex()).isIn(LabelColorPalette.colors());
-        assertThat(response.childLabels().get(0).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
+        assertThat(response.parentTag().name()).isEqualTo("parent");
+        assertThat(response.parentTag().colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.parentTag().parentId()).isNull();
+        assertThat(response.childTags()).hasSize(2);
+        assertThat(response.childTags().get(0).name()).isEqualTo("child-2");
+        assertThat(response.childTags().get(0).colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.childTags().get(0).parentId()).isEqualTo(10L);
+        assertThat(response.childTags().get(0).childTags()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
                 .containsExactly("grand-2");
-        assertThat(response.childLabels().get(1).childLabels()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
+        assertThat(response.childTags().get(0).childTags().get(0).parentId()).isEqualTo(12L);
+        assertThat(response.childTags().get(1).childTags()).extracting(LabelHierarchyResponse.LabelTreeResponse::name)
                 .containsExactly("grand-1");
     }
 
@@ -138,9 +142,10 @@ class LabelServiceTest {
         LabelSummaryResponse response = labelService.createLabel(1L, new LabelCreateRequest("parent", null));
 
         // then
-        assertThat(response.labelId()).isEqualTo(100L);
+        assertThat(response.tagId()).isEqualTo(100L);
         assertThat(response.name()).isEqualTo("parent");
         assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.parentId()).isNull();
     }
 
     @Test
@@ -163,9 +168,10 @@ class LabelServiceTest {
         LabelSummaryResponse response = labelService.createLabel(1L, new LabelCreateRequest("child", 10L));
 
         // then
-        assertThat(response.labelId()).isEqualTo(101L);
+        assertThat(response.tagId()).isEqualTo(101L);
         assertThat(response.name()).isEqualTo("child");
         assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.parentId()).isEqualTo(10L);
     }
 
     @Test
@@ -183,9 +189,10 @@ class LabelServiceTest {
         LabelSummaryResponse response = labelService.updateLabel(1L, 10L, new LabelUpdateRequest("new"));
 
         // then
-        assertThat(response.labelId()).isEqualTo(10L);
+        assertThat(response.tagId()).isEqualTo(10L);
         assertThat(response.name()).isEqualTo("new");
         assertThat(response.colorHex()).isIn(LabelColorPalette.colors());
+        assertThat(response.parentId()).isNull();
     }
 
     @Test
