@@ -13,11 +13,11 @@ public interface LabelService {
 
     LabelParentListResponse getParentLabels(Long userId);
 
-    LabelHierarchyResponse getChildAndGrandChildLabels(Long userId, Long parentLabelId);
+    LabelHierarchyResponse getChildAndGrandChildLabels(Long userId, Long parentTagId);
 
     LabelSummaryResponse createLabel(Long userId, LabelCreateRequest request);
 
-    LabelSummaryResponse updateLabel(Long userId, Long labelId, LabelUpdateRequest request);
+    LabelSummaryResponse updateLabel(Long userId, Long tagId, LabelUpdateRequest request);
 
-    void deleteLabel(Long userId, Long labelId);
+    void deleteLabel(Long userId, Long tagId);
 }

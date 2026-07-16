@@ -27,8 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/label")
-@Tag(name = "라벨", description = "라벨 관련 API")
+@RequestMapping("/api/v1/tag")
+@Tag(name = "태그", description = "태그 관련 API")
 public class LabelController {
 
     private final LabelService labelService;
@@ -57,7 +57,7 @@ public class LabelController {
             summary = "태그 생성",
             description = """
             태그를 생성합니다.
-            parentLabelId가 있으면 하위 태그로 생성하고, 없으면 부모 태그로 생성합니다.
+            parentTagId가 있으면 하위 태그로 생성하고, 없으면 부모 태그로 생성합니다.
             """
     )
     @PostMapping
@@ -79,15 +79,15 @@ public class LabelController {
             태그 이름을 수정합니다.
             """
     )
-    @PutMapping("/{labelId}")
+    @PutMapping("/{tagId}")
     public ResponseEntity<ApiResponse<LabelSummaryResponse>> updateLabel(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long labelId,
+            @PathVariable Long tagId,
             @Valid @RequestBody LabelUpdateRequest request
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelSummaryResponse response = labelService.updateLabel(userId, labelId, request);
+        LabelSummaryResponse response = labelService.updateLabel(userId, tagId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -99,14 +99,14 @@ public class LabelController {
             태그에 연결된 메모-태그 관계도 함께 정리합니다.
             """
     )
-    @DeleteMapping("/{labelId}")
+    @DeleteMapping("/{tagId}")
     public ResponseEntity<ApiResponse<String>> deleteLabel(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long labelId
+            @PathVariable Long tagId
     ) {
         Long userId = userDetails.getUserId();
 
-        labelService.deleteLabel(userId, labelId);
+        labelService.deleteLabel(userId, tagId);
 
         return ResponseEntity.ok(ApiResponse.ok("태그가 삭제되었습니다."));
     }
@@ -134,14 +134,14 @@ public class LabelController {
             부모 태그를 기준으로 자식 태그와 손자 태그를 계층 구조로 조회합니다.
             """
     )
-    @GetMapping("/parents/{parentLabelId}/children")
+    @GetMapping("/parents/{parentTagId}/children")
     public ResponseEntity<ApiResponse<LabelHierarchyResponse>> getChildAndGrandChildLabels(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long parentLabelId
+            @PathVariable Long parentTagId
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelHierarchyResponse response = labelService.getChildAndGrandChildLabels(userId, parentLabelId);
+        LabelHierarchyResponse response = labelService.getChildAndGrandChildLabels(userId, parentTagId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
