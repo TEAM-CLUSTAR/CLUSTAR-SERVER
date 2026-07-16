@@ -79,6 +79,8 @@ memo:
     single-selection-similarity-threshold: 0.58
   search:
     semantic-similarity-threshold: 0.52
+    vector-top-k: 10
+    max-memo-results: 2
 
 jwt:
   secret-key: test-secret-key-test-secret-key-test-secret-key

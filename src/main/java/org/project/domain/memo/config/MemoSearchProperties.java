@@ -2,6 +2,7 @@ package org.project.domain.memo.config;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -22,4 +23,16 @@ public class MemoSearchProperties {
     @DecimalMin("0.0")
     @DecimalMax("1.0")
     private double semanticSimilarityThreshold;
+
+    /**
+     * 벡터스토어에서 몇 개의 후보를 받아와 threshold 필터링할지.
+     */
+    @Min(1)
+    private int vectorTopK;
+
+    /**
+     * threshold를 통과한 후보 중 최종적으로 몇 개를 반환할지.
+     */
+    @Min(1)
+    private int maxMemoResults;
 }

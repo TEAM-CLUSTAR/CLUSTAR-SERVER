@@ -29,9 +29,6 @@ public class MemoSearchVectorRetriever {
     private final MemoRepository memoRepository;
     private final MemoSearchProperties memoSearchProperties;
 
-    private static final int VECTOR_TOP_K = 10;
-    private static final int MAX_MEMO_RESULTS = 2;
-
     public List<Memo> retrieve(Long userId, String query) {
         try {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
@@ -41,7 +38,7 @@ public class MemoSearchVectorRetriever {
             //  나중에 threshold를 재조정할 때 "얼마나 아깝게 컷됐는지"를 알 수 없게 된다.)
             var searchRequest = SearchRequest.builder()
                     .query(query)
-                    .topK(VECTOR_TOP_K)
+                    .topK(memoSearchProperties.getVectorTopK())
                     .similarityThresholdAll()
                     .filterExpression(b.eq("userId", userId).build())
                     .build();
@@ -67,7 +64,7 @@ public class MemoSearchVectorRetriever {
             });
 
             List<Long> topMemoIds = new ArrayList<>(seenMemoIds)
-                    .subList(0, Math.min(MAX_MEMO_RESULTS, seenMemoIds.size()));
+                    .subList(0, Math.min(memoSearchProperties.getMaxMemoResults(), seenMemoIds.size()));
 
             if (topMemoIds.isEmpty()) {
                 return List.of();
