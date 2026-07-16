@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 public record LabelHierarchyResponse(
-        LabelSummaryResponse parentLabel,
-        List<LabelTreeResponse> childLabels
+        LabelSummaryResponse parentTag,
+        List<LabelTreeResponse> childTags
 ) {
     public static LabelHierarchyResponse from(Label parentLabel, List<Label> childLabels, Map<Long, List<Label>> grandChildLabelsByParentId) {
         return new LabelHierarchyResponse(
@@ -22,21 +22,24 @@ public record LabelHierarchyResponse(
     }
 
     public record LabelTreeResponse(
-            Long labelId,
+            Long tagId,
             String name,
             String colorHex,
-            List<LabelTreeResponse> childLabels
+            Long parentId,
+            List<LabelTreeResponse> childTags
     ) {
         public static LabelTreeResponse from(Label label, List<Label> childLabels) {
             return new LabelTreeResponse(
                     label.getId(),
                     label.getName(),
                     label.getColorHex(),
+                    label.getParent() == null ? null : label.getParent().getId(),
                     childLabels.stream()
                             .map(child -> new LabelTreeResponse(
                                     child.getId(),
                                     child.getName(),
                                     child.getColorHex(),
+                                    child.getParent() == null ? null : child.getParent().getId(),
                                     List.of()
                             ))
                             .toList()

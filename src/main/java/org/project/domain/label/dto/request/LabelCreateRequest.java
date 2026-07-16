@@ -9,6 +9,6 @@ public record LabelCreateRequest(
         String name,
 
         @Schema(description = "부모 태그 ID", example = "1")
-        Long parentLabelId
+        Long parentTagId
 ) {
 }

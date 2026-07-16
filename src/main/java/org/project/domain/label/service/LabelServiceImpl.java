@@ -46,12 +46,12 @@ public class LabelServiceImpl implements LabelService{
     }
 
     @Override
-    public LabelHierarchyResponse getChildAndGrandChildLabels(Long userId, Long parentLabelId) {
-        Label parentLabel = labelRepository.findByIdAndUserIdAndParentIsNull(parentLabelId, userId)
+    public LabelHierarchyResponse getChildAndGrandChildLabels(Long userId, Long parentTagId) {
+        Label parentLabel = labelRepository.findByIdAndUserIdAndParentIsNull(parentTagId, userId)
                 .orElseThrow(() -> new LabelException(LabelErrorCode.PARENT_LABEL_NOT_FOUND));
 
-        List<Label> childLabels = labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, parentLabelId);
-        List<Label> grandChildLabels = labelRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(userId, parentLabelId);
+        List<Label> childLabels = labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, parentTagId);
+        List<Label> grandChildLabels = labelRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(userId, parentTagId);
 
         Map<Long, List<Label>> grandChildLabelsByParentId = grandChildLabels.stream()
                 .collect(Collectors.groupingBy(label -> label.getParent().getId()));
@@ -68,9 +68,9 @@ public class LabelServiceImpl implements LabelService{
     private LabelSummaryResponse createLabelInternal(Long userId, LabelCreateRequest request) {
         Label parentLabel = null;
 
-        if (request.parentLabelId() != null) {
-            validateParentLabelId(request.parentLabelId());
-            parentLabel = getLabelOrThrow(userId, request.parentLabelId());
+        if (request.parentTagId() != null) {
+            validateParentTagId(request.parentTagId());
+            parentLabel = getLabelOrThrow(userId, request.parentTagId());
             validateLabelDepth(parentLabel);
         }
 
@@ -88,9 +88,9 @@ public class LabelServiceImpl implements LabelService{
 
     @Override
     @Transactional
-    public LabelSummaryResponse updateLabel(Long userId, Long labelId, LabelUpdateRequest request) {
-        Label label = getLabelOrThrow(userId, labelId);
-        ensureLabelNameIsUnique(userId, request.name(), labelId);
+    public LabelSummaryResponse updateLabel(Long userId, Long tagId, LabelUpdateRequest request) {
+        Label label = getLabelOrThrow(userId, tagId);
+        ensureLabelNameIsUnique(userId, request.name(), tagId);
 
         label.rename(request.name());
         return LabelSummaryResponse.from(label);
@@ -98,10 +98,10 @@ public class LabelServiceImpl implements LabelService{
 
     @Override
     @Transactional
-    public void deleteLabel(Long userId, Long labelId) {
-        Label target = getLabelOrThrow(userId, labelId);
+    public void deleteLabel(Long userId, Long tagId) {
+        Label target = getLabelOrThrow(userId, tagId);
 
-        List<Label> childLabels = labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, labelId);
+        List<Label> childLabels = labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, tagId);
         List<Label> grandChildLabels = new ArrayList<>();
         for (Label child : childLabels) {
             grandChildLabels.addAll(labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, child.getId()));
@@ -140,8 +140,8 @@ public class LabelServiceImpl implements LabelService{
         }
     }
 
-    private void validateParentLabelId(Long parentLabelId) {
-        if (parentLabelId <= 0) {
+    private void validateParentTagId(Long parentTagId) {
+        if (parentTagId <= 0) {
             throw new LabelException(LabelErrorCode.INVALID_PARENT_LABEL_ID);
         }
     }

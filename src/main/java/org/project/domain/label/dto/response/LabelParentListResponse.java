@@ -5,7 +5,7 @@ import org.project.domain.label.entity.Label;
 import java.util.List;
 
 public record LabelParentListResponse(
-        List<LabelSummaryResponse> labels
+        List<LabelSummaryResponse> tags
 ) {
 
     public static LabelParentListResponse from(List<Label> labelEntities) {
