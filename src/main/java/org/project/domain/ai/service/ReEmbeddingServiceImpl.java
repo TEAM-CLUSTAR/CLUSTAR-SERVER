@@ -76,24 +76,40 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
         Memo memo = memoRepository.findByIdWithUserAndNotDeleted(memoId)
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
-        // 텍스트는 항상 시도. 이미지/파일은 하나가 실패해도 나머지 타입은 계속 시도한다(서로 독립).
-        Boolean textSucceeded = attempt(memoId, "text", () -> reEmbedText(memo));
+        // 텍스트는 항상 시도 대상. 이미지/파일은 하나가 실패해도 나머지 타입은 계속 시도한다(서로 독립).
+        Boolean textSucceeded = attemptIfNeeded(
+                memoId, RagDocumentType.MEMO_TEXT.name(), "text", () -> reEmbedText(memo));
 
         List<Long> imageIds = memoImageRepository.findByMemoIdIn(List.of(memoId)).stream()
                 .map(MemoImage::getId)
                 .toList();
         Boolean imageSucceeded = imageIds.isEmpty()
                 ? null
-                : attempt(memoId, "image", () -> reEmbedImage(memo, imageIds));
+                : attemptIfNeeded(memoId, RagDocumentType.MEMO_IMAGE.name(), "image",
+                        () -> reEmbedImage(memo, imageIds));
 
         List<Long> fileIds = memoFileRepository.findByMemoIdIn(List.of(memoId)).stream()
                 .map(MemoFile::getId)
                 .toList();
         Boolean fileSucceeded = fileIds.isEmpty()
                 ? null
-                : attempt(memoId, "file", () -> reEmbedFile(memo, fileIds));
+                : attemptIfNeeded(memoId, RagDocumentType.MEMO_FILE.name(), "file",
+                        () -> reEmbedFile(memo, fileIds));
 
         return new ReEmbeddingResultResponse(memoId, textSucceeded, imageSucceeded, fileSucceeded);
+    }
+
+    /**
+     * 이미 embeddedAt이 찍힌(= 새 파이프라인을 거친) 벡터가 있으면 API 호출 없이 스킵한다.
+     * 이 판단 하나로 "배치 중단 후 재개"와 "실패한 타입만 선택적 재시도"가 동시에 해결된다 —
+     * 둘 다 "이미 끝난 건 다시 안 한다"는 같은 규칙이기 때문.
+     */
+    private Boolean attemptIfNeeded(Long memoId, String ragType, String failureType, Runnable action) {
+        if (vectorStoreRepository.existsEmbeddedDocumentByMemoIdAndType(memoId, ragType)) {
+            log.debug("[ReEmbedding] {} 이미 최신 상태라 스킵: memoId={}", failureType, memoId);
+            return true;
+        }
+        return attempt(memoId, failureType, action);
     }
 
     /**
