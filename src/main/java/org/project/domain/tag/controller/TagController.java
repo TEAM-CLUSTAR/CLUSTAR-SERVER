@@ -1,16 +1,16 @@
-package org.project.domain.label.controller;
+package org.project.domain.tag.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.project.domain.label.dto.request.LabelCreateRequest;
-import org.project.domain.label.dto.request.LabelUpdateRequest;
-import org.project.domain.label.dto.response.LabelHierarchyResponse;
-import org.project.domain.label.dto.response.LabelListResponse;
-import org.project.domain.label.dto.response.LabelParentListResponse;
-import org.project.domain.label.dto.response.LabelSummaryResponse;
-import org.project.domain.label.service.LabelService;
+import org.project.domain.tag.dto.request.TagCreateRequest;
+import org.project.domain.tag.dto.request.TagUpdateRequest;
+import org.project.domain.tag.dto.response.TagHierarchyResponse;
+import org.project.domain.tag.dto.response.TagListResponse;
+import org.project.domain.tag.dto.response.TagParentListResponse;
+import org.project.domain.tag.dto.response.TagSummaryResponse;
+import org.project.domain.tag.service.TagService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
@@ -29,26 +29,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/tag")
 @Tag(name = "태그", description = "태그 관련 API")
-public class LabelController {
+public class TagController {
 
-    private final LabelService labelService;
+    private final TagService tagService;
 
     @Operation(
-            summary = "[Legacy] 라벨 전체 조회",
+            summary = "[Legacy] 태그 전체 조회",
             description = """
-            사용자가 생성한 모든 라벨 목록을 조회합니다.
-            메모에 사용된 라벨과 미사용 라벨을 모두 포함합니다.
+            사용자가 생성한 모든 태그 목록을 조회합니다.
+            메모에 사용된 태그와 미사용 태그를 모두 포함합니다.
             """
     )
     @GetMapping
-    public ResponseEntity<ApiResponse<LabelListResponse>> getAllLabels(
+    public ResponseEntity<ApiResponse<TagListResponse>> getAllTags(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
 
         Long userId = userDetails.getUserId();
 
-        LabelListResponse response =
-                labelService.getAllLabels(userId);
+        TagListResponse response =
+                tagService.getAllTags(userId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -61,13 +61,13 @@ public class LabelController {
             """
     )
     @PostMapping
-    public ResponseEntity<ApiResponse<LabelSummaryResponse>> createLabel(
+    public ResponseEntity<ApiResponse<TagSummaryResponse>> createTag(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody LabelCreateRequest request
+            @Valid @RequestBody TagCreateRequest request
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelSummaryResponse response = labelService.createLabel(userId, request);
+        TagSummaryResponse response = tagService.createTag(userId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(response));
@@ -80,14 +80,14 @@ public class LabelController {
             """
     )
     @PutMapping("/{tagId}")
-    public ResponseEntity<ApiResponse<LabelSummaryResponse>> updateLabel(
+    public ResponseEntity<ApiResponse<TagSummaryResponse>> updateTag(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long tagId,
-            @Valid @RequestBody LabelUpdateRequest request
+            @Valid @RequestBody TagUpdateRequest request
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelSummaryResponse response = labelService.updateLabel(userId, tagId, request);
+        TagSummaryResponse response = tagService.updateTag(userId, tagId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -100,13 +100,13 @@ public class LabelController {
             """
     )
     @DeleteMapping("/{tagId}")
-    public ResponseEntity<ApiResponse<String>> deleteLabel(
+    public ResponseEntity<ApiResponse<String>> deleteTag(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long tagId
     ) {
         Long userId = userDetails.getUserId();
 
-        labelService.deleteLabel(userId, tagId);
+        tagService.deleteTag(userId, tagId);
 
         return ResponseEntity.ok(ApiResponse.ok("태그가 삭제되었습니다."));
     }
@@ -118,12 +118,12 @@ public class LabelController {
             """
     )
     @GetMapping("/parents")
-    public ResponseEntity<ApiResponse<LabelParentListResponse>> getParentLabels(
+    public ResponseEntity<ApiResponse<TagParentListResponse>> getParentTags(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelParentListResponse response = labelService.getParentLabels(userId);
+        TagParentListResponse response = tagService.getParentTags(userId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -135,13 +135,13 @@ public class LabelController {
             """
     )
     @GetMapping("/parents/{parentTagId}/children")
-    public ResponseEntity<ApiResponse<LabelHierarchyResponse>> getChildAndGrandChildLabels(
+    public ResponseEntity<ApiResponse<TagHierarchyResponse>> getChildAndGrandChildTags(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long parentTagId
     ) {
         Long userId = userDetails.getUserId();
 
-        LabelHierarchyResponse response = labelService.getChildAndGrandChildLabels(userId, parentTagId);
+        TagHierarchyResponse response = tagService.getChildAndGrandChildTags(userId, parentTagId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

@@ -3,8 +3,8 @@ package org.project.global.exception.domainException;
 import org.project.global.exception.BusinessException;
 import org.project.global.exception.errorcode.ErrorCode;
 
-public class LabelException extends BusinessException {
-    public LabelException(ErrorCode errorCode) {
+public class TagException extends BusinessException {
+    public TagException(ErrorCode errorCode) {
         super(errorCode);
     }
 }

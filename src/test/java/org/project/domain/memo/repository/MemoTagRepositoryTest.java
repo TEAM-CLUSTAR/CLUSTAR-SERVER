@@ -2,10 +2,10 @@ package org.project.domain.memo.repository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.project.domain.label.entity.Label;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.entity.Tag;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.querydsl.QuerydslTestConfig;
@@ -24,23 +24,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @Import(QuerydslTestConfig.class)
-@DisplayName("MemoLabelRepository 테스트")
-class MemoLabelRepositoryTest {
+@DisplayName("MemoTagRepository 테스트")
+class MemoTagRepositoryTest {
 
     @Autowired
-    private MemoLabelRepository memoLabelRepository;
+    private MemoTagRepository memoTagRepository;
 
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
-    private LabelRepository labelRepository;
+    private TagRepository tagRepository;
 
     @Autowired
     private TestEntityManager em;
 
     @Test
-    @DisplayName("memo 기준으로 MemoLabel이 모두 삭제된다")
+    @DisplayName("memo 기준으로 MemoTag가 모두 삭제된다")
     void deleteByMemo_success() {
         // given
         User user = userRepository.save(
@@ -55,26 +55,26 @@ class MemoLabelRepositoryTest {
         Memo memo = Memo.createMemo("제목", "내용", user);
         em.persist(memo);
 
-        Label label1 = labelRepository.save(Label.create("라벨1", user));
-        Label label2 = labelRepository.save(Label.create("라벨2", user));
+        Tag tag1 = tagRepository.save(Tag.create("태그1", user));
+        Tag tag2 = tagRepository.save(Tag.create("태그2", user));
 
-        MemoLabel memoLabel1 = MemoLabel.create(memo, label1, 1);
-        MemoLabel memoLabel2 = MemoLabel.create(memo, label2, 2);
+        MemoTag memoTag1 = MemoTag.create(memo, tag1, 1);
+        MemoTag memoTag2 = MemoTag.create(memo, tag2, 2);
 
-        em.persist(memoLabel1);
-        em.persist(memoLabel2);
+        em.persist(memoTag1);
+        em.persist(memoTag2);
 
         em.flush();
         em.clear();
 
         // when
-        memoLabelRepository.deleteByMemo(memo);
+        memoTagRepository.deleteByMemo(memo);
         em.flush();
         em.clear();
 
         // then
-        List<MemoLabel> result = em.getEntityManager()
-                .createQuery("SELECT ml FROM MemoLabel ml", MemoLabel.class)
+        List<MemoTag> result = em.getEntityManager()
+                .createQuery("SELECT mt FROM MemoTag mt", MemoTag.class)
                 .getResultList();
 
         assertThat(result).isEmpty();

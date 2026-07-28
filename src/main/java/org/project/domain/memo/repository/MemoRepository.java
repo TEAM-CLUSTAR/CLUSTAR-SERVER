@@ -18,13 +18,13 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     @Query("""
             SELECT DISTINCT m
             FROM Memo m
-            LEFT JOIN FETCH m.memoLabels ml
-            LEFT JOIN FETCH ml.label
+            LEFT JOIN FETCH m.memoTags mt
+            LEFT JOIN FETCH mt.tag
             WHERE m.user.id = :userId
               AND m.id IN :memoIds
               AND m.isDeleted = false
             """)
-    List<Memo> findByIdInWithLabelsAndNotDeleted(
+    List<Memo> findByIdInWithTagsAndNotDeleted(
             @Param("userId") Long userId,
             @Param("memoIds") List<Long> memoIds
     );
@@ -32,25 +32,25 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     @Query("""
             SELECT DISTINCT m
             FROM Memo m
-            LEFT JOIN FETCH m.memoLabels ml
-            LEFT JOIN FETCH ml.label
+            LEFT JOIN FETCH m.memoTags mt
+            LEFT JOIN FETCH mt.tag
             WHERE m.user.id = :userId
               AND m.isDeleted = false
             ORDER BY m.createdAt DESC, m.id DESC
             """)
-    List<Memo> findAllByUserIdWithLabelsAndNotDeleted(@Param("userId") Long userId);
+    List<Memo> findAllByUserIdWithTagsAndNotDeleted(@Param("userId") Long userId);
 
     @Query("""
         SELECT COUNT(DISTINCT m)
         FROM Memo m
-        LEFT JOIN m.memoLabels ml
+        LEFT JOIN m.memoTags mt
         WHERE m.user.id = :userId
         AND m.isDeleted = false
-        AND ml.label.id IN :labelIds
+        AND mt.tag.id IN :tagIds
         """)
-    long countMemosByLabels(
+    long countMemosByTags(
             @Param("userId") Long userId,
-            @Param("labelIds") List<Long> labelIds
+            @Param("tagIds") List<Long> tagIds
     );
 
     @Query("""

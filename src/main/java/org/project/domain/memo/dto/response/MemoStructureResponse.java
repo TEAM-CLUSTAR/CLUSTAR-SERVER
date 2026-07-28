@@ -2,7 +2,7 @@ package org.project.domain.memo.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.global.util.MemoContentUtils;
 
 import java.util.List;
@@ -17,8 +17,8 @@ public record MemoStructureResponse(
         @Schema(description = "메모 내용", example = "발박수 치며 날아 간다.")
         String content,
 
-        @Schema(description = "메모에 딸린 라벨 목록")
-        List<MemoListDashboardResponse.LabelResponse> labelList
+        @Schema(description = "메모에 딸린 태그 목록")
+        List<MemoListDashboardResponse.TagResponse> tagList
 ) {
 
     public static MemoStructureResponse from(
@@ -29,9 +29,9 @@ public record MemoStructureResponse(
                 memo.getId(),
                 memo.getTitle(),
                 MemoContentUtils.truncateForDashboard(content),
-                memo.getMemoLabels().stream()
-                        .map(MemoLabel::getLabel)
-                        .map(MemoListDashboardResponse.LabelResponse::from)
+                memo.getMemoTags().stream()
+                        .map(MemoTag::getTag)
+                        .map(MemoListDashboardResponse.TagResponse::from)
                         .toList()
         );
     }

@@ -5,8 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.project.domain.label.entity.Label;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.entity.Tag;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.dto.response.JwtLoginResponse;
 import org.project.domain.user.entity.User;
@@ -45,7 +45,7 @@ public class GoogleAuthService {
     private final TokenResponseBuilder tokenResponseBuilder;
     private final BlacklistTokenRepository blacklistTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final LabelRepository labelRepository;
+    private final TagRepository tagRepository;
 
     public ResponseEntity<ApiResponse<Void>> loginOrRegisterWithResponse(String code,
                                                                          HttpServletResponse response) {
@@ -81,8 +81,8 @@ public class GoogleAuthService {
         }
 
         if (isNewUser) {
-            labelRepository.saveAll(Label.createDefaultLabels(user));
-            log.info("기본 라벨 생성 완료 - userId: {}", user.getId());
+            tagRepository.saveAll(Tag.createDefaultTags(user));
+            log.info("기본 태그 생성 완료 - userId: {}", user.getId());
         }
 
         // 3. JWT 토큰 생성

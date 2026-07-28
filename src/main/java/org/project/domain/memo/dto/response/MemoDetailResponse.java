@@ -2,7 +2,7 @@ package org.project.domain.memo.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -25,8 +25,8 @@ public record MemoDetailResponse(
         @Schema(description = "첨부 파일 정보 목록")
         List<FileInfo> files,
 
-        @Schema(description = "메모에 딸린 라벨들")
-        List<MemoListDashboardResponse.LabelResponse> labelList,
+        @Schema(description = "메모에 딸린 태그들")
+        List<MemoListDashboardResponse.TagResponse> tagList,
 
         @Schema(description = "메모 생성 시각", example = "2026-01-13T10:30:00")
         LocalDateTime createdAt,
@@ -93,9 +93,9 @@ public record MemoDetailResponse(
                 memo.getContent(),
                 images,
                 files,
-                memo.getMemoLabels().stream()
-                        .map(MemoLabel::getLabel)
-                        .map(MemoListDashboardResponse.LabelResponse::from)
+                memo.getMemoTags().stream()
+                        .map(MemoTag::getTag)
+                        .map(MemoListDashboardResponse.TagResponse::from)
                         .toList(),
                 memo.getCreatedAt(),
                 memo.getIsAiGenerated(),

@@ -1,9 +1,9 @@
-package org.project.domain.label.entity;
+package org.project.domain.tag.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.project.domain.label.util.LabelColorPalette;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.tag.util.TagColorPalette;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
@@ -16,14 +16,14 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-        name = "label",
+        name = "tag",
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "name"})
 )
-public class Label extends BaseEntity {
+public class Tag extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "label_id")
+    @Column(name = "tag_id")
     private Long id;
 
     @Column(name = "name", nullable = false)
@@ -37,29 +37,29 @@ public class Label extends BaseEntity {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_label_id")
-    private Label parent;
+    @JoinColumn(name = "parent_tag_id")
+    private Tag parent;
 
     @OneToMany(mappedBy = "parent")
     @Builder.Default
-    private List<Label> children = new ArrayList<>();
+    private List<Tag> children = new ArrayList<>();
 
-    @OneToMany(mappedBy = "label", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "tag", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<MemoLabel> memoLabels = new ArrayList<>();
+    private List<MemoTag> memoTags = new ArrayList<>();
 
-    public static Label create(String name, User user) {
-        return Label.builder()
+    public static Tag create(String name, User user) {
+        return Tag.builder()
                 .name(name)
-                .colorHex(LabelColorPalette.randomColor())
+                .colorHex(TagColorPalette.randomColor())
                 .user(user)
                 .build();
     }
 
-    public static Label create(String name, User user, Label parent) {
-        return Label.builder()
+    public static Tag create(String name, User user, Tag parent) {
+        return Tag.builder()
                 .name(name)
-                .colorHex(LabelColorPalette.randomColor())
+                .colorHex(TagColorPalette.randomColor())
                 .user(user)
                 .parent(parent)
                 .build();
@@ -77,15 +77,15 @@ public class Label extends BaseEntity {
     @PreUpdate
     private void applyColorHex() {
         if (colorHex == null) {
-            colorHex = LabelColorPalette.randomColor();
+            colorHex = TagColorPalette.randomColor();
         }
     }
 
     /**
-     * 기본 라벨 목록 생성
+     * 기본 태그 목록 생성
      * - 최초 회원가입 시 사용
      */
-    public static List<Label> createDefaultLabels(User user) {
+    public static List<Tag> createDefaultTags(User user) {
         return List.of(
                 create("졸업 프로젝트", user),
                 create("교양", user),

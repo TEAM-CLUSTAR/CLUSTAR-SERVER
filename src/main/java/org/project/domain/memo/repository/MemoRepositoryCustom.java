@@ -9,7 +9,7 @@ import java.util.List;
 public interface MemoRepositoryCustom {
     List<Memo> findMemos(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             Pageable pageable
@@ -17,7 +17,7 @@ public interface MemoRepositoryCustom {
 
     List<Memo> findAiMemos(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             Pageable pageable

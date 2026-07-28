@@ -1,7 +1,7 @@
 package org.project.domain.memo.dto.response;
 
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.global.util.MarkdownUtil;
 import org.project.global.util.MemoContentUtils;
 
@@ -12,7 +12,7 @@ public record MemoSearchItemResponse(
         Long memoId,
         String title,
         String content,
-        List<MemoListDashboardResponse.LabelResponse> labelList,
+        List<MemoListDashboardResponse.TagResponse> tagList,
         LocalDateTime createdAt,
         SearchType searchType
 ) {
@@ -21,9 +21,9 @@ public record MemoSearchItemResponse(
                 memo.getId(),
                 memo.getTitle(),
                 MemoContentUtils.truncateForDashboard(MarkdownUtil.strip(memo.getContent())),
-                memo.getMemoLabels().stream()
-                        .map(MemoLabel::getLabel)
-                        .map(MemoListDashboardResponse.LabelResponse::from)
+                memo.getMemoTags().stream()
+                        .map(MemoTag::getTag)
+                        .map(MemoListDashboardResponse.TagResponse::from)
                         .toList(),
                 memo.getCreatedAt(),
                 searchType

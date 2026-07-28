@@ -1,8 +1,8 @@
 package org.project.domain.memo.dto.response;
 
-import org.project.domain.label.entity.Label;
+import org.project.domain.tag.entity.Tag;
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.global.util.MemoContentUtils;
 
 import java.time.LocalDateTime;
@@ -38,7 +38,7 @@ public record MemoListDashboardResponse(
             Boolean isNew,
             LocalDateTime createdAt,
 
-            List<LabelResponse> labelList
+            List<TagResponse> tagList
     ) {
 
         /**
@@ -63,28 +63,28 @@ public record MemoListDashboardResponse(
                     memo.getIsAiGenerated(),
                     memo.getIsNew(),
                     memo.getCreatedAt(),
-                    memo.getMemoLabels().stream()
-                            .map(MemoLabel::getLabel)
-                            .map(LabelResponse::from)
+                    memo.getMemoTags().stream()
+                            .map(MemoTag::getTag)
+                            .map(TagResponse::from)
                             .toList()
             );
         }
     }
 
     /**
-     * 라벨 응답
+     * 태그 응답
      */
-    public record LabelResponse(
-            Long labelId,
+    public record TagResponse(
+            Long tagId,
             String name,
             String colorHex
     ) {
 
-        public static LabelResponse from(Label label) {
-            return new LabelResponse(
-                    label.getId(),
-                    label.getName(),
-                    label.getColorHex()
+        public static TagResponse from(Tag tag) {
+            return new TagResponse(
+                    tag.getId(),
+                    tag.getName(),
+                    tag.getColorHex()
             );
         }
     }

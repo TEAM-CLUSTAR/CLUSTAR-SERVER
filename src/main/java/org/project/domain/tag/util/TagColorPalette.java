@@ -1,9 +1,9 @@
-package org.project.domain.label.util;
+package org.project.domain.tag.util;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class LabelColorPalette {
+public final class TagColorPalette {
 
     private static final List<String> COLORS = List.of(
             "#ABDEE6", "#CBAACB", "#FFFFB5", "#FFCCB6", "#F3B0C3",
@@ -13,7 +13,7 @@ public final class LabelColorPalette {
             "#FCB9AA", "#FFDBCC", "#ECEAE4", "#A2E1DB", "#55CBCD"
     );
 
-    private LabelColorPalette() {
+    private TagColorPalette() {
     }
 
     public static String randomColor() {

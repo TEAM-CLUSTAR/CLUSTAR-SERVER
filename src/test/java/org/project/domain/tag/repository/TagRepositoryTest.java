@@ -1,8 +1,8 @@
-package org.project.domain.label.repository;
+package org.project.domain.tag.repository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.project.domain.label.entity.Label;
+import org.project.domain.tag.entity.Tag;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.querydsl.QuerydslTestConfig;
@@ -22,11 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @Import(QuerydslTestConfig.class)
-@DisplayName("LabelRepository 테스트")
-class LabelRepositoryTest {
+@DisplayName("TagRepository 테스트")
+class TagRepositoryTest {
 
     @Autowired
-    private LabelRepository labelRepository;
+    private TagRepository tagRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -41,20 +41,20 @@ class LabelRepositoryTest {
         User user = userRepository.save(createUser());
 
         for (int i = 1; i <= 12; i++) {
-            Label label = Label.create("parent-" + i, user);
+            Tag tag = Tag.create("parent-" + i, user);
             ReflectionTestUtils.setField(
-                    label,
+                    tag,
                     "createdAt",
                     LocalDateTime.of(2026, 1, 1, 0, 0).plusMinutes(i)
             );
-            labelRepository.save(label);
+            tagRepository.save(tag);
         }
 
         em.flush();
         em.clear();
 
         // when
-        List<Label> result = labelRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(user.getId());
+        List<Tag> result = tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(user.getId());
 
         // then
         assertThat(result).hasSize(10);
@@ -68,41 +68,41 @@ class LabelRepositoryTest {
         // given
         User user = userRepository.save(createUser());
 
-        Label parent = Label.create("parent", user);
+        Tag parent = Tag.create("parent", user);
         ReflectionTestUtils.setField(parent, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 0));
-        labelRepository.save(parent);
+        tagRepository.save(parent);
 
-        Label child1 = Label.create("child-1", user, parent);
+        Tag child1 = Tag.create("child-1", user, parent);
         ReflectionTestUtils.setField(child1, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 10));
-        labelRepository.save(child1);
+        tagRepository.save(child1);
 
-        Label child2 = Label.create("child-2", user, parent);
+        Tag child2 = Tag.create("child-2", user, parent);
         ReflectionTestUtils.setField(child2, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 20));
-        labelRepository.save(child2);
+        tagRepository.save(child2);
 
-        Label grand1 = Label.create("grand-1", user, child1);
+        Tag grand1 = Tag.create("grand-1", user, child1);
         ReflectionTestUtils.setField(grand1, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 30));
-        labelRepository.save(grand1);
+        tagRepository.save(grand1);
 
-        Label grand2 = Label.create("grand-2", user, child1);
+        Tag grand2 = Tag.create("grand-2", user, child1);
         ReflectionTestUtils.setField(grand2, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 40));
-        labelRepository.save(grand2);
+        tagRepository.save(grand2);
 
-        Label grand3 = Label.create("grand-3", user, child2);
+        Tag grand3 = Tag.create("grand-3", user, child2);
         ReflectionTestUtils.setField(grand3, "createdAt", LocalDateTime.of(2026, 1, 1, 0, 50));
-        labelRepository.save(grand3);
+        tagRepository.save(grand3);
 
         em.flush();
         em.clear();
 
         // when
-        List<Label> children = labelRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
-        List<Label> grandChildren = labelRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
+        List<Tag> children = tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
+        List<Tag> grandChildren = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
 
         // then
-        assertThat(children).extracting(Label::getName)
+        assertThat(children).extracting(Tag::getName)
                 .containsExactly("child-2", "child-1");
-        assertThat(grandChildren).extracting(Label::getName)
+        assertThat(grandChildren).extracting(Tag::getName)
                 .containsExactly("grand-3", "grand-2", "grand-1");
     }
 

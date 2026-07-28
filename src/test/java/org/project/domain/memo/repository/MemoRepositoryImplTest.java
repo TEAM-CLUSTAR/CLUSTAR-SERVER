@@ -2,10 +2,10 @@ package org.project.domain.memo.repository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.project.domain.label.entity.Label;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.entity.Tag;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.entity.Memo;
-import org.project.domain.memo.entity.MemoLabel;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.querydsl.QuerydslTestConfig;
@@ -34,14 +34,14 @@ class MemoRepositoryImplTest {
     UserRepository userRepository;
 
     @Autowired
-    LabelRepository labelRepository;
+    TagRepository tagRepository;
 
     @Autowired
     TestEntityManager em;
 
     @Test
-    @DisplayName("라벨 조건 없이 최신 메모부터 조회된다")
-    void findMemos_withoutLabel_success() {
+    @DisplayName("태그 조건 없이 최신 메모부터 조회된다")
+    void findMemos_withoutTag_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
@@ -76,20 +76,20 @@ class MemoRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("라벨로 메모 필터링된다")
-    void findMemos_withLabel_success() {
+    @DisplayName("태그로 메모 필터링된다")
+    void findMemos_withTag_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
-                        "label@test.com",
+                        "tag@test.com",
                         "유저",
                         "profile.png",
                         "google"
                 )
         );
 
-        Label label1 = labelRepository.save(Label.create("라벨1", user));
-        Label label2 = labelRepository.save(Label.create("라벨2", user));
+        Tag tag1 = tagRepository.save(Tag.create("태그1", user));
+        Tag tag2 = tagRepository.save(Tag.create("태그2", user));
 
         Memo memo1 = Memo.createMemo("memo1", "content1", user);
         Memo memo2 = Memo.createMemo("memo2", "content2", user);
@@ -97,8 +97,8 @@ class MemoRepositoryImplTest {
         em.persist(memo1);
         em.persist(memo2);
 
-        em.persist(MemoLabel.create(memo1, label1, 1));
-        em.persist(MemoLabel.create(memo2, label2, 1));
+        em.persist(MemoTag.create(memo1, tag1, 1));
+        em.persist(MemoTag.create(memo2, tag2, 1));
 
         em.flush();
         em.clear();
@@ -106,7 +106,7 @@ class MemoRepositoryImplTest {
         // when
         List<Memo> result = memoRepository.findMemos(
                 user.getId(),
-                List.of(label1.getId()),
+                List.of(tag1.getId()),
                 null,
                 null,
                 PageRequest.of(0, 10)
