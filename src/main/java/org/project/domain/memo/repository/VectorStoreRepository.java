@@ -136,9 +136,8 @@ public class VectorStoreRepository {
     /**
      * 해당 메모/타입이 "현재 설정된 임베딩 모델"로 이미 임베딩됐는지 확인한다.
      * embeddedAt(시점)이 아니라 embeddingModel(어떤 모델로 만들어졌는지) 기준으로 판단해야
-     * 나중에 모델이 또 바뀌었을 때 기존 벡터가 자동으로 "구버전"으로 인식되어 재임베딩 대상이 된다
-     * (embeddedAt만 보면 "언제든 한 번 새 파이프라인을 거쳤는지"만 알 수 있어 모델이 또 바뀌어도 전부 스킵돼버리는 문제가 있었음).
-     * 재임베딩 배치의 재개(resume)와 실패 타입만 선택적으로 재시도하는 데 사용된다 — 둘 다 "이미 현재 모델로 끝난 건 다시 안 한다"는 동일한 판단.
+     * 나중에 모델이 또 바뀌었을 때 기존 벡터가 자동으로 "구버전"으로 인식되어 재임베딩 대상이 된다.
+     * 재임베딩 배치의 재개(resume)와 실패 타입만 선택적으로 재시도하는 데 사용된다.
      */
     public boolean existsEmbeddedDocumentByMemoIdAndType(Long memoId, String type, String embeddingModel) {
         String sql = """
