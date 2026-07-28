@@ -102,7 +102,7 @@ public class MemoController {
             summary = "메모 전체 조회(대시보드)",
             description = """
                 메모를 전체 조회합니다.
-                - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
+                - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
                 - 커서 기반 페이지네이션을 지원합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
                   이미지/파일 개수 정보를 포함합니다.
@@ -114,7 +114,7 @@ public class MemoController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
 
             @RequestParam(required = false)
-            List<Long> labelIds,
+            List<Long> tagIds,
 
             @RequestParam(required = false)
             LocalDateTime cursorCreatedAt,
@@ -129,7 +129,7 @@ public class MemoController {
         MemoListDashboardResponse response =
                 memoService.getMemosWithMedia(
                         userDetails.getUserId(),
-                        labelIds,
+                        tagIds,
                         cursorCreatedAt,
                         cursorMemoId,
                         size
@@ -141,8 +141,8 @@ public class MemoController {
     @Operation(
             summary = "AI가 생성한 메모 전체 조회(대시보드)",
             description = """
-                AI가 생성한 메모를 전체 조회합니다. 
-                - labelIds가 있으면 해당 라벨이 포함된 메모만 조회합니다.
+                AI가 생성한 메모를 전체 조회합니다.
+                - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
                 - 커서 기반 페이지네이션을 지원합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
                   이미지/파일 개수 정보를 포함합니다.
@@ -154,7 +154,7 @@ public class MemoController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
 
             @RequestParam(required = false)
-            List<Long> labelIds,
+            List<Long> tagIds,
 
             @RequestParam(required = false)
             LocalDateTime cursorCreatedAt,
@@ -169,7 +169,7 @@ public class MemoController {
         MemoListDashboardResponse response =
                 memoService.getAiMemosWithMedia(
                         userDetails.getUserId(),
-                        labelIds,
+                        tagIds,
                         cursorCreatedAt,
                         cursorMemoId,
                         size
@@ -183,7 +183,7 @@ public class MemoController {
             하나의 메모를 상세조회 합니다.
             AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
             AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
-            라벨은 리스트의 앞부터 우선순위가 높은 순서 입니다.
+            태그는 리스트의 앞부터 우선순위가 높은 순서 입니다.
             """)
     @BusinessExceptionDescription(SwaggerResponseDescription.GET_ONE_MEMO)
     public ResponseEntity<ApiResponse<MemoDetailResponse>> getOneDetailMemo
@@ -217,7 +217,7 @@ public class MemoController {
     @GetMapping("/search")
     @Operation(summary = "메모 검색", description = """
             검색어를 입력하면 최대 5개의 메모를 반환합니다.
-            - 텍스트 매칭(제목/본문/라벨) 최대 3개
+            - 텍스트 매칭(제목/본문/태그) 최대 3개
             - 의미 기반 벡터 검색 최대 2개
             """)
     public ResponseEntity<ApiResponse<MemoSearchResponse>> searchMemos(

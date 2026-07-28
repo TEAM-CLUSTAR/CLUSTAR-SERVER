@@ -1,6 +1,7 @@
 package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.project.domain.ai.rag.A.extract.MemoDocumentReader;
 import org.project.domain.ai.rag.B.transform.text.MemoTextTransformer;
 import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
@@ -17,6 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MemoTextEmbeddingListener {
@@ -26,31 +28,36 @@ public class MemoTextEmbeddingListener {
     private final MemoDocumentReader memoDocumentReader;      // Extract
     private final MemoTextTransformer memoTextTransformer;    // Transform
     private final VectorStoreDocumentLoader vectorStoreDocumentLoader; // Load
+    private final EmbeddingFailureHandler embeddingFailureHandler;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(MemoTextCreatedEvent event) {
+        try {
+            // 1️⃣ Extract
+            Memo memo = memoRepository.findByIdWithUserAndNotDeleted(event.memoId())
+                    .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
-        // 1️⃣ Extract
-        Memo memo = memoRepository.findByIdWithUserAndNotDeleted(event.memoId())
-                .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+            List<Document> extractedDocuments =
+                    memoDocumentReader.readText(memo);
 
-        List<Document> extractedDocuments =
-                memoDocumentReader.readText(memo);
+            if (extractedDocuments.isEmpty()) {
+                return;
+            }
 
-        if (extractedDocuments.isEmpty()) {
-            return;
+            // 2️⃣ Transform
+            List<Document> transformedDocuments =
+                    memoTextTransformer.transform(extractedDocuments);
+
+            if (transformedDocuments.isEmpty()) {
+                return;
+            }
+
+            // 3️⃣ Load
+            vectorStoreDocumentLoader.load(transformedDocuments);
+        } catch (Exception e) {
+            log.error("텍스트 임베딩 실패: memoId={}", event.memoId(), e);
+            embeddingFailureHandler.record(event.memoId(), "text", e);
         }
-
-        // 2️⃣ Transform
-        List<Document> transformedDocuments =
-                memoTextTransformer.transform(extractedDocuments);
-
-        if (transformedDocuments.isEmpty()) {
-            return;
-        }
-
-        // 3️⃣ Load
-        vectorStoreDocumentLoader.load(transformedDocuments);
     }
 }

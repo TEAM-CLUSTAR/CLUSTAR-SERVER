@@ -12,7 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.dto.response.JwtLoginResponse;
 import org.project.domain.user.entity.User;
@@ -58,7 +58,7 @@ class GoogleAuthServiceTest {
     @Mock private TokenResponseBuilder tokenResponseBuilder;
     @Mock private BlacklistTokenRepository blacklistTokenRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private LabelRepository labelRepository;
+    @Mock private TagRepository tagRepository;
 
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
@@ -126,13 +126,13 @@ class GoogleAuthServiceTest {
             assertThat(response.name()).isEqualTo(user.getName());
             assertThat(response.profileImageUrl()).isEqualTo(user.getProfileImageUrl());
 
-            verify(labelRepository, never()).saveAll(any());
+            verify(tagRepository, never()).saveAll(any());
             verify(refreshTokenRepository, times(1))
                     .save("refresh-jti", 1000L);
         }
 
         @Test
-        @DisplayName("신규 유저면 회원 생성 + 기본 라벨 생성 + JWT 발급")
+        @DisplayName("신규 유저면 회원 생성 + 기본 태그 생성 + JWT 발급")
         void login_new_user_success() {
             // given
             when(googleClient.getGoogleAccountProfile(any()))
@@ -165,7 +165,7 @@ class GoogleAuthServiceTest {
             assertThat(response.accessToken()).isEqualTo("access-token");
 
             verify(userRepository, times(1)).save(any(User.class));
-            verify(labelRepository, times(1)).saveAll(any(List.class));
+            verify(tagRepository, times(1)).saveAll(any(List.class));
             verify(refreshTokenRepository, times(1))
                     .save("refresh-jti", 1000L);
         }

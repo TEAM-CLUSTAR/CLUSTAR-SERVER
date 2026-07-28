@@ -10,7 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -27,7 +27,7 @@ import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
-import org.project.domain.memo.repository.MemoLabelRepository;
+import org.project.domain.memo.repository.MemoTagRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.memo.repository.VectorStoreRepository;
 import org.project.domain.user.entity.User;
@@ -60,11 +60,11 @@ class MemoServiceImplTest {
 
     @Mock private MemoRepository memoRepository;
     @Mock private UserRepository userRepository;
-    @Mock private LabelRepository labelRepository;
+    @Mock private TagRepository tagRepository;
 
     @Mock private MemoImageRepository memoImageRepository;
     @Mock private MemoFileRepository memoFileRepository;
-    @Mock private MemoLabelRepository memoLabelRepository;
+    @Mock private MemoTagRepository memoTagRepository;
 
     @Mock private S3KeyUtil s3KeyUtil;
     @Mock private S3Util s3Util;
@@ -217,14 +217,14 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("메모 생성 실패 - 라벨 저장 중 예외 발생")
-        void createMemo_fail_labelError() {
+        @DisplayName("메모 생성 실패 - 태그 저장 중 예외 발생")
+        void createMemo_fail_tagError() {
             // given
             when(userRepository.findById(user.getId()))
                     .thenReturn(Optional.of(user));
 
-            when(labelRepository.findByNameAndUser(anyString(), any()))
-                    .thenThrow(new RuntimeException("라벨 오류"));
+            when(tagRepository.findByNameAndUser(anyString(), any()))
+                    .thenThrow(new RuntimeException("태그 오류"));
 
             // when & then
             assertThatThrownBy(() -> memoService.createMemo(user.getId(), request))
@@ -625,7 +625,7 @@ class MemoServiceImplTest {
             // then 검증
             verify(memoImageRepository).deleteByMemo(memo);
             verify(memoFileRepository).deleteByMemo(memo);
-            verify(memoLabelRepository).deleteByMemo(memo);
+            verify(memoTagRepository).deleteByMemo(memo);
 
             verify(eventPublisher).publishEvent(any(MemoDeletedEvent.class));
         }
@@ -899,7 +899,7 @@ class MemoServiceImplTest {
                     .willReturn(null);
             given(vectorStoreRepository.findRecommendedMemoIds(eq(userId), eq(List.of(1L, 2L, 3L)), eq(candidateThreshold)))
                     .willReturn(List.of(5L));
-            given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(5L))))
+            given(memoRepository.findByIdInWithTagsAndNotDeleted(eq(userId), eq(List.of(5L))))
                     .willReturn(List.of(memo));
 
             // when
@@ -952,7 +952,7 @@ class MemoServiceImplTest {
             // 기본 목 동작(0.0)과 무관하게 Gate1을 확실히 건너뛰도록 명시한다.
             given(vectorStoreRepository.computeSelectionCohesion(eq(userId), eq(List.of(1L))))
                     .willReturn(null);
-            given(memoRepository.findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L))))
+            given(memoRepository.findByIdInWithTagsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L))))
                     .willReturn(List.of(memo1, memo2, memo3));
 
             // when
@@ -960,7 +960,7 @@ class MemoServiceImplTest {
 
             // then
             assertThat(response.results()).hasSize(3);
-            verify(memoRepository).findByIdInWithLabelsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L)));
+            verify(memoRepository).findByIdInWithTagsAndNotDeleted(eq(userId), eq(List.of(10L, 11L, 12L)));
             verify(memoRecommendationProperties).getSingleSelectionSimilarityThreshold();
             verify(memoRecommendationProperties, never()).getCandidateSimilarityThreshold();
         }

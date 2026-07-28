@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Repository
@@ -102,5 +103,57 @@ public class VectorStoreRepository {
         Double cohesion = jdbcTemplate.queryForObject(sql, params, Double.class);
         log.info("[Recommendation][Gate1] userId={} selected={} cohesion={}", userId, memoIds, cohesion);
         return cohesion;
+    }
+
+    /**
+     * 재임베딩 시 "새 벡터 적재 성공 후 기존 벡터 삭제" 순서를 지키기 위해,
+     * 재임베딩을 시작하기 전에 특정 메모/타입의 기존 document id를 먼저 캡처해둔다.
+     */
+    public List<UUID> findDocumentIdsByMemoIdAndType(Long memoId, String type) {
+        String sql = """
+                SELECT id FROM vector_store
+                WHERE CAST(metadata->>'memoId' AS BIGINT) = :memoId
+                  AND metadata->>'type' = :type
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("memoId", memoId)
+                .addValue("type", type);
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
+    }
+
+    public void deleteByIds(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        String sql = "DELETE FROM vector_store WHERE id IN (:ids)";
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("ids", ids);
+        jdbcTemplate.update(sql, params);
+    }
+
+    /**
+     * 해당 메모/타입이 "현재 설정된 임베딩 모델"로 이미 임베딩됐는지 확인한다.
+     * embeddedAt(시점)이 아니라 embeddingModel(어떤 모델로 만들어졌는지) 기준으로 판단해야
+     * 나중에 모델이 또 바뀌었을 때 기존 벡터가 자동으로 "구버전"으로 인식되어 재임베딩 대상이 된다.
+     * 재임베딩 배치의 재개(resume)와 실패 타입만 선택적으로 재시도하는 데 사용된다.
+     */
+    public boolean existsEmbeddedDocumentByMemoIdAndType(Long memoId, String type, String embeddingModel) {
+        String sql = """
+                SELECT EXISTS (
+                    SELECT 1 FROM vector_store
+                    WHERE CAST(metadata->>'memoId' AS BIGINT) = :memoId
+                      AND metadata->>'type' = :type
+                      AND metadata->>'embeddingModel' = :embeddingModel
+                )
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("memoId", memoId)
+                .addValue("type", type)
+                .addValue("embeddingModel", embeddingModel);
+
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(sql, params, Boolean.class));
     }
 }

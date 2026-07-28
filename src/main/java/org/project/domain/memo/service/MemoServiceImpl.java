@@ -1,8 +1,8 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
-import org.project.domain.label.entity.Label;
-import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.tag.entity.Tag;
+import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
@@ -17,7 +17,7 @@ import org.project.domain.memo.event.MemoImageCreatedEvent;
 import org.project.domain.memo.event.MemoTextCreatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
-import org.project.domain.memo.repository.MemoLabelRepository;
+import org.project.domain.memo.repository.MemoTagRepository;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
@@ -55,11 +55,11 @@ public class MemoServiceImpl implements MemoService {
 
     private final MemoRepository memoRepository;
     private final UserRepository userRepository;
-    private final LabelRepository labelRepository;
+    private final TagRepository tagRepository;
 
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
-    private final MemoLabelRepository memoLabelRepository;
+    private final MemoTagRepository memoTagRepository;
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
@@ -131,8 +131,8 @@ public class MemoServiceImpl implements MemoService {
                 user
         );
 
-        // 라벨 처리 (중복 제거 + 우선순위)
-        attachLabels(memo, request.labelNames(), user);
+        // 태그 처리 (중복 제거 + 우선순위)
+        attachTags(memo, request.tagNames(), user);
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
@@ -164,7 +164,7 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         List<Memo> sourceMemos =
-                memoRepository.findByIdInWithLabelsAndNotDeleted(userId, sourceMemoIds);
+                memoRepository.findByIdInWithTagsAndNotDeleted(userId, sourceMemoIds);
 
         validateSourceMemos(sourceMemoIds, sourceMemos);
 
@@ -175,7 +175,7 @@ public class MemoServiceImpl implements MemoService {
                 sourceMemoIds
         );
 
-        attachLabels(memo, resolveCommonLabelNames(sourceMemos), user);
+        attachTags(memo, resolveCommonTagNames(sourceMemos), user);
 
         Memo savedMemo = memoRepository.save(memo);
 
@@ -193,7 +193,7 @@ public class MemoServiceImpl implements MemoService {
     @Override
     public MemoListDashboardResponse getMemosWithMedia(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             int size
@@ -201,16 +201,16 @@ public class MemoServiceImpl implements MemoService {
 
         long totalCount;
 
-        if(labelIds == null || labelIds.isEmpty()) {
+        if(tagIds == null || tagIds.isEmpty()) {
             totalCount = memoRepository.countAllMemos(userId);
         } else {
-            totalCount = memoRepository.countMemosByLabels(userId, labelIds);
+            totalCount = memoRepository.countMemosByTags(userId, tagIds);
         }
 
         // 메모 조회 (기존 로직 재사용)
         List<Memo> memos = memoRepository.findMemos(
                 userId,
-                labelIds,
+                tagIds,
                 cursorCreatedAt,
                 cursorMemoId,
                 PageRequest.of(0, size)
@@ -253,7 +253,7 @@ public class MemoServiceImpl implements MemoService {
     @Override
     public MemoListDashboardResponse getAiMemosWithMedia(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             int size
@@ -261,16 +261,16 @@ public class MemoServiceImpl implements MemoService {
 
         long totalCount;
 
-        if(labelIds == null || labelIds.isEmpty()) {
+        if(tagIds == null || tagIds.isEmpty()) {
             totalCount = memoRepository.countAllMemos(userId);
         } else {
-            totalCount = memoRepository.countMemosByLabels(userId, labelIds);
+            totalCount = memoRepository.countMemosByTags(userId, tagIds);
         }
 
         // 메모 조회 (기존 로직 재사용)
         List<Memo> memos = memoRepository.findAiMemos(
                 userId,
-                labelIds,
+                tagIds,
                 cursorCreatedAt,
                 cursorMemoId,
                 PageRequest.of(0, size)
@@ -344,8 +344,8 @@ public class MemoServiceImpl implements MemoService {
 
     @Override
     public MemoStructureListResponse getStructureMemo(Long userId){
-        // 메모 + 라벨 한번에 조회
-        List<Memo> memos = memoRepository.findAllByUserIdWithLabelsAndNotDeleted(userId);
+        // 메모 + 태그 한번에 조회
+        List<Memo> memos = memoRepository.findAllByUserIdWithTagsAndNotDeleted(userId);
 
         List<MemoStructureResponse> responses = memos.stream()
                 .map(memo -> MemoStructureResponse.from(memo, MarkdownUtil.strip(memo.getContent())))
@@ -374,7 +374,7 @@ public class MemoServiceImpl implements MemoService {
         // DB 삭제 hard/soft delete
         memoImageRepository.deleteByMemo(memo);
         memoFileRepository.deleteByMemo(memo);
-        memoLabelRepository.deleteByMemo(memo);
+        memoTagRepository.deleteByMemo(memo);
         memo.delete();
 
         // 이벤트 발행(트랜잭션 커밋 후 실행됨)
@@ -444,7 +444,7 @@ public class MemoServiceImpl implements MemoService {
 
         List<Long> top3Ids = recommendedIds.stream().limit(3).toList();
 
-        List<Memo> memos = memoRepository.findByIdInWithLabelsAndNotDeleted(userId, top3Ids);
+        List<Memo> memos = memoRepository.findByIdInWithTagsAndNotDeleted(userId, top3Ids);
 
         Map<Long, Memo> memoById = memos.stream()
                 .collect(Collectors.toMap(Memo::getId, Function.identity()));
@@ -479,27 +479,27 @@ public class MemoServiceImpl implements MemoService {
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
     }
 
-    // 라벨 처리 (중복 제거 + 우선순위)
-    private void attachLabels(Memo memo, List<String> labelNames, User user) {
-        if (labelNames == null || labelNames.isEmpty()) {
+    // 태그 처리 (중복 제거 + 우선순위)
+    private void attachTags(Memo memo, List<String> tagNames, User user) {
+        if (tagNames == null || tagNames.isEmpty()) {
             return;
         }
 
-        List<String> uniqueLabelNames = labelNames.stream()
+        List<String> uniqueTagNames = tagNames.stream()
                 .distinct()
                 .toList();
 
-        for (int priority = 0; priority < uniqueLabelNames.size(); priority++) {
-            String labelName = uniqueLabelNames.get(priority);
-            Label label = findOrCreateLabel(labelName, user);
-            memo.addLabel(label, priority);
+        for (int priority = 0; priority < uniqueTagNames.size(); priority++) {
+            String tagName = uniqueTagNames.get(priority);
+            Tag tag = findOrCreateTag(tagName, user);
+            memo.addTag(tag, priority);
         }
     }
 
-    private Label findOrCreateLabel(String labelName, User user) {
-        return labelRepository.findByNameAndUser(labelName, user)
-                .orElseGet(() -> labelRepository.save(
-                        Label.create(labelName, user)
+    private Tag findOrCreateTag(String tagName, User user) {
+        return tagRepository.findByNameAndUser(tagName, user)
+                .orElseGet(() -> tagRepository.save(
+                        Tag.create(tagName, user)
                 ));
     }
 
@@ -514,31 +514,31 @@ public class MemoServiceImpl implements MemoService {
         }
     }
 
-    private List<String> resolveCommonLabelNames(List<Memo> sourceMemos) {
-        String commonLabel = null;
+    private List<String> resolveCommonTagNames(List<Memo> sourceMemos) {
+        String commonTag = null;
 
         for (Memo memo : sourceMemos) {
-            List<Label> labels = memo.getLabels();
-            if (labels.size() != 1) {
+            List<Tag> tags = memo.getTags();
+            if (tags.size() != 1) {
                 return List.of();
             }
 
-            String labelName = labels.get(0).getName();
-            if (commonLabel == null) {
-                commonLabel = labelName;
+            String tagName = tags.get(0).getName();
+            if (commonTag == null) {
+                commonTag = tagName;
                 continue;
             }
 
-            if (!commonLabel.equals(labelName)) {
+            if (!commonTag.equals(tagName)) {
                 return List.of();
             }
         }
 
-        if (commonLabel == null) {
+        if (commonTag == null) {
             return List.of();
         }
 
-        return List.of(commonLabel);
+        return List.of(commonTag);
     }
 
     private void saveMemoImages(Memo memo, List<MemoCreateRequest.ImageRequest> images, Long userId) {

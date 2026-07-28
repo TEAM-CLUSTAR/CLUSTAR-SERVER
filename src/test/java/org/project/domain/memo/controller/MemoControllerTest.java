@@ -384,7 +384,7 @@ class MemoControllerTest {
         @Test
         @DisplayName("라벨과 함께 메모를 작성하는 것이 성공해야 한다.")
         @WithMockCustomUser(userId = 1L)
-        void createMemo_WithLabels_Success() throws Exception {
+        void createMemo_WithTags_Success() throws Exception {
             // given
             Long userId = 1L;
 
@@ -586,7 +586,7 @@ class MemoControllerTest {
                     {
                         "title": null,
                         "content": "내용입니다.",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -611,7 +611,7 @@ class MemoControllerTest {
                     {
                         "title": "",
                         "content": "내용입니다.",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -637,7 +637,7 @@ class MemoControllerTest {
                     {
                         "title": "   ",
                         "content": "내용입니다.",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -662,7 +662,7 @@ class MemoControllerTest {
                     {
                         "title": "제목입니다.",
                         "content": null,
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -687,7 +687,7 @@ class MemoControllerTest {
                     {
                         "title": "제목입니다.",
                         "content": "",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -712,7 +712,7 @@ class MemoControllerTest {
                     {
                         "title": "제목입니다.",
                         "content": "   ",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -736,7 +736,7 @@ class MemoControllerTest {
             String requestJson = """
                     {
                         "content": "내용입니다.",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -761,7 +761,7 @@ class MemoControllerTest {
             String requestJson = """
                     {
                         "title": "제목입니다.",
-                        "labelNames": [],
+                        "tagNames": [],
                         "images": [],
                         "files": []
                     }
@@ -804,8 +804,8 @@ class MemoControllerTest {
                             true,
                             LocalDateTime.now(),
                             List.of(
-                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT", "#FF5722"),
-                                    new MemoListDashboardResponse.LabelResponse(2L, "교양", "#4CAF50")
+                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#FF5722"),
+                                    new MemoListDashboardResponse.TagResponse(2L, "교양", "#4CAF50")
                             )
                     );
 
@@ -829,7 +829,7 @@ class MemoControllerTest {
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
-                    eq(null),  // labelIds
+                    eq(null),  // tagIds
                     eq(null),  // cursorCreatedAt
                     eq(null),  // cursorMemoId
                     eq(20)     // default size
@@ -848,13 +848,13 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos[0].imageCount").value(2))
                     .andExpect(jsonPath("$.data.memos[0].fileCount").value(1))
                     .andExpect(jsonPath("$.data.memos[0].isPinned").value(false))
-                    .andExpect(jsonPath("$.data.memos[0].labelList.length()").value(2))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].colorHex").value("#FF5722"))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[1].labelId").value(2L))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[1].name").value("교양"))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[1].colorHex").value("#4CAF50"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList.length()").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].tagId").value(1L))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].colorHex").value("#FF5722"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[1].tagId").value(2L))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[1].name").value("교양"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[1].colorHex").value("#4CAF50"))
                     .andExpect(jsonPath("$.data.memos[1].memoId").value(2L))
                     .andExpect(jsonPath("$.data.memos[1].isPinned").value(true));
 
@@ -865,10 +865,10 @@ class MemoControllerTest {
         @Test
         @DisplayName("단일 라벨로 필터링하여 조회가 성공해야 한다.")
         @WithMockCustomUser(userId = 1L)
-        void getMemos_WithLabelFilter_Success() throws Exception {
+        void getMemos_WithTagFilter_Success() throws Exception {
             // given
             Long userId = 1L;
-            List<Long> labelIds = List.of(1L);
+            List<Long> tagIds = List.of(1L);
 
             MemoListDashboardResponse.MemoDashboardResponse memo =
                     new MemoListDashboardResponse.MemoDashboardResponse(
@@ -883,7 +883,7 @@ class MemoControllerTest {
                             true,
                             LocalDateTime.now(),
                             List.of(
-                                    new MemoListDashboardResponse.LabelResponse(1L, "SOPT", "#FF5722")
+                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#FF5722")
                             )
                     );
 
@@ -892,7 +892,7 @@ class MemoControllerTest {
 
             when(memoService.getMemosWithMedia(
                     eq(userId),
-                    eq(labelIds),
+                    eq(tagIds),
                     eq(null),
                     eq(null),
                     eq(20)
@@ -900,17 +900,17 @@ class MemoControllerTest {
 
             // when & then
             mockMvc.perform(get("/api/v1/memo")
-                            .param("labelIds", "1")  // List<Long> 파라미터
+                            .param("tagIds", "1")  // List<Long> 파라미터
                             .contentType(MediaType.APPLICATION_JSON))
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.memos.length()").value(1))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.memos[0].labelList[0].colorHex").value("#FF5722"));
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].tagId").value(1L))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].colorHex").value("#FF5722"));
 
             verify(memoService, times(1))
-                    .getMemosWithMedia(eq(userId), eq(labelIds), eq(null), eq(null), eq(20));
+                    .getMemosWithMedia(eq(userId), eq(tagIds), eq(null), eq(null), eq(20));
         }
 
         @Test
@@ -1052,9 +1052,9 @@ class MemoControllerTest {
                     List.of(image1, image2),
                     List.of(file),
                     List.of(
-                            new MemoListDashboardResponse.LabelResponse(1L, "SOPT", "#FF5722"),
-                            new MemoListDashboardResponse.LabelResponse(2L, "교양", "#4CAF50"),
-                            new MemoListDashboardResponse.LabelResponse(3L, "레퍼런스", "#2196F3")
+                            new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#FF5722"),
+                            new MemoListDashboardResponse.TagResponse(2L, "교양", "#4CAF50"),
+                            new MemoListDashboardResponse.TagResponse(3L, "레퍼런스", "#2196F3")
                     ),
                     LocalDateTime.of(2026, 1, 16, 10, 30),
                     false,  // AI 생성 아님
@@ -1082,11 +1082,11 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.files.length()").value(1))
                     .andExpect(jsonPath("$.data.files[0].fileId").value(1L))
                     .andExpect(jsonPath("$.data.files[0].fileName").value("SOPT_7th_seminar.pdf"))
-                    .andExpect(jsonPath("$.data.labelList").isArray())
-                    .andExpect(jsonPath("$.data.labelList.length()").value(3))
-                    .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.labelList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#FF5722"))
+                    .andExpect(jsonPath("$.data.tagList").isArray())
+                    .andExpect(jsonPath("$.data.tagList.length()").value(3))
+                    .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
+                    .andExpect(jsonPath("$.data.tagList[0].name").value("SOPT"))
+                    .andExpect(jsonPath("$.data.tagList[0].colorHex").value("#FF5722"))
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
@@ -1109,7 +1109,7 @@ class MemoControllerTest {
                     "사용자가 직접 작성한 메모입니다.",
                     List.of(),
                     List.of(),
-                    List.of(new MemoListDashboardResponse.LabelResponse(1L, "개인", "#9C27B0")),
+                    List.of(new MemoListDashboardResponse.TagResponse(1L, "개인", "#9C27B0")),
                     LocalDateTime.of(2026, 1, 16, 12, 0),
                     false,  // AI 생성 아님
                     List.of()  // sourceList 비어있음
@@ -1124,9 +1124,9 @@ class MemoControllerTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
-                    .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.labelList[0].name").value("개인"))
-                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#9C27B0"))
+                    .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
+                    .andExpect(jsonPath("$.data.tagList[0].name").value("개인"))
+                    .andExpect(jsonPath("$.data.tagList[0].colorHex").value("#9C27B0"))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
 
@@ -1148,7 +1148,7 @@ class MemoControllerTest {
                     "이미지나 파일 없이 텍스트만 있습니다.",
                     List.of(),  // 이미지 없음
                     List.of(),  // 파일 없음
-                    List.of(new MemoListDashboardResponse.LabelResponse(1L, "메모", "#795548")),
+                    List.of(new MemoListDashboardResponse.TagResponse(1L, "메모", "#795548")),
                     LocalDateTime.of(2026, 1, 16, 13, 0),
                     false,
                     List.of()
@@ -1167,9 +1167,9 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.images.length()").value(0))
                     .andExpect(jsonPath("$.data.files").isArray())
                     .andExpect(jsonPath("$.data.files.length()").value(0))
-                    .andExpect(jsonPath("$.data.labelList[0].labelId").value(1L))
-                    .andExpect(jsonPath("$.data.labelList[0].name").value("메모"))
-                    .andExpect(jsonPath("$.data.labelList[0].colorHex").value("#795548"));
+                    .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
+                    .andExpect(jsonPath("$.data.tagList[0].name").value("메모"))
+                    .andExpect(jsonPath("$.data.tagList[0].colorHex").value("#795548"));
 
             verify(memoService, times(1))
                     .getOneMemoDetail(eq(userId), eq(memoId));

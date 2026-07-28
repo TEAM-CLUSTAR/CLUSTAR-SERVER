@@ -3,10 +3,10 @@ package org.project.domain.memo.repository;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
-import org.project.domain.label.entity.QLabel;
+import org.project.domain.tag.entity.QTag;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.QMemo;
-import org.project.domain.memo.entity.QMemoLabel;
+import org.project.domain.memo.entity.QMemoTag;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
@@ -20,26 +20,26 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     @Override
     public List<Memo> findMemos(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             Pageable pageable
     ) {
 
         QMemo memo = QMemo.memo;
-        QMemoLabel memoLabel = QMemoLabel.memoLabel;
-        QLabel label = QLabel.label;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
 
         // 전체조회가 아닌 필요한 만큼 조회
         List<Long> memoIds = queryFactory
                 .select(memo.id)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel)
-                .leftJoin(memoLabel.label, label)
+                .leftJoin(memo.memoTags, memoTag)
+                .leftJoin(memoTag.tag, tag)
                 .where(
                         memo.user.id.eq(userId),
                         memo.isDeleted.eq(false),
-                        labelIn(labelIds),
+                        tagIn(tagIds),
                         cursorCondition(cursorCreatedAt, cursorMemoId)
                 )
                 .groupBy(memo.id)
@@ -58,8 +58,8 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         return queryFactory
                 .selectDistinct(memo)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
-                .leftJoin(memoLabel.label, label).fetchJoin()
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
                 .where(memo.id.in(memoIds))
                 .orderBy(
                         memo.createdAt.desc(),
@@ -72,27 +72,27 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     @Override
     public List<Memo> findAiMemos(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             Pageable pageable
     ) {
 
         QMemo memo = QMemo.memo;
-        QMemoLabel memoLabel = QMemoLabel.memoLabel;
-        QLabel label = QLabel.label;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
 
         // 전체조회가 아닌 필요한 만큼 조회
         List<Long> memoIds = queryFactory
                 .select(memo.id)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel)
-                .leftJoin(memoLabel.label, label)
+                .leftJoin(memo.memoTags, memoTag)
+                .leftJoin(memoTag.tag, tag)
                 .where(
                         memo.user.id.eq(userId),
                         memo.isDeleted.eq(false),
                         memo.isAiGenerated.eq(true),
-                        labelIn(labelIds),
+                        tagIn(tagIds),
                         cursorCondition(cursorCreatedAt, cursorMemoId)
                 )
                 .groupBy(memo.id)
@@ -111,8 +111,8 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         return queryFactory
                 .selectDistinct(memo)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
-                .leftJoin(memoLabel.label, label).fetchJoin()
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
                 .where(memo.id.in(memoIds))
                 .orderBy(
                         memo.createdAt.desc(),
@@ -124,20 +124,20 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     @Override
     public List<Memo> searchByText(Long userId, String query, int limit) {
         QMemo memo = QMemo.memo;
-        QMemoLabel memoLabel = QMemoLabel.memoLabel;
-        QLabel label = QLabel.label;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
 
         List<Long> memoIds = queryFactory
                 .select(memo.id)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel)
-                .leftJoin(memoLabel.label, label)
+                .leftJoin(memo.memoTags, memoTag)
+                .leftJoin(memoTag.tag, tag)
                 .where(
                         memo.user.id.eq(userId),
                         memo.isDeleted.eq(false),
                         memo.title.containsIgnoreCase(query)
                                 .or(memo.content.containsIgnoreCase(query))
-                                .or(label.name.containsIgnoreCase(query))
+                                .or(tag.name.containsIgnoreCase(query))
                 )
                 .groupBy(memo.id)
                 .orderBy(memo.createdAt.desc(), memo.id.desc())
@@ -151,21 +151,21 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         return queryFactory
                 .selectDistinct(memo)
                 .from(memo)
-                .leftJoin(memo.memoLabels, memoLabel).fetchJoin()
-                .leftJoin(memoLabel.label, label).fetchJoin()
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
                 .where(memo.id.in(memoIds))
                 .orderBy(memo.createdAt.desc(), memo.id.desc())
                 .fetch();
     }
 
     /**
-     * labelIds가 있을 때
+     * tagIds가 있을 때
      */
-    private BooleanExpression labelIn(List<Long> labelIds) {
-        if (labelIds == null || labelIds.isEmpty()) {
+    private BooleanExpression tagIn(List<Long> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
             return null;
         }
-        return QMemoLabel.memoLabel.label.id.in(labelIds);
+        return QMemoTag.memoTag.tag.id.in(tagIds);
     }
 
     /**

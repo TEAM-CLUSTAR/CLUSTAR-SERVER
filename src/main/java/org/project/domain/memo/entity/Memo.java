@@ -2,7 +2,7 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.project.domain.label.entity.Label;
+import org.project.domain.tag.entity.Tag;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
@@ -49,9 +49,9 @@ public class Memo extends BaseEntity {
     private User user;
 
     @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("labelPriority ASC")
+    @OrderBy("tagPriority ASC")
     @Builder.Default
-    private List<MemoLabel> memoLabels = new ArrayList<>();
+    private List<MemoTag> memoTags = new ArrayList<>();
 
     @Column(name = "is_deleted")
     @Builder.Default
@@ -110,15 +110,15 @@ public class Memo extends BaseEntity {
     }
 
 
-    public List<Label> getLabels() {
-        return memoLabels.stream()
-                .map(MemoLabel::getLabel)
+    public List<Tag> getTags() {
+        return memoTags.stream()
+                .map(MemoTag::getTag)
                 .toList();
     }
 
-    public void addLabel(Label label,Integer labelPriority) {
-        MemoLabel memoLabel = MemoLabel.create(this, label, labelPriority);
-        this.memoLabels.add(memoLabel);
+    public void addTag(Tag tag, Integer tagPriority) {
+        MemoTag memoTag = MemoTag.create(this, tag, tagPriority);
+        this.memoTags.add(memoTag);
     }
 
     public void delete() {

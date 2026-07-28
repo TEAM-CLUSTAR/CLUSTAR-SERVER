@@ -22,7 +22,7 @@ public interface MemoService {
 
     MemoListDashboardResponse getMemosWithMedia(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             int size
@@ -36,7 +36,7 @@ public interface MemoService {
 
     MemoListDashboardResponse getAiMemosWithMedia(
             Long userId,
-            List<Long> labelIds,
+            List<Long> tagIds,
             LocalDateTime cursorCreatedAt,
             Long cursorMemoId,
             int size

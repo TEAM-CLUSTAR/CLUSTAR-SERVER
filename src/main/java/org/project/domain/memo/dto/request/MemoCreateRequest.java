@@ -15,8 +15,8 @@ public record MemoCreateRequest(
         @NotBlank(message = "내용을 입력해주세요.")
         String content,
 
-        @Schema(description = "라벨 이름 목록", example = "[\"SOPT\", \"교양\", \"레퍼런스\"]")
-        List<String> labelNames,
+        @Schema(description = "태그 이름 목록", example = "[\"SOPT\", \"교양\", \"레퍼런스\"]")
+        List<String> tagNames,
 
         @Schema(description = "이미지 메타데이터 목록 (선택)")
         List<ImageRequest> images,

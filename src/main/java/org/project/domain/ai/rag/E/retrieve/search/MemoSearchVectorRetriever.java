@@ -70,8 +70,8 @@ public class MemoSearchVectorRetriever {
                 return List.of();
             }
 
-            // findByIdInWithLabelsAndNotDeleted는 IN 조회라 반환 순서가 보장되지 않으므로 유사도 순서(topMemoIds)로 재정렬한다.
-            Map<Long, Memo> memoById = memoRepository.findByIdInWithLabelsAndNotDeleted(userId, topMemoIds).stream()
+            // findByIdInWithTagsAndNotDeleted는 IN 조회라 반환 순서가 보장되지 않으므로 유사도 순서(topMemoIds)로 재정렬한다.
+            Map<Long, Memo> memoById = memoRepository.findByIdInWithTagsAndNotDeleted(userId, topMemoIds).stream()
                     .collect(Collectors.toMap(Memo::getId, Function.identity()));
 
             return topMemoIds.stream()
