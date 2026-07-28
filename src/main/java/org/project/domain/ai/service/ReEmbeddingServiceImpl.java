@@ -24,6 +24,7 @@ import org.project.domain.memo.repository.VectorStoreRepository;
 import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,10 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
 
     private final EmbeddingFailureHandler embeddingFailureHandler;
     private final EmbeddingFailureRepository embeddingFailureRepository;
+
+    // 스킵 판단 기준 - 이 값과 vector_store의 embeddingModel이 다르면 구버전으로 보고 재임베딩 대상에 포함시킨다.
+    @Value("${spring.ai.google.genai.embedding.text.options.model}")
+    private String currentEmbeddingModel;
 
     @Async
     @Override
@@ -105,8 +110,8 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
      * 둘 다 "이미 끝난 건 다시 안 한다"는 같은 규칙이기 때문.
      */
     private Boolean attemptIfNeeded(Long memoId, String ragType, String failureType, Runnable action) {
-        if (vectorStoreRepository.existsEmbeddedDocumentByMemoIdAndType(memoId, ragType)) {
-            log.debug("[ReEmbedding] {} 이미 최신 상태라 스킵: memoId={}", failureType, memoId);
+        if (vectorStoreRepository.existsEmbeddedDocumentByMemoIdAndType(memoId, ragType, currentEmbeddingModel)) {
+            log.debug("[ReEmbedding] {} 이미 현재 모델({})로 임베딩됨 - 스킵: memoId={}", failureType, currentEmbeddingModel, memoId);
             return true;
         }
         return attempt(memoId, failureType, action);
