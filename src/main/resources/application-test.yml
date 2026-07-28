@@ -69,7 +69,18 @@ spring:
           api-key: test-google-ai-api-key
           text:
             options:
-              model: text-embedding-004
+              model: gemini-embedding-001
+              dimensions: 768
+
+memo:
+  recommendation:
+    cohesion-threshold: 0.57
+    candidate-similarity-threshold: 0.63
+    single-selection-similarity-threshold: 0.58
+  search:
+    semantic-similarity-threshold: 0.52
+    vector-top-k: 10
+    max-memo-results: 2
 
 jwt:
   secret-key: test-secret-key-test-secret-key-test-secret-key

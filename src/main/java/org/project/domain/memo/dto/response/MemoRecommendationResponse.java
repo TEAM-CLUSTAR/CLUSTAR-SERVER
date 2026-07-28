@@ -12,4 +12,8 @@ public record MemoRecommendationResponse(
         }
         return new MemoRecommendationResponse(results, null);
     }
+
+    public static MemoRecommendationResponse empty(String message) {
+        return new MemoRecommendationResponse(List.of(), message);
+    }
 }

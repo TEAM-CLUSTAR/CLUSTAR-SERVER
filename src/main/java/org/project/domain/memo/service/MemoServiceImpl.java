@@ -3,6 +3,7 @@ package org.project.domain.memo.service;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.label.entity.Label;
 import org.project.domain.label.repository.LabelRepository;
+import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -66,6 +67,7 @@ public class MemoServiceImpl implements MemoService {
     private final ApplicationEventPublisher eventPublisher;
     private final MemoSearchVectorRetriever memoSearchVectorRetriever;
     private final VectorStoreRepository vectorStoreRepository;
+    private final MemoRecommendationProperties memoRecommendationProperties;
 
     @Autowired
     @Qualifier("ioExecutor")
@@ -417,12 +419,24 @@ public class MemoServiceImpl implements MemoService {
             }
         });
 
-        return MemoSearchResponse.from(results);
+         String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
+        return MemoSearchResponse.of(results, message);
     }
 
     @Override
     public MemoRecommendationResponse recommendMemos(Long userId, MemoRecommendationRequest request) {
-        List<Long> recommendedIds = vectorStoreRepository.findRecommendedMemoIds(userId, request.memoIds());
+        // Gate 1: 선택된 메모들 자체가 서로 응집돼 있지 않으면(평균 벡터가 대표성이 없으면) 후보 검색 없이 바로 종료
+        Double cohesion = vectorStoreRepository.computeSelectionCohesion(userId, request.memoIds());
+        if (cohesion != null && cohesion < memoRecommendationProperties.getCohesionThreshold()) {
+            return MemoRecommendationResponse.empty("선택한 메모들끼리 연관성이 없어요.");
+        }
+
+        // Gate 2: 응집된 선택 기준으로 유사 후보 검색
+        // 단일 선택은 평균화 효과가 없어 벡터 간 유사도가 구조적으로 낮게 나오므로 별도 임계값을 쓴다
+        double candidateThreshold = request.memoIds().size() == 1
+                ? memoRecommendationProperties.getSingleSelectionSimilarityThreshold()
+                : memoRecommendationProperties.getCandidateSimilarityThreshold();
+        List<Long> recommendedIds = vectorStoreRepository.findRecommendedMemoIds(userId, request.memoIds(), candidateThreshold);
 
         if (recommendedIds.isEmpty()) {
             return MemoRecommendationResponse.of(List.of());
