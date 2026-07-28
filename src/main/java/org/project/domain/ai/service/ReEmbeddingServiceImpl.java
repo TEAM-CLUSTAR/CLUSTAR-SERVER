@@ -29,7 +29,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -105,13 +108,18 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
     }
 
     /**
-     * 이미 embeddedAt이 찍힌(= 새 파이프라인을 거친) 벡터가 있으면 API 호출 없이 스킵한다.
-     * 이 판단 하나로 "배치 중단 후 재개"와 "실패한 타입만 선택적 재시도"가 동시에 해결된다 —
-     * 둘 다 "이미 끝난 건 다시 안 한다"는 같은 규칙이기 때문.
+     * "이미 끝났다"고 스킵하려면 두 조건을 다 만족해야 한다:
+     * 1) 현재 모델로 임베딩된 벡터가 있다 (모델 교체 감지용)
+     * 2) 이 타입에 미해결 실패 기록이 없다 (부분 성공 감지용 — image/file은 여러 문서로 이뤄져 있어서
+     *    "현재 모델 벡터가 하나라도 있다"만으로는 나머지 문서가 실패한 채로 방치될 수 있기 때문)
+     * 즉 벡터 존재 여부만으로 판단하지 않고, 실제 완료 여부(미해결 실패 없음)까지 같이 봐야 한다.
      */
-    private Boolean attemptIfNeeded(Long memoId, String ragType, String failureType, Runnable action) {
-        if (vectorStoreRepository.existsEmbeddedDocumentByMemoIdAndType(memoId, ragType, currentEmbeddingModel)) {
-            log.debug("[ReEmbedding] {} 이미 현재 모델({})로 임베딩됨 - 스킵: memoId={}", failureType, currentEmbeddingModel, memoId);
+    private Boolean attemptIfNeeded(Long memoId, String ragType, String failureType, Supplier<Boolean> action) {
+        boolean upToDate = vectorStoreRepository.existsEmbeddedDocumentByMemoIdAndType(memoId, ragType, currentEmbeddingModel);
+        boolean hasUnresolvedFailure = embeddingFailureRepository.existsByMemoIdAndEmbeddingTypeAndIsResolvedFalse(memoId, failureType);
+
+        if (upToDate && !hasUnresolvedFailure) {
+            log.debug("[ReEmbedding] {} 이미 현재 모델({})로 완전히 임베딩됨 - 스킵: memoId={}", failureType, currentEmbeddingModel, memoId);
             return true;
         }
         return attempt(memoId, failureType, action);
@@ -119,14 +127,22 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
 
     /**
      * 타입 하나(text/image/file)를 재임베딩 시도한다.
-     * 성공하면 해당 타입의 미해결 실패 기록만 resolve하고, 실패하면 해당 타입으로 새로 기록한다.
+     * action은 "실제로 새 벡터를 온전히 채워 넣고 기존 벡터 정리까지 끝냈는지"를 boolean으로 리턴해야 한다
+     * (문서 존재 여부나 예외 미발생만으로 완료를 판단하지 않기 위함).
+     * true(완전 성공)일 때만 resolve하고, false(빈 결과/부분 성공)나 예외는 전부 실패로 기록한다.
      * 실패해도 예외를 밖으로 던지지 않아 다른 타입 시도를 막지 않는다.
      */
-    private boolean attempt(Long memoId, String type, Runnable action) {
+    private boolean attempt(Long memoId, String type, Supplier<Boolean> action) {
         try {
-            action.run();
-            embeddingFailureHandler.resolveType(memoId, type);
-            return true;
+            boolean completed = action.get();
+            if (completed) {
+                embeddingFailureHandler.resolveType(memoId, type);
+            } else {
+                log.warn("[ReEmbedding] {} 불완전한 결과(빈 추출/변환 또는 일부 문서만 처리됨): memoId={}", type, memoId);
+                embeddingFailureHandler.record(memoId, type,
+                        new IllegalStateException("추출/변환 결과가 없거나 일부 문서만 처리됨"));
+            }
+            return completed;
         } catch (Exception e) {
             log.error("[ReEmbedding] {} 실패: memoId={}", type, memoId, e);
             embeddingFailureHandler.record(memoId, type, e);
@@ -145,49 +161,83 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
        메모별 재임베딩 (타입별로 old id 캡처 -> 신규 적재 -> old 삭제)
        ========================= */
 
-    private void reEmbedText(Memo memo) {
+    /**
+     * @return 새 텍스트 벡터를 온전히 채워 넣었으면 true. 추출/변환 결과가 비어있으면 기존 벡터를
+     *         전혀 건드리지 않고 false를 반환한다(빈 결과를 성공으로 오인해 기존 데이터를 지우지 않기 위함).
+     */
+    private boolean reEmbedText(Memo memo) {
         List<UUID> oldIds = vectorStoreRepository.findDocumentIdsByMemoIdAndType(
                 memo.getId(), RagDocumentType.MEMO_TEXT.name());
 
         List<Document> extracted = memoDocumentReader.readText(memo);
         if (extracted.isEmpty()) {
-            return;
+            return false;
         }
 
         List<Document> transformed = memoTextTransformer.transform(extracted);
         if (transformed.isEmpty()) {
-            return;
+            return false;
         }
 
         vectorStoreDocumentLoader.load(transformed);
         vectorStoreRepository.deleteByIds(oldIds);
+        return true;
     }
 
-    private void reEmbedImage(Memo memo, List<Long> imageIds) {
+    /**
+     * @return 요청한 이미지 전부(imageIds 전체)가 문서로 추출되어 새로 적재됐을 때만 true.
+     *         일부 이미지만 OCR에 성공한 경우(나머지는 예외 없이 조용히 걸러짐)에도 그 일부는 적재하되,
+     *         "완전히 끝난 것"은 아니므로 false를 반환해 미해결 실패로 계속 추적되게 한다.
+     *         추출/변환 결과가 아예 비었으면 기존 벡터를 건드리지 않는다.
+     */
+    private boolean reEmbedImage(Memo memo, List<Long> imageIds) {
         List<UUID> oldIds = vectorStoreRepository.findDocumentIdsByMemoIdAndType(
                 memo.getId(), RagDocumentType.MEMO_IMAGE.name());
 
         List<Document> extracted = memoImageDocumentReader.read(memo.getId(), imageIds, memo.getUser().getId());
         if (extracted.isEmpty()) {
-            return;
+            return false;
         }
 
         List<Document> transformed = memoImageDocumentTransformer.transform(extracted);
+        if (transformed.isEmpty()) {
+            return false;
+        }
+
         vectorStoreDocumentLoader.load(transformed);
         vectorStoreRepository.deleteByIds(oldIds);
+
+        Set<Object> succeededImageIds = extracted.stream()
+                .map(doc -> doc.getMetadata().get("imageId"))
+                .collect(Collectors.toSet());
+        return succeededImageIds.size() == imageIds.size();
     }
 
-    private void reEmbedFile(Memo memo, List<Long> fileIds) {
+    /**
+     * @return 요청한 파일 전부(fileIds 전체)가 문서로 추출되어 새로 적재됐을 때만 true.
+     *         파일 하나가 Tika에서 문서 여러 개로 쪼개질 수 있어 문서 개수가 아니라
+     *         "성공한 fileId의 종류 수"로 완전성을 판단한다.
+     */
+    private boolean reEmbedFile(Memo memo, List<Long> fileIds) {
         List<UUID> oldIds = vectorStoreRepository.findDocumentIdsByMemoIdAndType(
                 memo.getId(), RagDocumentType.MEMO_FILE.name());
 
         List<Document> extracted = memoFileDocumentReader.read(memo.getId(), fileIds, memo.getUser().getId());
         if (extracted.isEmpty()) {
-            return;
+            return false;
         }
 
         List<Document> transformed = memoFileDocumentTransformer.transform(extracted);
+        if (transformed.isEmpty()) {
+            return false;
+        }
+
         vectorStoreDocumentLoader.load(transformed);
         vectorStoreRepository.deleteByIds(oldIds);
+
+        Set<Object> succeededFileIds = extracted.stream()
+                .map(doc -> doc.getMetadata().get("fileId"))
+                .collect(Collectors.toSet());
+        return succeededFileIds.size() == fileIds.size();
     }
 }

@@ -10,4 +10,6 @@ public interface EmbeddingFailureRepository extends JpaRepository<EmbeddingFailu
     List<EmbeddingFailure> findByIsResolvedFalse();
 
     List<EmbeddingFailure> findByMemoIdAndEmbeddingTypeAndIsResolvedFalse(Long memoId, String embeddingType);
+
+    boolean existsByMemoIdAndEmbeddingTypeAndIsResolvedFalse(Long memoId, String embeddingType);
 }
