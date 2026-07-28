@@ -1,6 +1,7 @@
 package org.project.domain.ai.event;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.project.domain.ai.rag.A.extract.MemoImageDocumentReader;
 import org.project.domain.ai.rag.B.transform.image.MemoImageDocumentTransformer;
 import org.project.domain.ai.rag.C.load.VectorStoreDocumentLoader;
@@ -13,6 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MemoImageEmbeddingListener {
@@ -20,24 +22,29 @@ public class MemoImageEmbeddingListener {
     private final MemoImageDocumentReader memoImageDocumentReader;
     private final MemoImageDocumentTransformer memoImageDocumentTransformer;
     private final VectorStoreDocumentLoader vectorStoreDocumentLoader;
+    private final EmbeddingFailureHandler embeddingFailureHandler;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(MemoImageCreatedEvent event) {
+        try {
+            // 1️⃣ Extract
+            List<Document> documents =
+                    memoImageDocumentReader.read(
+                            event.memoId(),
+                            event.memoImageIds(),
+                            event.userId()
+                    );
 
-        // 1️⃣ Extract
-        List<Document> documents =
-                memoImageDocumentReader.read(
-                        event.memoId(),
-                        event.memoImageIds(),
-                        event.userId()
-                );
+            // 2️⃣ Transform
+            List<Document> transformed =
+                    memoImageDocumentTransformer.transform(documents);
 
-        // 2️⃣ Transform
-        List<Document> transformed =
-                memoImageDocumentTransformer.transform(documents);
-
-        vectorStoreDocumentLoader.load(transformed);
+            vectorStoreDocumentLoader.load(transformed);
+        } catch (Exception e) {
+            log.error("이미지 임베딩 실패: memoId={}", event.memoId(), e);
+            embeddingFailureHandler.record(event.memoId(), "image", e);
+        }
     }
 }
 
