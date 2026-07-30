@@ -77,14 +77,16 @@ public record MemoListDashboardResponse(
     public record TagResponse(
             Long tagId,
             String name,
-            String colorHex
+            String backgroundColorHex,
+            String textColorHex
     ) {
 
         public static TagResponse from(Tag tag) {
             return new TagResponse(
                     tag.getId(),
                     tag.getName(),
-                    tag.getColorHex()
+                    tag.getBackgroundColorHex(),
+                    tag.getTextColorHex()
             );
         }
     }

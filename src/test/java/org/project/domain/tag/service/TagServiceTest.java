@@ -68,7 +68,8 @@ class TagServiceTest {
         // then
         assertThat(response.tags()).hasSize(2);
         assertThat(response.tags().get(0).name()).isEqualTo("parent-2");
-        assertThat(response.tags().get(0).colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.tags().get(0).backgroundColorHex()).isIn(TagColorPalette.backgroundColors());
+        assertThat(response.tags().get(0).textColorHex()).isIn(TagColorPalette.textColors());
         assertThat(response.tags().get(0).parentId()).isNull();
     }
 
@@ -101,15 +102,21 @@ class TagServiceTest {
 
         // then
         assertThat(response.parentTag().name()).isEqualTo("parent");
-        assertThat(response.parentTag().colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.parentTag().backgroundColorHex()).isIn(TagColorPalette.backgroundColors());
+        assertThat(response.parentTag().textColorHex()).isIn(TagColorPalette.textColors());
         assertThat(response.parentTag().parentId()).isNull();
         assertThat(response.childTags()).hasSize(2);
         assertThat(response.childTags().get(0).name()).isEqualTo("child-2");
-        assertThat(response.childTags().get(0).colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.childTags().get(0).backgroundColorHex()).isEqualTo(response.parentTag().backgroundColorHex());
+        assertThat(response.childTags().get(0).textColorHex()).isEqualTo(response.parentTag().textColorHex());
         assertThat(response.childTags().get(0).parentId()).isEqualTo(10L);
         assertThat(response.childTags().get(0).childTags()).extracting(TagHierarchyResponse.TagTreeResponse::name)
                 .containsExactly("grand-2");
         assertThat(response.childTags().get(0).childTags().get(0).parentId()).isEqualTo(12L);
+        assertThat(response.childTags().get(0).childTags().get(0).backgroundColorHex())
+                .isEqualTo(response.parentTag().backgroundColorHex());
+        assertThat(response.childTags().get(0).childTags().get(0).textColorHex())
+                .isEqualTo(response.parentTag().textColorHex());
         assertThat(response.childTags().get(1).childTags()).extracting(TagHierarchyResponse.TagTreeResponse::name)
                 .containsExactly("grand-1");
     }
@@ -144,7 +151,8 @@ class TagServiceTest {
         // then
         assertThat(response.tagId()).isEqualTo(100L);
         assertThat(response.name()).isEqualTo("parent");
-        assertThat(response.colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.backgroundColorHex()).isIn(TagColorPalette.backgroundColors());
+        assertThat(response.textColorHex()).isIn(TagColorPalette.textColors());
         assertThat(response.parentId()).isNull();
     }
 
@@ -170,7 +178,8 @@ class TagServiceTest {
         // then
         assertThat(response.tagId()).isEqualTo(101L);
         assertThat(response.name()).isEqualTo("child");
-        assertThat(response.colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.backgroundColorHex()).isEqualTo(parent.getBackgroundColorHex());
+        assertThat(response.textColorHex()).isEqualTo(parent.getTextColorHex());
         assertThat(response.parentId()).isEqualTo(10L);
     }
 
@@ -191,7 +200,8 @@ class TagServiceTest {
         // then
         assertThat(response.tagId()).isEqualTo(10L);
         assertThat(response.name()).isEqualTo("new");
-        assertThat(response.colorHex()).isIn(TagColorPalette.colors());
+        assertThat(response.backgroundColorHex()).isIn(TagColorPalette.backgroundColors());
+        assertThat(response.textColorHex()).isIn(TagColorPalette.textColors());
         assertThat(response.parentId()).isNull();
     }
 
