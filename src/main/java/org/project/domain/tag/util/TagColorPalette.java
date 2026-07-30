@@ -5,22 +5,57 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public final class TagColorPalette {
 
-    private static final List<String> COLORS = List.of(
-            "#ABDEE6", "#CBAACB", "#FFFFB5", "#FFCCB6", "#F3B0C3",
-            "#C6DBDA", "#FEE1E8", "#FED7C3", "#F6EAC2", "#ECD5E3",
-            "#FF968A", "#FFAEA5", "#FFC5BF", "#FFD8BE", "#FFC8A2",
-            "#D4F0F0", "#8FCACA", "#CCE2CB", "#B6CFB6", "#97C1A9",
-            "#FCB9AA", "#FFDBCC", "#ECEAE4", "#A2E1DB", "#55CBCD"
+    private static final List<ColorSet> COLOR_SETS = List.of(
+            new ColorSet("#D9ECFF", "#2194FF"),
+            new ColorSet("#E7DEFF", "#8259FF"),
+            new ColorSet("#D0F5F5", "#02A9A9"),
+            new ColorSet("#FFDBDC", "#E63639"),
+            new ColorSet("#FFD9C6", "#FF6200"),
+            new ColorSet("#FFEFC7", "#F99E00"),
+            new ColorSet("#D1DEFF", "#3A50E0"),
+            new ColorSet("#D2FFD5", "#02B50E"),
+            new ColorSet("#EFD3FF", "#D93FDB"),
+            new ColorSet("#FFE3EC", "#FF4E89")
     );
 
     private TagColorPalette() {
     }
 
-    public static String randomColor() {
-        return COLORS.get(ThreadLocalRandom.current().nextInt(COLORS.size()));
+    public static ColorSet randomColorSet() {
+        return COLOR_SETS.get(ThreadLocalRandom.current().nextInt(COLOR_SETS.size()));
     }
 
-    public static List<String> colors() {
-        return COLORS;
+    public static String randomColor() {
+        return randomColorSet().backgroundColorHex();
+    }
+
+    public static String textColorOf(String backgroundColorHex) {
+        return COLOR_SETS.stream()
+                .filter(colorSet -> colorSet.backgroundColorHex().equals(backgroundColorHex))
+                .map(ColorSet::textColorHex)
+                .findFirst()
+                .orElse(COLOR_SETS.get(0).textColorHex());
+    }
+
+    public static List<ColorSet> colorSets() {
+        return COLOR_SETS;
+    }
+
+    public static List<String> backgroundColors() {
+        return COLOR_SETS.stream()
+                .map(ColorSet::backgroundColorHex)
+                .toList();
+    }
+
+    public static List<String> textColors() {
+        return COLOR_SETS.stream()
+                .map(ColorSet::textColorHex)
+                .toList();
+    }
+
+    public record ColorSet(
+            String backgroundColorHex,
+            String textColorHex
+    ) {
     }
 }

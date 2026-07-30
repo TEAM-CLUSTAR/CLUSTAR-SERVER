@@ -30,7 +30,10 @@ public class Tag extends BaseEntity {
     private String name;
 
     @Column(name = "color_hex", nullable = false, length = 7)
-    private String colorHex;
+    private String backgroundColorHex;
+
+    @Column(name = "text_color_hex", length = 7)
+    private String textColorHex;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -49,9 +52,12 @@ public class Tag extends BaseEntity {
     private List<MemoTag> memoTags = new ArrayList<>();
 
     public static Tag create(String name, User user) {
+        TagColorPalette.ColorSet colorSet = TagColorPalette.randomColorSet();
+
         return Tag.builder()
                 .name(name)
-                .colorHex(TagColorPalette.randomColor())
+                .backgroundColorHex(colorSet.backgroundColorHex())
+                .textColorHex(colorSet.textColorHex())
                 .user(user)
                 .build();
     }
@@ -59,7 +65,8 @@ public class Tag extends BaseEntity {
     public static Tag create(String name, User user, Tag parent) {
         return Tag.builder()
                 .name(name)
-                .colorHex(TagColorPalette.randomColor())
+                .backgroundColorHex(parent.getBackgroundColorHex())
+                .textColorHex(parent.getTextColorHex())
                 .user(user)
                 .parent(parent)
                 .build();
@@ -70,14 +77,28 @@ public class Tag extends BaseEntity {
     }
 
     public String getColorHex() {
-        return colorHex;
+        return getBackgroundColorHex();
+    }
+
+    public String getTextColorHex() {
+        if (textColorHex == null) {
+            return TagColorPalette.textColorOf(backgroundColorHex);
+        }
+        return textColorHex;
     }
 
     @PrePersist
     @PreUpdate
-    private void applyColorHex() {
-        if (colorHex == null) {
-            colorHex = TagColorPalette.randomColor();
+    private void applyColorHexes() {
+        if (backgroundColorHex == null) {
+            TagColorPalette.ColorSet colorSet = TagColorPalette.randomColorSet();
+            backgroundColorHex = colorSet.backgroundColorHex();
+            textColorHex = colorSet.textColorHex();
+            return;
+        }
+
+        if (textColorHex == null) {
+            textColorHex = TagColorPalette.textColorOf(backgroundColorHex);
         }
     }
 

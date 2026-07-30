@@ -24,7 +24,8 @@ public record TagHierarchyResponse(
     public record TagTreeResponse(
             Long tagId,
             String name,
-            String colorHex,
+            String backgroundColorHex,
+            String textColorHex,
             Long parentId,
             List<TagTreeResponse> childTags
     ) {
@@ -32,13 +33,15 @@ public record TagHierarchyResponse(
             return new TagTreeResponse(
                     tag.getId(),
                     tag.getName(),
-                    tag.getColorHex(),
+                    tag.getBackgroundColorHex(),
+                    tag.getTextColorHex(),
                     tag.getParent() == null ? null : tag.getParent().getId(),
                     childTags.stream()
                             .map(child -> new TagTreeResponse(
                                     child.getId(),
                                     child.getName(),
-                                    child.getColorHex(),
+                                    child.getBackgroundColorHex(),
+                                    child.getTextColorHex(),
                                     child.getParent() == null ? null : child.getParent().getId(),
                                     List.of()
                             ))

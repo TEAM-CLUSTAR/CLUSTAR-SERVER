@@ -18,14 +18,16 @@ public record TagListResponse(
     public record TagResponse(
             Long tagId,
             String name,
-            String colorHex,
+            String backgroundColorHex,
+            String textColorHex,
             Long parentId
     ) {
         public static TagResponse from(Tag tag) {
             return new TagResponse(
                     tag.getId(),
                     tag.getName(),
-                    tag.getColorHex(),
+                    tag.getBackgroundColorHex(),
+                    tag.getTextColorHex(),
                     tag.getParent() == null ? null : tag.getParent().getId()
             );
         }
