@@ -29,11 +29,11 @@ public class Tag extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "color_hex", nullable = false, length = 7)
-    private String backgroundColorHex;
+    @Column(name = "color", length = 20)
+    private String color;
 
-    @Column(name = "text_color_hex", length = 7)
-    private String textColorHex;
+    @Column(name = "color_hex", length = 7)
+    private String legacyColorHex;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -52,12 +52,9 @@ public class Tag extends BaseEntity {
     private List<MemoTag> memoTags = new ArrayList<>();
 
     public static Tag create(String name, User user) {
-        TagColorPalette.ColorSet colorSet = TagColorPalette.randomColorSet();
-
         return Tag.builder()
                 .name(name)
-                .backgroundColorHex(colorSet.backgroundColorHex())
-                .textColorHex(colorSet.textColorHex())
+                .color(TagColorPalette.randomColor())
                 .user(user)
                 .build();
     }
@@ -65,8 +62,7 @@ public class Tag extends BaseEntity {
     public static Tag create(String name, User user, Tag parent) {
         return Tag.builder()
                 .name(name)
-                .backgroundColorHex(parent.getBackgroundColorHex())
-                .textColorHex(parent.getTextColorHex())
+                .color(parent.getColor())
                 .user(user)
                 .parent(parent)
                 .build();
@@ -76,29 +72,18 @@ public class Tag extends BaseEntity {
         this.name = name;
     }
 
-    public String getColorHex() {
-        return getBackgroundColorHex();
-    }
-
-    public String getTextColorHex() {
-        if (textColorHex == null) {
-            return TagColorPalette.textColorOf(backgroundColorHex);
+    public String getColor() {
+        if (color == null) {
+            return TagColorPalette.colorOf(legacyColorHex);
         }
-        return textColorHex;
+        return color;
     }
 
     @PrePersist
     @PreUpdate
-    private void applyColorHexes() {
-        if (backgroundColorHex == null) {
-            TagColorPalette.ColorSet colorSet = TagColorPalette.randomColorSet();
-            backgroundColorHex = colorSet.backgroundColorHex();
-            textColorHex = colorSet.textColorHex();
-            return;
-        }
-
-        if (textColorHex == null) {
-            textColorHex = TagColorPalette.textColorOf(backgroundColorHex);
+    private void applyColor() {
+        if (color == null) {
+            color = TagColorPalette.colorOf(legacyColorHex);
         }
     }
 

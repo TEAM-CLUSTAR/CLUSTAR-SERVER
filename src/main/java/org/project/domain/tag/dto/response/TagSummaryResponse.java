@@ -5,16 +5,14 @@ import org.project.domain.tag.entity.Tag;
 public record TagSummaryResponse(
         Long tagId,
         String name,
-        String backgroundColorHex,
-        String textColorHex,
+        String color,
         Long parentId
 ) {
     public static TagSummaryResponse from(Tag tag) {
         return new TagSummaryResponse(
                 tag.getId(),
                 tag.getName(),
-                tag.getBackgroundColorHex(),
-                tag.getTextColorHex(),
+                tag.getColor(),
                 tag.getParent() == null ? null : tag.getParent().getId()
         );
     }
