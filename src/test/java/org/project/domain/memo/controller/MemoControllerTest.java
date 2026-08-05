@@ -804,8 +804,8 @@ class MemoControllerTest {
                             true,
                             LocalDateTime.now(),
                             List.of(
-                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#D9ECFF", "#2194FF"),
-                                    new MemoListDashboardResponse.TagResponse(2L, "교양", "#D2FFD5", "#02B50E")
+                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "light-blue"),
+                                    new MemoListDashboardResponse.TagResponse(2L, "교양", "green")
                             )
                     );
 
@@ -851,12 +851,10 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos[0].tagList.length()").value(2))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[0].backgroundColorHex").value("#D9ECFF"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[0].textColorHex").value("#2194FF"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].color").value("light-blue"))
                     .andExpect(jsonPath("$.data.memos[0].tagList[1].tagId").value(2L))
                     .andExpect(jsonPath("$.data.memos[0].tagList[1].name").value("교양"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[1].backgroundColorHex").value("#D2FFD5"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[1].textColorHex").value("#02B50E"))
+                    .andExpect(jsonPath("$.data.memos[0].tagList[1].color").value("green"))
                     .andExpect(jsonPath("$.data.memos[1].memoId").value(2L))
                     .andExpect(jsonPath("$.data.memos[1].isPinned").value(true));
 
@@ -885,7 +883,7 @@ class MemoControllerTest {
                             true,
                             LocalDateTime.now(),
                             List.of(
-                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#D9ECFF", "#2194FF")
+                                    new MemoListDashboardResponse.TagResponse(1L, "SOPT", "light-blue")
                             )
                     );
 
@@ -909,8 +907,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos.length()").value(1))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[0].backgroundColorHex").value("#D9ECFF"))
-                    .andExpect(jsonPath("$.data.memos[0].tagList[0].textColorHex").value("#2194FF"));
+                    .andExpect(jsonPath("$.data.memos[0].tagList[0].color").value("light-blue"));
 
             verify(memoService, times(1))
                     .getMemosWithMedia(eq(userId), eq(tagIds), eq(null), eq(null), eq(20));
@@ -1055,9 +1052,9 @@ class MemoControllerTest {
                     List.of(image1, image2),
                     List.of(file),
                     List.of(
-                            new MemoListDashboardResponse.TagResponse(1L, "SOPT", "#D9ECFF", "#2194FF"),
-                            new MemoListDashboardResponse.TagResponse(2L, "교양", "#D2FFD5", "#02B50E"),
-                            new MemoListDashboardResponse.TagResponse(3L, "레퍼런스", "#E7DEFF", "#8259FF")
+                            new MemoListDashboardResponse.TagResponse(1L, "SOPT", "light-blue"),
+                            new MemoListDashboardResponse.TagResponse(2L, "교양", "green"),
+                            new MemoListDashboardResponse.TagResponse(3L, "레퍼런스", "purple")
                     ),
                     LocalDateTime.of(2026, 1, 16, 10, 30),
                     false,  // AI 생성 아님
@@ -1089,8 +1086,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.tagList.length()").value(3))
                     .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.tagList[0].name").value("SOPT"))
-                    .andExpect(jsonPath("$.data.tagList[0].backgroundColorHex").value("#D9ECFF"))
-                    .andExpect(jsonPath("$.data.tagList[0].textColorHex").value("#2194FF"))
+                    .andExpect(jsonPath("$.data.tagList[0].color").value("light-blue"))
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
@@ -1113,7 +1109,7 @@ class MemoControllerTest {
                     "사용자가 직접 작성한 메모입니다.",
                     List.of(),
                     List.of(),
-                    List.of(new MemoListDashboardResponse.TagResponse(1L, "개인", "#EFD3FF", "#D93FDB")),
+                    List.of(new MemoListDashboardResponse.TagResponse(1L, "개인", "magenta")),
                     LocalDateTime.of(2026, 1, 16, 12, 0),
                     false,  // AI 생성 아님
                     List.of()  // sourceList 비어있음
@@ -1130,8 +1126,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
                     .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.tagList[0].name").value("개인"))
-                    .andExpect(jsonPath("$.data.tagList[0].backgroundColorHex").value("#EFD3FF"))
-                    .andExpect(jsonPath("$.data.tagList[0].textColorHex").value("#D93FDB"))
+                    .andExpect(jsonPath("$.data.tagList[0].color").value("magenta"))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
 
@@ -1153,7 +1148,7 @@ class MemoControllerTest {
                     "이미지나 파일 없이 텍스트만 있습니다.",
                     List.of(),  // 이미지 없음
                     List.of(),  // 파일 없음
-                    List.of(new MemoListDashboardResponse.TagResponse(1L, "메모", "#FFE3EC", "#FF4E89")),
+                    List.of(new MemoListDashboardResponse.TagResponse(1L, "메모", "pink")),
                     LocalDateTime.of(2026, 1, 16, 13, 0),
                     false,
                     List.of()
@@ -1174,8 +1169,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.files.length()").value(0))
                     .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.tagList[0].name").value("메모"))
-                    .andExpect(jsonPath("$.data.tagList[0].backgroundColorHex").value("#FFE3EC"))
-                    .andExpect(jsonPath("$.data.tagList[0].textColorHex").value("#FF4E89"));
+                    .andExpect(jsonPath("$.data.tagList[0].color").value("pink"));
 
             verify(memoService, times(1))
                     .getOneMemoDetail(eq(userId), eq(memoId));
