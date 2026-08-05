@@ -25,26 +25,6 @@ public final class TagColorPalette {
         return COLORS.get(ThreadLocalRandom.current().nextInt(COLORS.size()));
     }
 
-    public static String colorOf(String colorHex) {
-        if (colorHex == null) {
-            return COLORS.get(0);
-        }
-
-        return switch (colorHex) {
-            case "#D9ECFF" -> "light-blue";
-            case "#E7DEFF" -> "purple";
-            case "#D0F5F5" -> "cyan";
-            case "#FFDBDC" -> "red";
-            case "#FFD9C6" -> "orange";
-            case "#FFEFC7" -> "yellow";
-            case "#D1DEFF" -> "blue";
-            case "#D2FFD5" -> "green";
-            case "#EFD3FF" -> "magenta";
-            case "#FFE3EC" -> "pink";
-            default -> COLORS.get(0);
-        };
-    }
-
     public static List<String> colors() {
         return COLORS;
     }

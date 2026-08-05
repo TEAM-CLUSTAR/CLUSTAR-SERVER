@@ -29,11 +29,8 @@ public class Tag extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "color", length = 20)
+    @Column(name = "color", nullable = false, length = 20)
     private String color;
-
-    @Column(name = "color_hex", length = 7)
-    private String legacyColorHex;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -72,18 +69,11 @@ public class Tag extends BaseEntity {
         this.name = name;
     }
 
-    public String getColor() {
-        if (color == null) {
-            return TagColorPalette.colorOf(legacyColorHex);
-        }
-        return color;
-    }
-
     @PrePersist
     @PreUpdate
     private void applyColor() {
         if (color == null) {
-            color = TagColorPalette.colorOf(legacyColorHex);
+            color = TagColorPalette.randomColor();
         }
     }
 
