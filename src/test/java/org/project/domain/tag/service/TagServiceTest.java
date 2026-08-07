@@ -211,7 +211,7 @@ class TagServiceTest {
         when(tagRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
         when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
                 .thenReturn(List.of(child));
-        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 11L))
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
                 .thenReturn(List.of());
 
         // when
@@ -219,8 +219,7 @@ class TagServiceTest {
 
         // then
         verify(memoTagRepository).deleteByTagIds(List.of(11L, 10L));
-        verify(tagRepository).delete(child);
-        verify(tagRepository).delete(parent);
+        verify(tagRepository).deleteAllInBatch(List.of(child, parent));
     }
 
     @Test
