@@ -1,11 +1,6 @@
 package org.project.domain.memo.service;
 
-import com.querydsl.core.Tuple;
-import com.querydsl.jpa.JPAExpressions;
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
-import org.project.domain.memo.entity.QMemoFile;
-import org.project.domain.memo.entity.QMemoImage;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
@@ -65,8 +60,6 @@ public class MemoServiceImpl implements MemoService {
     private final MemoImageRepository memoImageRepository;
     private final MemoFileRepository memoFileRepository;
     private final MemoTagRepository memoTagRepository;
-
-    private final JPAQueryFactory queryFactory;
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
@@ -233,9 +226,9 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         // 이미지 / 파일: 대표 이미지 s3Key + 개수만 조회 (전체 엔티티 조회 대신 프로젝션)
-        Map<Long, String> representativeImageS3KeyMap = findRepresentativeImageS3Keys(memoIds);
-        Map<Long, Long> imageCountMap = countImagesByMemoId(memoIds);
-        Map<Long, Long> fileCountMap = countFilesByMemoId(memoIds);
+        Map<Long, String> representativeImageS3KeyMap = memoImageRepository.findRepresentativeImageS3Keys(memoIds);
+        Map<Long, Long> imageCountMap = memoImageRepository.countImagesByMemoId(memoIds);
+        Map<Long, Long> fileCountMap = memoFileRepository.countFilesByMemoId(memoIds);
 
         // 응답 조립
         List<MemoListDashboardResponse.MemoDashboardResponse> responses =
@@ -283,9 +276,9 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         // 이미지 / 파일: 대표 이미지 s3Key + 개수만 조회 (전체 엔티티 조회 대신 프로젝션)
-        Map<Long, String> representativeImageS3KeyMap = findRepresentativeImageS3Keys(memoIds);
-        Map<Long, Long> imageCountMap = countImagesByMemoId(memoIds);
-        Map<Long, Long> fileCountMap = countFilesByMemoId(memoIds);
+        Map<Long, String> representativeImageS3KeyMap = memoImageRepository.findRepresentativeImageS3Keys(memoIds);
+        Map<Long, Long> imageCountMap = memoImageRepository.countImagesByMemoId(memoIds);
+        Map<Long, Long> fileCountMap = memoFileRepository.countFilesByMemoId(memoIds);
 
         // 응답 조립
         List<MemoListDashboardResponse.MemoDashboardResponse> responses =
@@ -627,68 +620,6 @@ public class MemoServiceImpl implements MemoService {
                 imageCountMap.getOrDefault(memo.getId(), 0L).intValue(),
                 fileCountMap.getOrDefault(memo.getId(), 0L).intValue()
         );
-    }
-
-    // 메모별 대표 이미지(우선순위 최소값)의 s3Key만 조회 — image_bytes/name/extension 등 안 쓰는 컬럼은 안 가져옴
-    private Map<Long, String> findRepresentativeImageS3Keys(List<Long> memoIds) {
-        QMemoImage memoImage = QMemoImage.memoImage;
-        QMemoImage subImage = new QMemoImage("subImage");
-
-        List<Tuple> results = queryFactory
-                .select(memoImage.memo.id, memoImage.imageS3Key)
-                .from(memoImage)
-                .where(
-                        memoImage.memo.id.in(memoIds),
-                        memoImage.imagePriority.eq(
-                                JPAExpressions.select(subImage.imagePriority.min())
-                                        .from(subImage)
-                                        .where(subImage.memo.id.eq(memoImage.memo.id))
-                        )
-                )
-                .fetch();
-
-        return results.stream()
-                .collect(Collectors.toMap(
-                        t -> t.get(memoImage.memo.id),
-                        t -> t.get(memoImage.imageS3Key),
-                        (a, b) -> a
-                ));
-    }
-
-    // 메모별 이미지 개수만 집계 (행 자체를 안 끌고 옴)
-    private Map<Long, Long> countImagesByMemoId(List<Long> memoIds) {
-        QMemoImage memoImage = QMemoImage.memoImage;
-
-        List<Tuple> results = queryFactory
-                .select(memoImage.memo.id, memoImage.count())
-                .from(memoImage)
-                .where(memoImage.memo.id.in(memoIds))
-                .groupBy(memoImage.memo.id)
-                .fetch();
-
-        return results.stream()
-                .collect(Collectors.toMap(
-                        t -> t.get(memoImage.memo.id),
-                        t -> t.get(memoImage.count())
-                ));
-    }
-
-    // 메모별 파일 개수만 집계
-    private Map<Long, Long> countFilesByMemoId(List<Long> memoIds) {
-        QMemoFile memoFile = QMemoFile.memoFile;
-
-        List<Tuple> results = queryFactory
-                .select(memoFile.memo.id, memoFile.count())
-                .from(memoFile)
-                .where(memoFile.memo.id.in(memoIds))
-                .groupBy(memoFile.memo.id)
-                .fetch();
-
-        return results.stream()
-                .collect(Collectors.toMap(
-                        t -> t.get(memoFile.memo.id),
-                        t -> t.get(memoFile.count())
-                ));
     }
 
     private List<MemoDetailResponse.ImageInfo> mapToImageInfos(List<MemoImage> memoImages) {

@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface MemoFileRepository extends JpaRepository<MemoFile, Long> {
+public interface MemoFileRepository extends JpaRepository<MemoFile, Long>, MemoFileRepositoryCustom {
 
     List<MemoFile> findByMemoIdIn(List<Long> memoIds);
 
