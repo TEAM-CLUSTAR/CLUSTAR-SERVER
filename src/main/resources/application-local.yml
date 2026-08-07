@@ -19,6 +19,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        generate_statistics: true
     show-sql: true
 
   web:
@@ -120,3 +121,27 @@ swagger:
   auth:
     username: ${SWAGGER_USERNAME}
     password: ${SWAGGER_PASSWORD}
+
+
+management:
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  health:
+    redis:
+      enabled: false
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
+logging:
+  level:
+    org.hibernate.stat: DEBUG
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: DEBUG
