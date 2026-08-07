@@ -102,10 +102,7 @@ public class TagServiceImpl implements TagService{
         Tag target = getTagOrThrow(userId, tagId);
 
         List<Tag> childTags = tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, tagId);
-        List<Tag> grandChildTags = new ArrayList<>();
-        for (Tag child : childTags) {
-            grandChildTags.addAll(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, child.getId()));
-        }
+        List<Tag> grandChildTags = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(userId, tagId);
 
         List<Long> tagIds = new ArrayList<>();
         grandChildTags.forEach(tag -> tagIds.add(tag.getId()));
@@ -116,9 +113,10 @@ public class TagServiceImpl implements TagService{
             memoTagRepository.deleteByTagIds(tagIds);
         }
 
-        grandChildTags.forEach(tagRepository::delete);
-        childTags.forEach(tagRepository::delete);
-        tagRepository.delete(target);
+        List<Tag> allTags = new ArrayList<>(grandChildTags);
+        allTags.addAll(childTags);
+        allTags.add(target);
+        tagRepository.deleteAllInBatch(allTags);
     }
 
     private Tag getTagOrThrow(Long userId, Long tagId) {
