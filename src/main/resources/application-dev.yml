@@ -125,6 +125,11 @@ management:
     redis:
       enabled: false # Redis가 없어도 전체 앱은 UP 상태로 유지
 
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true # 이게 없으면 tomcat_threads_* 지표가 안 잡힘
+
 cloud:
   aws:
     s3:
