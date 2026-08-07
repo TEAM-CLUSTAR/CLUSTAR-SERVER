@@ -32,6 +32,9 @@ public class MemoImageRepositoryImpl implements MemoImageRepositoryCustom {
                                         .where(subImage.memo.id.eq(memoImage.memo.id))
                         )
                 )
+                // imagePriority가 동점이면 같은 memoId로 여러 행이 나올 수 있어서,
+                // id 오름차순으로 정렬해 항상 같은 이미지가 선택되도록 결정성을 보장함 (merge 함수는 첫 번째(a)를 유지)
+                .orderBy(memoImage.id.asc())
                 .fetch();
 
         return results.stream()
