@@ -225,25 +225,15 @@ public class MemoServiceImpl implements MemoService {
                 .map(Memo::getId)
                 .toList();
 
-        // 이미지 / 파일 조회
-        List<MemoImage> images = memoImageRepository.findByMemoIdIn(memoIds);
-        List<MemoFile> files = memoFileRepository.findByMemoIdIn(memoIds);
-
-        // memoId 기준 그룹핑
-        Map<Long, List<MemoImage>> imageMap = images.stream()
-                .collect(Collectors.groupingBy(
-                        image -> image.getMemo().getId()
-                ));
-
-        Map<Long, List<MemoFile>> fileMap = files.stream()
-                .collect(Collectors.groupingBy(
-                        file -> file.getMemo().getId()
-                ));
+        // 이미지 / 파일: 대표 이미지 s3Key + 개수만 조회 (전체 엔티티 조회 대신 프로젝션)
+        Map<Long, String> representativeImageS3KeyMap = memoImageRepository.findRepresentativeImageS3Keys(memoIds);
+        Map<Long, Long> imageCountMap = memoImageRepository.countImagesByMemoId(memoIds);
+        Map<Long, Long> fileCountMap = memoFileRepository.countFilesByMemoId(memoIds);
 
         // 응답 조립
         List<MemoListDashboardResponse.MemoDashboardResponse> responses =
                 memos.stream()
-                        .map(memo -> mapToDashboardResponse(memo, imageMap, fileMap))
+                        .map(memo -> mapToDashboardResponse(memo, representativeImageS3KeyMap, imageCountMap, fileCountMap))
                         .toList();
 
         return MemoListDashboardResponse.from(totalCount, responses);
@@ -285,25 +275,15 @@ public class MemoServiceImpl implements MemoService {
                 .map(Memo::getId)
                 .toList();
 
-        // 이미지 / 파일 조회
-        List<MemoImage> images = memoImageRepository.findByMemoIdIn(memoIds);
-        List<MemoFile> files = memoFileRepository.findByMemoIdIn(memoIds);
-
-        // memoId 기준 그룹핑
-        Map<Long, List<MemoImage>> imageMap = images.stream()
-                .collect(Collectors.groupingBy(
-                        image -> image.getMemo().getId()
-                ));
-
-        Map<Long, List<MemoFile>> fileMap = files.stream()
-                .collect(Collectors.groupingBy(
-                        file -> file.getMemo().getId()
-                ));
+        // 이미지 / 파일: 대표 이미지 s3Key + 개수만 조회 (전체 엔티티 조회 대신 프로젝션)
+        Map<Long, String> representativeImageS3KeyMap = memoImageRepository.findRepresentativeImageS3Keys(memoIds);
+        Map<Long, Long> imageCountMap = memoImageRepository.countImagesByMemoId(memoIds);
+        Map<Long, Long> fileCountMap = memoFileRepository.countFilesByMemoId(memoIds);
 
         // 응답 조립
         List<MemoListDashboardResponse.MemoDashboardResponse> responses =
                 memos.stream()
-                        .map(memo -> mapToDashboardResponse(memo, imageMap, fileMap))
+                        .map(memo -> mapToDashboardResponse(memo, representativeImageS3KeyMap, imageCountMap, fileCountMap))
                         .toList();
 
         return MemoListDashboardResponse.from(totalCount, responses);
@@ -479,7 +459,7 @@ public class MemoServiceImpl implements MemoService {
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
     }
 
-    // 태그 처리 (중복 제거 + 우선순위)
+    // 태그 처리 (중복 제거 + 우선순위) — 이름 목록으로 기존 태그 일괄 조회 후, 없는 것만 일괄 생성
     private void attachTags(Memo memo, List<String> tagNames, User user) {
         if (tagNames == null || tagNames.isEmpty()) {
             return;
@@ -489,18 +469,30 @@ public class MemoServiceImpl implements MemoService {
                 .distinct()
                 .toList();
 
+        Map<String, Tag> tagsByName = findOrCreateTags(uniqueTagNames, user);
+
         for (int priority = 0; priority < uniqueTagNames.size(); priority++) {
             String tagName = uniqueTagNames.get(priority);
-            Tag tag = findOrCreateTag(tagName, user);
-            memo.addTag(tag, priority);
+            memo.addTag(tagsByName.get(tagName), priority);
         }
     }
 
-    private Tag findOrCreateTag(String tagName, User user) {
-        return tagRepository.findByNameAndUser(tagName, user)
-                .orElseGet(() -> tagRepository.save(
-                        Tag.create(tagName, user)
-                ));
+    private Map<String, Tag> findOrCreateTags(List<String> tagNames, User user) {
+        List<Tag> existingTags = tagRepository.findAllByNameInAndUser(tagNames, user);
+        Map<String, Tag> tagsByName = new HashMap<>(existingTags.stream()
+                .collect(Collectors.toMap(Tag::getName, Function.identity())));
+
+        List<Tag> newTags = tagNames.stream()
+                .filter(name -> !tagsByName.containsKey(name))
+                .map(name -> Tag.create(name, user))
+                .toList();
+
+        if (!newTags.isEmpty()) {
+            tagRepository.saveAll(newTags)
+                    .forEach(tag -> tagsByName.put(tag.getName(), tag));
+        }
+
+        return tagsByName;
     }
 
     private void validateSourceMemos(List<Long> sourceMemoIds, List<Memo> sourceMemos) {
@@ -614,28 +606,20 @@ public class MemoServiceImpl implements MemoService {
 
     private MemoListDashboardResponse.MemoDashboardResponse mapToDashboardResponse(
             Memo memo,
-            Map<Long, List<MemoImage>> imageMap,
-            Map<Long, List<MemoFile>> fileMap
+            Map<Long, String> representativeImageS3KeyMap,
+            Map<Long, Long> imageCountMap,
+            Map<Long, Long> fileCountMap
     ) {
-        List<MemoImage> memoImages = imageMap.getOrDefault(memo.getId(), List.of());
-        List<MemoFile> memoFiles = fileMap.getOrDefault(memo.getId(), List.of());
-
-        String representativeImageUrl = findRepresentativeImage(memoImages);
+        String s3Key = representativeImageS3KeyMap.get(memo.getId());
+        String representativeImageUrl = (s3Key != null) ? s3Util.generatePresignedUrl(s3Key) : null;
 
         return MemoListDashboardResponse.MemoDashboardResponse.of(
                 memo,
                 MarkdownUtil.strip(memo.getContent()),
                 representativeImageUrl,
-                memoImages.size(),
-                memoFiles.size()
+                imageCountMap.getOrDefault(memo.getId(), 0L).intValue(),
+                fileCountMap.getOrDefault(memo.getId(), 0L).intValue()
         );
-    }
-
-    private String findRepresentativeImage(List<MemoImage> images) {
-        return images.stream()
-                .min(Comparator.comparingInt(MemoImage::getImagePriority))
-                .map(img -> s3Util.generatePresignedUrl(img.getImageS3Key()))
-                .orElse(null);
     }
 
     private List<MemoDetailResponse.ImageInfo> mapToImageInfos(List<MemoImage> memoImages) {

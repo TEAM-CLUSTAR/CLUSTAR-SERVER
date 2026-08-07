@@ -42,6 +42,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 
@@ -223,7 +224,7 @@ class MemoServiceImplTest {
             when(userRepository.findById(user.getId()))
                     .thenReturn(Optional.of(user));
 
-            when(tagRepository.findByNameAndUser(anyString(), any()))
+            when(tagRepository.findAllByNameInAndUser(anyList(), any()))
                     .thenThrow(new RuntimeException("태그 오류"));
 
             // when & then
@@ -377,11 +378,13 @@ class MemoServiceImplTest {
                     any(PageRequest.class)
             )).thenReturn(List.of(memo1, memo2));
 
-            when(memoImageRepository.findByMemoIdIn(List.of(1L, 2L)))
-                    .thenReturn(List.of(image1));
+            when(memoImageRepository.findRepresentativeImageS3Keys(List.of(1L, 2L)))
+                    .thenReturn(Map.of(1L, image1.getImageS3Key()));
+            when(memoImageRepository.countImagesByMemoId(List.of(1L, 2L)))
+                    .thenReturn(Map.of(1L, 1L));
 
-            when(memoFileRepository.findByMemoIdIn(List.of(1L, 2L)))
-                    .thenReturn(List.of(file1));
+            when(memoFileRepository.countFilesByMemoId(List.of(1L, 2L)))
+                    .thenReturn(Map.of(1L, 1L));
 
             // when
             MemoListDashboardResponse response =
@@ -414,8 +417,9 @@ class MemoServiceImplTest {
                     any(PageRequest.class)
             );
 
-            verify(memoImageRepository).findByMemoIdIn(List.of(1L, 2L));
-            verify(memoFileRepository).findByMemoIdIn(List.of(1L, 2L));
+            verify(memoImageRepository).findRepresentativeImageS3Keys(List.of(1L, 2L));
+            verify(memoImageRepository).countImagesByMemoId(List.of(1L, 2L));
+            verify(memoFileRepository).countFilesByMemoId(List.of(1L, 2L));
         }
 
         @Test
@@ -468,11 +472,13 @@ class MemoServiceImplTest {
                     any(PageRequest.class)
             )).thenReturn(List.of(memo1));
 
-            when(memoImageRepository.findByMemoIdIn(List.of(1L)))
-                    .thenReturn(List.of(image1));
+            when(memoImageRepository.findRepresentativeImageS3Keys(List.of(1L)))
+                    .thenReturn(Map.of(1L, image1.getImageS3Key()));
+            when(memoImageRepository.countImagesByMemoId(List.of(1L)))
+                    .thenReturn(Map.of(1L, 1L));
 
-            when(memoFileRepository.findByMemoIdIn(List.of(1L)))
-                    .thenReturn(List.of()); // 파일 없음
+            when(memoFileRepository.countFilesByMemoId(List.of(1L)))
+                    .thenReturn(Map.of()); // 파일 없음
 
             // when
             MemoListDashboardResponse response =
@@ -502,8 +508,9 @@ class MemoServiceImplTest {
                     isNull(),
                     any(PageRequest.class)
             );
-            verify(memoImageRepository).findByMemoIdIn(List.of(1L));
-            verify(memoFileRepository).findByMemoIdIn(List.of(1L));
+            verify(memoImageRepository).findRepresentativeImageS3Keys(List.of(1L));
+            verify(memoImageRepository).countImagesByMemoId(List.of(1L));
+            verify(memoFileRepository).countFilesByMemoId(List.of(1L));
         }
 
         @Test
@@ -535,11 +542,13 @@ class MemoServiceImplTest {
                     any(PageRequest.class)
             )).thenReturn(List.of(nextMemo));
 
-            when(memoImageRepository.findByMemoIdIn(List.of(1L)))
-                    .thenReturn(List.of());
+            when(memoImageRepository.findRepresentativeImageS3Keys(List.of(1L)))
+                    .thenReturn(Map.of());
+            when(memoImageRepository.countImagesByMemoId(List.of(1L)))
+                    .thenReturn(Map.of());
 
-            when(memoFileRepository.findByMemoIdIn(List.of(1L)))
-                    .thenReturn(List.of());
+            when(memoFileRepository.countFilesByMemoId(List.of(1L)))
+                    .thenReturn(Map.of());
 
             // when
             MemoListDashboardResponse response =

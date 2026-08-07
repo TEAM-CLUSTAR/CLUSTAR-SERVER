@@ -211,7 +211,7 @@ class TagServiceTest {
         when(tagRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
         when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
                 .thenReturn(List.of(child));
-        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 11L))
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
                 .thenReturn(List.of());
 
         // when
@@ -219,8 +219,36 @@ class TagServiceTest {
 
         // then
         verify(memoTagRepository).deleteByTagIds(List.of(11L, 10L));
-        verify(tagRepository).delete(child);
-        verify(tagRepository).delete(parent);
+        verify(tagRepository).deleteAllInBatch(List.of(child, parent));
+    }
+
+    @Test
+    @DisplayName("손자 태그가 있으면 손자까지 함께 삭제한다")
+    void deleteTag_withGrandChild_success() {
+        // given
+        User user = createUser();
+        Tag parent = Tag.create("parent", user);
+        ReflectionTestUtils.setField(parent, "id", 10L);
+
+        Tag child = Tag.create("child", user, parent);
+        ReflectionTestUtils.setField(child, "id", 11L);
+
+        Tag grandChild = Tag.create("grandChild", user, child);
+        ReflectionTestUtils.setField(grandChild, "id", 12L);
+
+        when(tagRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
+        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
+                .thenReturn(List.of(child));
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
+                .thenReturn(List.of(grandChild));
+
+        // when
+        tagService.deleteTag(1L, 10L);
+
+        // then
+        verify(tagRepository).findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L);
+        verify(memoTagRepository).deleteByTagIds(List.of(12L, 11L, 10L));
+        verify(tagRepository).deleteAllInBatch(List.of(grandChild, child, parent));
     }
 
     @Test
