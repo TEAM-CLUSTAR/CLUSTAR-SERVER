@@ -55,7 +55,7 @@ public class MemoSearchVectorRetriever {
                 boolean passed = similarity >= threshold;
 
                 // 향후 threshold 재조정을 위해 통과/탈락 여부와 무관하게 전부 로그로 남긴다 (임시값, 실사용 데이터로 재산정 예정)
-                log.info("[Search][Semantic] userId={} query=\"{}\" memoId={} similarity={} threshold={} passed={}",
+                log.debug("[Search][Semantic] userId={} query=\"{}\" memoId={} similarity={} threshold={} passed={}",
                         userId, query, memoIdObj, similarity, threshold, passed);
 
                 if (passed && memoIdObj instanceof Number memoId) {
