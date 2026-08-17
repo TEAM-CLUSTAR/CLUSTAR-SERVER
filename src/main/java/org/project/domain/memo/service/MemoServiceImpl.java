@@ -1,6 +1,7 @@
 package org.project.domain.memo.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
@@ -48,6 +49,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -368,9 +370,17 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.EMPTY_SEARCH_QUERY);
         }
 
-        // 텍스트 검색 (병렬)
+        // 텍스트 검색 (병렬) — 실패해도 의미 검색 결과라도 주도록 빈 리스트로 degrade
         CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
-                () -> memoRepository.searchByText(userId, query, 3), ioExecutor
+                () -> {
+                    try {
+                        return memoRepository.searchByText(userId, query, 3);
+                    } catch (Exception e) {
+                        log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} query=\"{}\" error={}",
+                                userId, query, e.getMessage());
+                        return List.<Memo>of();
+                    }
+                }, ioExecutor
         );
 
         // 의미 기반 벡터 검색 (병렬)
@@ -405,6 +415,13 @@ public class MemoServiceImpl implements MemoService {
 
     @Override
     public MemoRecommendationResponse recommendMemos(Long userId, MemoRecommendationRequest request) {
+        // 선택한 메모가 모두 본인 소유이며 삭제되지 않았는지 검증 (남의 메모/없는 메모로 추천 요청 방지)
+        List<Long> selectedMemoIds = request.memoIds();
+        long ownedCount = memoRepository.countByIdInAndUserIdAndNotDeleted(userId, selectedMemoIds);
+        if (ownedCount != selectedMemoIds.stream().distinct().count()) {
+            throw new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+        }
+
         // Gate 1: 선택된 메모들 자체가 서로 응집돼 있지 않으면(평균 벡터가 대표성이 없으면) 후보 검색 없이 바로 종료
         Double cohesion = vectorStoreRepository.computeSelectionCohesion(userId, request.memoIds());
         if (cohesion != null && cohesion < memoRecommendationProperties.getCohesionThreshold()) {
