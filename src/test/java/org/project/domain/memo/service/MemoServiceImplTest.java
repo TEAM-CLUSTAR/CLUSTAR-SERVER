@@ -882,6 +882,26 @@ class MemoServiceImplTest {
             // then
             assertThat(response.results()).isEmpty();
         }
+
+        @Test
+        @DisplayName("텍스트 검색이 실패해도 예외 없이 의미 검색 결과를 반환한다")
+        void searchMemos_textSearchFails_returnsVectorResultsOnly() {
+            // given: 텍스트 검색은 예외, 벡터 검색은 결과 1개
+            User user = User.builder().id(userId).build();
+            Memo vectorMemo = Memo.builder().id(2L).title("벡터 메모").content("내용").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), eq(3)))
+                    .willThrow(new RuntimeException("DB 오류"));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링")))
+                    .willReturn(List.of(vectorMemo));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            // then: 예외 없이 벡터 결과만 반환
+            assertThat(response.results()).hasSize(1);
+            assertThat(response.results().get(0).memoId()).isEqualTo(2L);
+        }
     }
 
     @Nested
@@ -893,6 +913,9 @@ class MemoServiceImplTest {
         @BeforeEach
         void setUp() {
             user = User.builder().id(userId).build();
+            // 기본: 선택한 메모는 모두 본인 소유로 간주(소유검증 통과). 개별 테스트에서 필요 시 재정의.
+            lenient().when(memoRepository.countByIdInAndUserIdAndNotDeleted(eq(userId), anyList()))
+                    .thenAnswer(inv -> inv.<List<Long>>getArgument(1).stream().distinct().count());
         }
 
         @Test
@@ -992,6 +1015,22 @@ class MemoServiceImplTest {
             assertThat(response.results()).isEmpty();
             assertThat(response.message()).isEqualTo("선택한 메모들끼리 연관성이 없어요.");
             verify(vectorStoreRepository, never()).findRecommendedMemoIds(any(), any(), anyDouble());
+        }
+
+        @Test
+        @DisplayName("선택한 메모가 본인 것이 아니거나 없으면 SOURCE_MEMO_NOT_FOUND 예외가 발생한다")
+        void recommendMemos_notOwnedOrMissing_throws() {
+            // given: 2개를 선택했지만 본인 소유(미삭제)는 1개뿐
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L));
+            given(memoRepository.countByIdInAndUserIdAndNotDeleted(eq(userId), eq(List.of(1L, 2L))))
+                    .willReturn(1L);
+
+            // when & then
+            assertThatThrownBy(() -> memoService.recommendMemos(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+
+            verify(vectorStoreRepository, never()).computeSelectionCohesion(any(), any());
         }
     }
 }
