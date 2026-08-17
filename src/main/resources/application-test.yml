@@ -74,11 +74,11 @@ spring:
 
 memo:
   recommendation:
-    cohesion-threshold: 0.57
-    candidate-similarity-threshold: 0.63
-    single-selection-similarity-threshold: 0.58
+    cohesion-threshold: 0.62
+    candidate-similarity-threshold: 0.70
+    single-selection-similarity-threshold: 0.62
   search:
-    semantic-similarity-threshold: 0.52
+    semantic-similarity-threshold: 0.60
     vector-top-k: 10
     max-memo-results: 2
 
