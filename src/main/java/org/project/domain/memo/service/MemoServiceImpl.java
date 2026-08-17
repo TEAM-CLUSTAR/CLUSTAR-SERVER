@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
+import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -70,6 +71,7 @@ public class MemoServiceImpl implements MemoService {
     private final MemoSearchVectorRetriever memoSearchVectorRetriever;
     private final VectorStoreRepository vectorStoreRepository;
     private final MemoRecommendationProperties memoRecommendationProperties;
+    private final MemoSearchProperties memoSearchProperties;
 
     @Autowired
     @Qualifier("ioExecutor")
@@ -403,11 +405,18 @@ public class MemoServiceImpl implements MemoService {
             }
         });
 
-        vectorResults.forEach(memo -> {
+        // 벡터 결과는 텍스트와 중복 제거를 먼저 한 뒤 상위 maxMemoResults개만 가져가게
+        int maxSemantic = memoSearchProperties.getMaxMemoResults();
+        int semanticAdded = 0;
+        for (Memo memo : vectorResults) {
+            if (semanticAdded >= maxSemantic) {
+                break;
+            }
             if (seenIds.add(memo.getId())) {
                 results.add(MemoSearchItemResponse.from(memo, SearchType.SEMANTIC));
+                semanticAdded++;
             }
-        });
+        }
 
          String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
         return MemoSearchResponse.of(results, message);

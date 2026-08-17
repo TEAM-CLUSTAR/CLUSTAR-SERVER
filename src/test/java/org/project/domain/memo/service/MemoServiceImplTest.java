@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
+import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
@@ -74,6 +75,7 @@ class MemoServiceImplTest {
     @Mock private MemoSearchVectorRetriever memoSearchVectorRetriever;
     @Mock private VectorStoreRepository vectorStoreRepository;
     @Mock private MemoRecommendationProperties memoRecommendationProperties;
+    @Mock private MemoSearchProperties memoSearchProperties;
 
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
@@ -816,6 +818,8 @@ class MemoServiceImplTest {
         void setUp() {
             // ioExecutor는 final이 아니라 @Autowired 필드라 직접 주입
             ReflectionTestUtils.setField(memoService, "ioExecutor", Executors.newSingleThreadExecutor());
+            // 의미 검색 결과 상한(중복 제거 후 상위 N개)
+            lenient().when(memoSearchProperties.getMaxMemoResults()).thenReturn(2);
         }
 
         @Test
@@ -901,6 +905,30 @@ class MemoServiceImplTest {
             // then: 예외 없이 벡터 결과만 반환
             assertThat(response.results()).hasSize(1);
             assertThat(response.results().get(0).memoId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("벡터 상위 결과가 텍스트와 겹쳐도 중복 제거 후 남은 상위 2개가 의미 결과로 채워진다")
+        void searchMemos_semanticBackfillsAfterDedup() {
+            // given: 텍스트=[1,2], 벡터(유사도순)=[1,2(겹침), 3,4,5]
+            User user = User.builder().id(userId).build();
+            Memo m1 = Memo.builder().id(1L).title("A").content("c").user(user).isDeleted(false).build();
+            Memo m2 = Memo.builder().id(2L).title("B").content("c").user(user).isDeleted(false).build();
+            Memo m3 = Memo.builder().id(3L).title("C").content("c").user(user).isDeleted(false).build();
+            Memo m4 = Memo.builder().id(4L).title("D").content("c").user(user).isDeleted(false).build();
+            Memo m5 = Memo.builder().id(5L).title("E").content("c").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("등산"), eq(3)))
+                    .willReturn(List.of(m1, m2));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("등산")))
+                    .willReturn(List.of(m1, m2, m3, m4, m5));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "등산");
+
+            // then: 텍스트 1,2 + 의미는 겹치는 1,2 제외하고 상위 2개(3,4)만 (5는 상한 초과로 제외)
+            assertThat(response.results()).extracting("memoId")
+                    .containsExactly(1L, 2L, 3L, 4L);
         }
     }
 
