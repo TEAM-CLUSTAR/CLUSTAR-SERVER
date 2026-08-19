@@ -60,7 +60,7 @@ public class VectorStoreRepository {
             boolean passed = similarity >= similarityThreshold;
 
             // 향후 threshold 재조정을 위해 통과/탈락 여부와 무관하게 전부 로그로 남긴다 (임시값, 실사용 데이터로 재산정 예정)
-            log.info("[Recommendation][Gate2] userId={} selected={} candidateMemoId={} similarity={} threshold={} passed={}",
+            log.debug("[Recommendation][Gate2] userId={} selected={} candidateMemoId={} similarity={} threshold={} passed={}",
                     userId, memoIds, candidateMemoId, similarity, similarityThreshold, passed);
 
             if (passed) {
@@ -101,7 +101,7 @@ public class VectorStoreRepository {
                 .addValue("userId", userId);
 
         Double cohesion = jdbcTemplate.queryForObject(sql, params, Double.class);
-        log.info("[Recommendation][Gate1] userId={} selected={} cohesion={}", userId, memoIds, cohesion);
+        log.debug("[Recommendation][Gate1] userId={} selected={} cohesion={}", userId, memoIds, cohesion);
         return cohesion;
     }
 

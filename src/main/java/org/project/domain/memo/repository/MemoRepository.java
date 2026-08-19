@@ -61,6 +61,18 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
         """)
     long countAllMemos(@Param("userId") Long userId);
 
+    @Query("""
+        SELECT COUNT(m)
+        FROM Memo m
+        WHERE m.user.id = :userId
+        AND m.id IN :memoIds
+        AND m.isDeleted = false
+        """)
+    long countByIdInAndUserIdAndNotDeleted(
+            @Param("userId") Long userId,
+            @Param("memoIds") List<Long> memoIds
+    );
+
     @Query("SELECT m.id FROM Memo m WHERE m.isDeleted = false")
     List<Long> findAllNotDeletedMemoIds();
 }

@@ -55,7 +55,7 @@ public class MemoSearchVectorRetriever {
                 boolean passed = similarity >= threshold;
 
                 // 향후 threshold 재조정을 위해 통과/탈락 여부와 무관하게 전부 로그로 남긴다 (임시값, 실사용 데이터로 재산정 예정)
-                log.info("[Search][Semantic] userId={} query=\"{}\" memoId={} similarity={} threshold={} passed={}",
+                log.debug("[Search][Semantic] userId={} query=\"{}\" memoId={} similarity={} threshold={} passed={}",
                         userId, query, memoIdObj, similarity, threshold, passed);
 
                 if (passed && memoIdObj instanceof Number memoId) {
@@ -63,18 +63,20 @@ public class MemoSearchVectorRetriever {
                 }
             });
 
-            List<Long> topMemoIds = new ArrayList<>(seenMemoIds)
-                    .subList(0, Math.min(memoSearchProperties.getMaxMemoResults(), seenMemoIds.size()));
+            // threshold를 통과한 후보를 유사도 순으로 "모두" 반환한다.
+            // 상위 N개로 자르는 것은 텍스트 검색 결과와 중복 제거한 뒤 서비스 계층에서 처리한다.
+            // (여기서 미리 자르면, 상위 후보가 텍스트 결과와 겹칠 때 의미 검색 결과가 통째로 사라진다.)
+            List<Long> passedMemoIds = new ArrayList<>(seenMemoIds);
 
-            if (topMemoIds.isEmpty()) {
+            if (passedMemoIds.isEmpty()) {
                 return List.of();
             }
 
-            // findByIdInWithTagsAndNotDeleted는 IN 조회라 반환 순서가 보장되지 않으므로 유사도 순서(topMemoIds)로 재정렬한다.
-            Map<Long, Memo> memoById = memoRepository.findByIdInWithTagsAndNotDeleted(userId, topMemoIds).stream()
+            // findByIdInWithTagsAndNotDeleted는 IN 조회라 반환 순서가 보장되지 않으므로 유사도 순서(passedMemoIds)로 재정렬한다.
+            Map<Long, Memo> memoById = memoRepository.findByIdInWithTagsAndNotDeleted(userId, passedMemoIds).stream()
                     .collect(Collectors.toMap(Memo::getId, Function.identity()));
 
-            return topMemoIds.stream()
+            return passedMemoIds.stream()
                     .map(memoById::get)
                     .filter(Objects::nonNull)
                     .toList();

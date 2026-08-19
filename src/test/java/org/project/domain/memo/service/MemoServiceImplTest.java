@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
+import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
@@ -74,6 +75,7 @@ class MemoServiceImplTest {
     @Mock private MemoSearchVectorRetriever memoSearchVectorRetriever;
     @Mock private VectorStoreRepository vectorStoreRepository;
     @Mock private MemoRecommendationProperties memoRecommendationProperties;
+    @Mock private MemoSearchProperties memoSearchProperties;
 
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
@@ -816,6 +818,8 @@ class MemoServiceImplTest {
         void setUp() {
             // ioExecutor는 final이 아니라 @Autowired 필드라 직접 주입
             ReflectionTestUtils.setField(memoService, "ioExecutor", Executors.newSingleThreadExecutor());
+            // 의미 검색 결과 상한(중복 제거 후 상위 N개)
+            lenient().when(memoSearchProperties.getMaxMemoResults()).thenReturn(2);
         }
 
         @Test
@@ -882,6 +886,50 @@ class MemoServiceImplTest {
             // then
             assertThat(response.results()).isEmpty();
         }
+
+        @Test
+        @DisplayName("텍스트 검색이 실패해도 예외 없이 의미 검색 결과를 반환한다")
+        void searchMemos_textSearchFails_returnsVectorResultsOnly() {
+            // given: 텍스트 검색은 예외, 벡터 검색은 결과 1개
+            User user = User.builder().id(userId).build();
+            Memo vectorMemo = Memo.builder().id(2L).title("벡터 메모").content("내용").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), eq(3)))
+                    .willThrow(new RuntimeException("DB 오류"));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링")))
+                    .willReturn(List.of(vectorMemo));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            // then: 예외 없이 벡터 결과만 반환
+            assertThat(response.results()).hasSize(1);
+            assertThat(response.results().get(0).memoId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("벡터 상위 결과가 텍스트와 겹쳐도 중복 제거 후 남은 상위 2개가 의미 결과로 채워진다")
+        void searchMemos_semanticBackfillsAfterDedup() {
+            // given: 텍스트=[1,2], 벡터(유사도순)=[1,2(겹침), 3,4,5]
+            User user = User.builder().id(userId).build();
+            Memo m1 = Memo.builder().id(1L).title("A").content("c").user(user).isDeleted(false).build();
+            Memo m2 = Memo.builder().id(2L).title("B").content("c").user(user).isDeleted(false).build();
+            Memo m3 = Memo.builder().id(3L).title("C").content("c").user(user).isDeleted(false).build();
+            Memo m4 = Memo.builder().id(4L).title("D").content("c").user(user).isDeleted(false).build();
+            Memo m5 = Memo.builder().id(5L).title("E").content("c").user(user).isDeleted(false).build();
+
+            given(memoRepository.searchByText(eq(userId), eq("등산"), eq(3)))
+                    .willReturn(List.of(m1, m2));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("등산")))
+                    .willReturn(List.of(m1, m2, m3, m4, m5));
+
+            // when
+            MemoSearchResponse response = memoService.searchMemos(userId, "등산");
+
+            // then: 텍스트 1,2 + 의미는 겹치는 1,2 제외하고 상위 2개(3,4)만 (5는 상한 초과로 제외)
+            assertThat(response.results()).extracting("memoId")
+                    .containsExactly(1L, 2L, 3L, 4L);
+        }
     }
 
     @Nested
@@ -893,6 +941,9 @@ class MemoServiceImplTest {
         @BeforeEach
         void setUp() {
             user = User.builder().id(userId).build();
+            // 기본: 선택한 메모는 모두 본인 소유로 간주(소유검증 통과). 개별 테스트에서 필요 시 재정의.
+            lenient().when(memoRepository.countByIdInAndUserIdAndNotDeleted(eq(userId), anyList()))
+                    .thenAnswer(inv -> inv.<List<Long>>getArgument(1).stream().distinct().count());
         }
 
         @Test
@@ -992,6 +1043,22 @@ class MemoServiceImplTest {
             assertThat(response.results()).isEmpty();
             assertThat(response.message()).isEqualTo("선택한 메모들끼리 연관성이 없어요.");
             verify(vectorStoreRepository, never()).findRecommendedMemoIds(any(), any(), anyDouble());
+        }
+
+        @Test
+        @DisplayName("선택한 메모가 본인 것이 아니거나 없으면 SOURCE_MEMO_NOT_FOUND 예외가 발생한다")
+        void recommendMemos_notOwnedOrMissing_throws() {
+            // given: 2개를 선택했지만 본인 소유(미삭제)는 1개뿐
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L));
+            given(memoRepository.countByIdInAndUserIdAndNotDeleted(eq(userId), eq(List.of(1L, 2L))))
+                    .willReturn(1L);
+
+            // when & then
+            assertThatThrownBy(() -> memoService.recommendMemos(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+
+            verify(vectorStoreRepository, never()).computeSelectionCohesion(any(), any());
         }
     }
 }
