@@ -378,8 +378,8 @@ public class MemoServiceImpl implements MemoService {
                     try {
                         return memoRepository.searchByText(userId, query, 3);
                     } catch (Exception e) {
-                        log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} query=\"{}\" error={}",
-                                userId, query, e.getMessage());
+                        log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} errorType={}",
+                                userId, e.getClass().getSimpleName());
                         return List.<Memo>of();
                     }
                 }, ioExecutor

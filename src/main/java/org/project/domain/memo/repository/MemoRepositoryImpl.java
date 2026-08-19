@@ -159,7 +159,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .fetch();
 
         // 랭킹: 정확한 구절 > 여러 단어 매칭 > 한 단어 매칭. 동점은 최신순.
-        String phrase = query.trim().toLowerCase();
+        String phrase = String.join(" ", tokens).toLowerCase();
         List<Memo> ranked = new ArrayList<>(candidates);
         ranked.sort(
                 Comparator.comparingInt((Memo m) -> textScore(m, tokens, phrase)).reversed()
