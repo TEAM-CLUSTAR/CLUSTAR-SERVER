@@ -44,9 +44,6 @@ application.yml
 ### q domain ###
 src/main/generated
 
-### codex ###
-AGENTS.md
-
 ## claude ##
 PLAN.md
 RESULT.md
