@@ -1,5 +1,8 @@
 package org.project.domain.ai.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(requiredProperties = {"relevancePass", "promptFaithfulnessScore", "groundednessScore", "taskAlignmentPass"})
 public record AiEvaluationResult(
         double relevancePass,
         double promptFaithfulnessScore,

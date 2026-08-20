@@ -1,8 +1,10 @@
 package org.project.domain.tag.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.tag.entity.Tag;
 import java.util.List;
 
+@Schema(requiredProperties = "tags")
 public record TagListResponse(
         List<TagResponse> tags
 ) {
@@ -15,10 +17,12 @@ public record TagListResponse(
         );
     }
 
+    @Schema(requiredProperties = {"tagId", "name", "color", "parentId"})
     public record TagResponse(
             Long tagId,
             String name,
             String color,
+            @Schema(nullable = true)
             Long parentId
     ) {
         public static TagResponse from(Tag tag) {

@@ -1,10 +1,12 @@
 package org.project.domain.tag.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.tag.entity.Tag;
 
 import java.util.List;
 import java.util.Map;
 
+@Schema(requiredProperties = {"parentTag", "childTags"})
 public record TagHierarchyResponse(
         TagSummaryResponse parentTag,
         List<TagTreeResponse> childTags
@@ -21,10 +23,12 @@ public record TagHierarchyResponse(
         );
     }
 
+    @Schema(requiredProperties = {"tagId", "name", "color", "parentId", "childTags"})
     public record TagTreeResponse(
             Long tagId,
             String name,
             String color,
+            @Schema(nullable = true)
             Long parentId,
             List<TagTreeResponse> childTags
     ) {

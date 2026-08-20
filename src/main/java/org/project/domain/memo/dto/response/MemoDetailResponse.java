@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
+@Schema(requiredProperties = {"memoId", "title", "content", "images", "files", "tagList", "createdAt", "isAiGenerated", "sourceMemoTitleList"})
 public record MemoDetailResponse(
 
         @Schema(description = "메모 ID", example = "1")
@@ -41,7 +42,7 @@ public record MemoDetailResponse(
         List<String> sourceMemoTitleList
 ) {
 
-    @Schema(description = "이미지 정보")
+    @Schema(description = "이미지 정보", requiredProperties = {"imageId", "imageUrl", "imageName", "imageExtension", "imageSize"})
     public record ImageInfo(
 
             @Schema(description = "이미지 ID", example = "1")
@@ -50,17 +51,17 @@ public record MemoDetailResponse(
             @Schema(description = "이미지 URL (Presigned URL)")
             String imageUrl,
 
-            @Schema(description = "이미지 파일명", example = "seminar_slide.png")
+            @Schema(description = "이미지 파일명", example = "seminar_slide.png", nullable = true)
             String imageName,
 
-            @Schema(description = "이미지 확장자", example = "png")
+            @Schema(description = "이미지 확장자", example = "png", nullable = true)
             String imageExtension,
 
-            @Schema(description = "이미지 크기", example = "0.24MB")
+            @Schema(description = "이미지 크기", example = "0.24MB", nullable = true)
             String imageSize
     ) {}
 
-    @Schema(description = "첨부 파일 정보")
+    @Schema(description = "첨부 파일 정보", requiredProperties = {"fileId", "fileUrl", "fileName", "fileExtension", "fileSize"})
     public record FileInfo(
 
             @Schema(description = "파일 ID", example = "1")
@@ -69,13 +70,13 @@ public record MemoDetailResponse(
             @Schema(description = "파일 다운로드 URL (Presigned URL)")
             String fileUrl,
 
-            @Schema(description = "파일명", example = "SOPT_7th_seminar.pdf")
+            @Schema(description = "파일명", example = "SOPT_7th_seminar.pdf", nullable = true)
             String fileName,
 
-            @Schema(description = "파일 확장자", example = "pdf")
+            @Schema(description = "파일 확장자", example = "pdf", nullable = true)
             String fileExtension,
 
-            @Schema(description = "파일 크기", example = "1.00GB")
+            @Schema(description = "파일 크기", example = "1.00GB", nullable = true)
             String fileSize
     ) {}
 

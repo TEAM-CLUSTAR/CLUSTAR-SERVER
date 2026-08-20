@@ -1,9 +1,11 @@
 package org.project.global.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(requiredProperties = {"code", "msg"})
 public record ApiResponse<T>(int code, String msg, T data) {
 
     public static <T> ApiResponse<T> ok(T data, String msg) {
