@@ -13,6 +13,9 @@ public interface MemoImageRepository extends JpaRepository<MemoImage, Long>, Mem
 
     List<MemoImage> findByMemoIdIn(List<Long> memoIds);
 
+    @Query("select mi.imageS3Key from MemoImage mi join mi.memo m where m.isDeleted = false")
+    List<String> findAllImageS3Keys();
+
     @Modifying
     @Query("DELETE FROM MemoImage mi WHERE mi.memo = :memo")
     void deleteByMemo(@Param("memo") Memo memo);

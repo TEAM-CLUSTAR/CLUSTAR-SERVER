@@ -13,6 +13,9 @@ public interface MemoFileRepository extends JpaRepository<MemoFile, Long>, MemoF
 
     List<MemoFile> findByMemoIdIn(List<Long> memoIds);
 
+    @Query("select mf.fileS3Key from MemoFile mf join mf.memo m where m.isDeleted = false")
+    List<String> findAllFileS3Keys();
+
     @Modifying
     @Query("DELETE FROM MemoFile mf WHERE mf.memo = :memo")
     void deleteByMemo(@Param("memo") Memo memo);

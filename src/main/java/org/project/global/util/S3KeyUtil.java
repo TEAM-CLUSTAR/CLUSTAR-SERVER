@@ -35,4 +35,12 @@ public class S3KeyUtil {
             throw new MemoException(MemoErrorCode.S3_KEY_USER_MISMATCH);
         }
     }
+
+    public void validateS3Key(Long requestUserId, String prefix, String s3Key) {
+        validateS3KeyOwner(requestUserId, s3Key);
+
+        if (!s3Key.startsWith(prefix + "/" + requestUserId + "/")) {
+            throw new MemoException(MemoErrorCode.INVALID_S3_KEY_FORMAT);
+        }
+    }
 }
