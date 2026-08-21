@@ -1,5 +1,6 @@
 package org.project.domain.memo.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoTag;
@@ -8,6 +9,7 @@ import org.project.global.util.MemoContentUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Schema(requiredProperties = {"totalCount", "memos"})
 public record MemoListDashboardResponse(
         long totalCount,
         List<MemoDashboardResponse> memos
@@ -21,12 +23,14 @@ public record MemoListDashboardResponse(
     /**
      * 대시보드용 메모 응답
      */
+    @Schema(requiredProperties = {"memoId", "title", "content", "representativeImageUrl", "imageCount", "fileCount", "isPinned", "isAiGenerated", "isNew", "createdAt", "tagList"})
     public record MemoDashboardResponse(
             Long memoId,
             String title,
             String content,
 
             // 대표 이미지 (priority 가장 낮은 1개, presigned URL)
+            @Schema(nullable = true)
             String representativeImageUrl,
 
             // 이미지 / 파일 개수
@@ -74,6 +78,7 @@ public record MemoListDashboardResponse(
     /**
      * 태그 응답
      */
+    @Schema(requiredProperties = {"tagId", "name", "color"})
     public record TagResponse(
             Long tagId,
             String name,

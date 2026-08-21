@@ -5,6 +5,7 @@ import org.project.domain.memo.entity.Memo;
 
 import java.time.LocalDateTime;
 
+@Schema(requiredProperties = {"memoId", "title", "createdAt"})
 public record MemoResponse (
         @Schema(description = "메모 ID", example = "1")
         Long memoId,

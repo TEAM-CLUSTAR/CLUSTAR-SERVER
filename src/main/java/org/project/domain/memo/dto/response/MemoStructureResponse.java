@@ -7,6 +7,7 @@ import org.project.global.util.MemoContentUtils;
 
 import java.util.List;
 
+@Schema(requiredProperties = {"memoId", "title", "content", "tagList"})
 public record MemoStructureResponse(
         @Schema(description = "메모 ID", example = "1")
         Long memoId,
