@@ -51,13 +51,13 @@ public record MemoDetailResponse(
             @Schema(description = "이미지 URL (Presigned URL)")
             String imageUrl,
 
-            @Schema(description = "이미지 파일명", example = "seminar_slide.png", nullable = true)
+            @Schema(description = "이미지 파일명. 저장된 파일명 정보가 없는 경우 null", example = "seminar_slide.png", nullable = true)
             String imageName,
 
-            @Schema(description = "이미지 확장자", example = "png", nullable = true)
+            @Schema(description = "이미지 확장자. 저장된 확장자 정보가 없는 경우 null", example = "png", nullable = true)
             String imageExtension,
 
-            @Schema(description = "이미지 크기", example = "0.24MB", nullable = true)
+            @Schema(description = "이미지 크기. 저장된 파일 크기 정보가 없는 경우 null", example = "0.24MB", nullable = true)
             String imageSize
     ) {}
 
@@ -70,13 +70,13 @@ public record MemoDetailResponse(
             @Schema(description = "파일 다운로드 URL (Presigned URL)")
             String fileUrl,
 
-            @Schema(description = "파일명", example = "SOPT_7th_seminar.pdf", nullable = true)
+            @Schema(description = "파일명. 저장된 파일명 정보가 없는 경우 null", example = "SOPT_7th_seminar.pdf", nullable = true)
             String fileName,
 
-            @Schema(description = "파일 확장자", example = "pdf", nullable = true)
+            @Schema(description = "파일 확장자. 저장된 확장자 정보가 없는 경우 null", example = "pdf", nullable = true)
             String fileExtension,
 
-            @Schema(description = "파일 크기", example = "1.00GB", nullable = true)
+            @Schema(description = "파일 크기. 저장된 파일 크기 정보가 없는 경우 null", example = "1.00GB", nullable = true)
             String fileSize
     ) {}
 
