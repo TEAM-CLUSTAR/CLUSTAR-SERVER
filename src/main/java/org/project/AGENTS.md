@@ -5,14 +5,14 @@
 ## 구조와 API
 
 - 공통 관심사는 `global`, 기능은 `domain/{ai,memo,tag,user,s3}` 아래에 둔다. Controller·Service·Repository·Entity·DTO의 상세 책임은 도메인 문서를 따른다.
-- HTTP 성공 응답은 `global.response.ApiResponse`와 `ResponseEntity`를 사용한다. 생성은 `ApiResponse.created`, 일반 성공은 `ApiResponse.ok` 관례를 따른다.
-- 새 API는 기존 Controller의 `/api/v1` 경로 규칙을 따르며, 운영 경로·응답 계약을 깨는 변경은 신규 계약 추가를 먼저 검토한다.
-- 요청 본문과 중첩 객체는 필요한 `@Valid` 및 Bean Validation으로 검증한다. 공개 API 변경 시 기존 `@Operation`, `@Schema` 문서화 관례를 따른다.
+- HTTP 성공 응답은 기본적으로 `global.response.ApiResponse`와 `ResponseEntity`를 사용한다. 생성은 `ApiResponse.created`, 일반 성공은 `ApiResponse.ok`를 기본 패턴으로 삼는다.
+- 새 API는 기본적으로 `/api/v1` 경로 규칙을 사용한다. 운영 경로·응답 계약을 바꿔 더 나은 API를 제안할 때는 하위 호환성, 마이그레이션 경로, 클라이언트 영향을 함께 제시한다.
+- 요청 본문과 중첩 객체는 필요한 `@Valid` 및 Bean Validation으로 검증한다. 공개 API 문서화는 `@Operation`, `@Schema`를 기본 패턴으로 삼되, 계약을 더 명확히 하는 대안은 근거와 함께 제안할 수 있다.
 
 ## 예외·보안·설정
 
 - 입력·도메인 오류는 `BusinessException`과 도메인별 error code로 표현한다. `IllegalArgumentException` 등 임의 예외로 API 오류 계약을 만들지 않으며 `GlobalExceptionHandler` 흐름을 따른다.
-- Security filter 수준 예외는 전역 예외 처리기가 잡지 못할 수 있으므로 기존 필터 응답 흐름을 따른다. CORS, whitelist, JWT, Swagger 보안 변경 시 `global/config/security`와 실제 클라이언트 영향을 함께 확인한다.
+- Security filter 수준 예외는 전역 예외 처리기가 잡지 못할 수 있으므로 현재 필터 응답 흐름을 기본값으로 사용한다. CORS, whitelist, JWT, Swagger 보안 변경 시 `global/config/security`와 실제 클라이언트 영향을 함께 확인한다.
 - 환경별 값은 `src/main/resources/application-*.yml`과 외부 환경 설정으로 관리한다. QueryDSL 생성 소스(`src/main/generated/querydsl`)와 `build/` 산출물은 수정하지 않는다.
 
 ## 데이터·트랜잭션·비동기

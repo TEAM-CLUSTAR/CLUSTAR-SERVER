@@ -9,8 +9,8 @@
 
 ## Git과 CI/CD
 
-- 브랜치는 `develop` 기준으로 생성하고 기존 관례인 `<type>/#<issue-number>/<summary>`를 사용한다. 사용 중인 type은 `feat`, `feature`, `fix`, `chore`, `refactor`, `test`, `init`, `docs`, `hotfix`다.
-- 커밋 메시지는 `[Type] 작업 요약` 형식을 사용한다. `Type`은 `Feat`, `Fix`, `Refactor`, `Test`, `Chore`, `Docs` 등 작업 성격을 나타내는 파스칼 표기 접두사로 작성한다.
+- 브랜치는 기본적으로 `develop` 기준과 `<type>/#<issue-number>/<summary>` 형식을 사용한다. 사용 중인 type은 `feat`, `feature`, `fix`, `chore`, `refactor`, `test`, `init`, `docs`, `hotfix`다.
+- 커밋 메시지는 기본적으로 `[Type] 작업 요약` 형식을 사용한다. `Type`은 `Feat`, `Fix`, `Refactor`, `Test`, `Chore`, `Docs` 등 작업 성격을 나타내는 파스칼 표기 접두사로 작성한다.
   - 예: `[Feat] 텍스트 검색을 단어 기반 매칭 + 랭킹으로 개선`
   - 예: `[Refactor] 검색/추천 예외처리 보강`
   - 예: `[Test] 테스트 코드`
