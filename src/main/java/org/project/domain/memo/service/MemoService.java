@@ -44,5 +44,7 @@ public interface MemoService {
 
     MemoSearchResponse searchMemos(Long userId, String query);
 
+    MemoRecentViewedResponse getRecentViewedMemos(Long userId);
+
     MemoRecommendationResponse recommendMemos(Long userId, MemoRecommendationRequest request);
 }
