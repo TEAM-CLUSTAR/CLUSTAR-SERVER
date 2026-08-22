@@ -35,4 +35,10 @@ public class MemoSearchProperties {
      */
     @Min(1)
     private int maxMemoResults;
+
+    /**
+     * 검색 모달 [입력 완료 전]의 "최근 열람한 메모" 목록에 노출할 개수.
+     */
+    @Min(1)
+    private int recentViewedLimit;
 }
