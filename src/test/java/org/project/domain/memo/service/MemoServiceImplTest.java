@@ -19,9 +19,11 @@ import org.project.domain.memo.dto.request.MemoRecommendationRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
+import org.project.domain.memo.dto.response.MemoRecentViewedResponse;
 import org.project.domain.memo.dto.response.MemoRecommendationResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.dto.response.MemoSearchResponse;
+import org.project.domain.memo.dto.response.SearchType;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
@@ -814,14 +816,6 @@ class MemoServiceImplTest {
     @DisplayName("메모 검색 테스트")
     class SearchMemos {
 
-        @BeforeEach
-        void setUp() {
-            // ioExecutor는 final이 아니라 @Autowired 필드라 직접 주입
-            ReflectionTestUtils.setField(memoService, "ioExecutor", Executors.newSingleThreadExecutor());
-            // 의미 검색 결과 상한(중복 제거 후 상위 N개)
-            lenient().when(memoSearchProperties.getMaxMemoResults()).thenReturn(2);
-        }
-
         @Test
         @DisplayName("빈 검색어이면 EMPTY_SEARCH_QUERY 예외가 발생한다")
         void searchMemos_emptyQuery_throwsException() {
@@ -831,53 +825,30 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("텍스트 검색과 벡터 검색 결과를 병합해서 반환한다")
-        void searchMemos_mergesTextAndVectorResults() {
+        @DisplayName("키워드 검색 결과를 모두 TEXT 타입으로 반환한다 (의미 검색 비활성화)")
+        void searchMemos_returnsTextResultsOnly() {
             // given
             User user = User.builder().id(userId).build();
-            Memo textMemo = Memo.builder().id(1L).title("텍스트 메모").content("내용").user(user).isDeleted(false).build();
-            Memo vectorMemo = Memo.builder().id(2L).title("벡터 메모").content("내용").user(user).isDeleted(false).build();
+            Memo m1 = Memo.builder().id(1L).title("스프링 정리").content("내용").user(user).isDeleted(false).build();
+            Memo m2 = Memo.builder().id(2L).title("스프링 부트").content("내용").user(user).isDeleted(false).build();
 
-            given(memoRepository.searchByText(eq(userId), eq("스프링"), eq(3)))
-                    .willReturn(List.of(textMemo));
-            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링")))
-                    .willReturn(List.of(vectorMemo));
+            given(memoRepository.searchByText(eq(userId), eq("스프링")))
+                    .willReturn(List.of(m1, m2));
 
             // when
             MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
 
-            // then
-            assertThat(response.results()).hasSize(2);
-            assertThat(response.results().get(0).memoId()).isEqualTo(1L);
-            assertThat(response.results().get(1).memoId()).isEqualTo(2L);
+            // then: 리포지토리가 정렬해준 순서 그대로, 전부 TEXT 타입
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+            assertThat(response.results()).extracting("searchType")
+                    .containsOnly(SearchType.TEXT);
         }
 
         @Test
-        @DisplayName("텍스트와 벡터 결과에 같은 메모가 있으면 중복 제거된다")
-        void searchMemos_deduplicatesDuplicateMemoIds() {
+        @DisplayName("검색 결과가 없으면 빈 리스트와 안내 메시지를 반환한다")
+        void searchMemos_noResults_returnsEmptyWithMessage() {
             // given
-            User user = User.builder().id(userId).build();
-            Memo sameMemo = Memo.builder().id(1L).title("중복 메모").content("내용").user(user).isDeleted(false).build();
-
-            given(memoRepository.searchByText(eq(userId), eq("중복"), eq(3)))
-                    .willReturn(List.of(sameMemo));
-            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("중복")))
-                    .willReturn(List.of(sameMemo));
-
-            // when
-            MemoSearchResponse response = memoService.searchMemos(userId, "중복");
-
-            // then
-            assertThat(response.results()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("검색 결과가 없으면 빈 리스트를 반환한다")
-        void searchMemos_noResults_returnsEmpty() {
-            // given
-            given(memoRepository.searchByText(eq(userId), eq("없는내용"), eq(3)))
-                    .willReturn(List.of());
-            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("없는내용")))
+            given(memoRepository.searchByText(eq(userId), eq("없는내용")))
                     .willReturn(List.of());
 
             // when
@@ -885,50 +856,46 @@ class MemoServiceImplTest {
 
             // then
             assertThat(response.results()).isEmpty();
+            assertThat(response.message()).isEqualTo("검색 결과가 없어요.");
         }
+    }
+
+    @Nested
+    @DisplayName("최근 열람 메모 테스트")
+    class RecentViewedMemos {
 
         @Test
-        @DisplayName("텍스트 검색이 실패해도 예외 없이 의미 검색 결과를 반환한다")
-        void searchMemos_textSearchFails_returnsVectorResultsOnly() {
-            // given: 텍스트 검색은 예외, 벡터 검색은 결과 1개
+        @DisplayName("최근 열람한 메모를 리포지토리 정렬 순서대로 반환한다")
+        void getRecentViewedMemos_returnsItems() {
+            // given
             User user = User.builder().id(userId).build();
-            Memo vectorMemo = Memo.builder().id(2L).title("벡터 메모").content("내용").user(user).isDeleted(false).build();
+            Memo m1 = Memo.builder().id(1L).title("최근1").content("내용").user(user).isDeleted(false).build();
+            Memo m2 = Memo.builder().id(2L).title("최근2").content("내용").user(user).isDeleted(false).build();
 
-            given(memoRepository.searchByText(eq(userId), eq("스프링"), eq(3)))
-                    .willThrow(new RuntimeException("DB 오류"));
-            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링")))
-                    .willReturn(List.of(vectorMemo));
-
-            // when
-            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
-
-            // then: 예외 없이 벡터 결과만 반환
-            assertThat(response.results()).hasSize(1);
-            assertThat(response.results().get(0).memoId()).isEqualTo(2L);
-        }
-
-        @Test
-        @DisplayName("벡터 상위 결과가 텍스트와 겹쳐도 중복 제거 후 남은 상위 2개가 의미 결과로 채워진다")
-        void searchMemos_semanticBackfillsAfterDedup() {
-            // given: 텍스트=[1,2], 벡터(유사도순)=[1,2(겹침), 3,4,5]
-            User user = User.builder().id(userId).build();
-            Memo m1 = Memo.builder().id(1L).title("A").content("c").user(user).isDeleted(false).build();
-            Memo m2 = Memo.builder().id(2L).title("B").content("c").user(user).isDeleted(false).build();
-            Memo m3 = Memo.builder().id(3L).title("C").content("c").user(user).isDeleted(false).build();
-            Memo m4 = Memo.builder().id(4L).title("D").content("c").user(user).isDeleted(false).build();
-            Memo m5 = Memo.builder().id(5L).title("E").content("c").user(user).isDeleted(false).build();
-
-            given(memoRepository.searchByText(eq(userId), eq("등산"), eq(3)))
+            given(memoSearchProperties.getRecentViewedLimit()).willReturn(6);
+            given(memoRepository.findRecentViewed(eq(userId), eq(6)))
                     .willReturn(List.of(m1, m2));
-            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("등산")))
-                    .willReturn(List.of(m1, m2, m3, m4, m5));
 
             // when
-            MemoSearchResponse response = memoService.searchMemos(userId, "등산");
+            MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userId);
 
-            // then: 텍스트 1,2 + 의미는 겹치는 1,2 제외하고 상위 2개(3,4)만 (5는 상한 초과로 제외)
-            assertThat(response.results()).extracting("memoId")
-                    .containsExactly(1L, 2L, 3L, 4L);
+            // then
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+        }
+
+        @Test
+        @DisplayName("열람 이력이 없으면 빈 리스트를 반환한다")
+        void getRecentViewedMemos_empty() {
+            // given
+            given(memoSearchProperties.getRecentViewedLimit()).willReturn(6);
+            given(memoRepository.findRecentViewed(eq(userId), eq(6)))
+                    .willReturn(List.of());
+
+            // when
+            MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userId);
+
+            // then
+            assertThat(response.results()).isEmpty();
         }
     }
 
