@@ -9,14 +9,17 @@ import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.event.MemoAttachmentsRemovedEvent;
 import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.event.MemoFileCreatedEvent;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
 import org.project.domain.memo.event.MemoTextCreatedEvent;
+import org.project.domain.memo.event.MemoTextUpdatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoTagRepository;
@@ -155,6 +158,204 @@ public class MemoServiceImpl implements MemoService {
         saveMemoFiles(savedMemo, request.files(), userId);
 
         return MemoResponse.from(savedMemo);
+    }
+
+    @Transactional
+    @Override
+    public MemoResponse updateMemo(Long userId, Long memoId, MemoUpdateRequest request) {
+
+        Memo memo = getMemoOrThrow(memoId);
+        checkMyMemo(memo, userId);
+
+        User user = memo.getUser();
+
+        // 1) 제목/본문 — 실제로 바뀐 경우에만 재임베딩 (임베딩 쿼터 절약)
+        boolean textChanged = !Objects.equals(memo.getTitle(), request.title())
+                || !Objects.equals(memo.getContent(), request.content());
+        memo.update(request.title(), request.content());
+
+        // 2) 태그 전체 교체 (태그는 임베딩에 영향 없음)
+        memo.getMemoTags().clear();
+        attachTags(memo, request.tagNames(), user);
+
+        // 3) 첨부(이미지/파일) diff — 유지/추가/삭제 (null이면 첨부를 건드리지 않는다)
+        RemovedMedia removedImages = applyImageEdits(memo, request.images(), userId);
+        RemovedMedia removedFiles = applyFileEdits(memo, request.files(), userId);
+
+        // 4) updatedAt을 응답에 반영하기 위해 flush (dirty checking → @LastModifiedDate 발동)
+        memoRepository.flush();
+
+        // 5) 커밋 후 후속 처리 이벤트 발행
+        if (textChanged) {
+            eventPublisher.publishEvent(new MemoTextUpdatedEvent(memoId, userId));
+        }
+        if (!removedImages.isEmpty() || !removedFiles.isEmpty()) {
+            eventPublisher.publishEvent(new MemoAttachmentsRemovedEvent(
+                    memoId,
+                    removedImages.ids(), removedFiles.ids(),
+                    removedImages.keys(), removedFiles.keys()
+            ));
+        }
+
+        return MemoResponse.from(memo);
+    }
+
+    // 첨부 diff로 제거된 대상의 식별자/키 모음 (제거 이벤트 payload용)
+    private record RemovedMedia(List<Long> ids, List<String> keys) {
+        static RemovedMedia empty() {
+            return new RemovedMedia(List.of(), List.of());
+        }
+
+        boolean isEmpty() {
+            return ids.isEmpty();
+        }
+    }
+
+    /**
+     * 이미지 최종 상태(edits)를 현재 메모와 비교해 유지/추가/삭제를 반영한다.
+     * edits == null 이면 이미지를 건드리지 않는다(부분 수정 허용). 반환값은 삭제된 이미지 정보.
+     */
+    private RemovedMedia applyImageEdits(Memo memo, List<MemoUpdateRequest.ImageEdit> edits, Long userId) {
+        if (edits == null) {
+            return RemovedMedia.empty();
+        }
+
+        Map<Long, MemoImage> existingById = memo.getMemoImages().stream()
+                .collect(Collectors.toMap(MemoImage::getId, Function.identity()));
+
+        List<MemoUpdateRequest.ImageEdit> keepEdits = edits.stream()
+                .filter(e -> e.imageId() != null)
+                .toList();
+        List<MemoUpdateRequest.ImageEdit> addEdits = edits.stream()
+                .filter(e -> e.imageId() == null)
+                .toList();
+
+        // 유지 대상이 실제 이 메모의 이미지인지 검증 (남의/없는 이미지 유지 요청 방지)
+        for (MemoUpdateRequest.ImageEdit keep : keepEdits) {
+            if (!existingById.containsKey(keep.imageId())) {
+                throw new MemoException(MemoErrorCode.MEMO_IMAGE_NOT_FOUND);
+            }
+        }
+
+        // 최종 개수/용량 검증
+        if (keepEdits.size() + addEdits.size() > MAX_IMAGE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_IMAGES);
+        }
+        validateBytes(addEdits, MemoUpdateRequest.ImageEdit::bytes, MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE);
+
+        // 유지 이미지 우선순위 갱신
+        keepEdits.forEach(e -> existingById.get(e.imageId()).updatePriority(e.priority()));
+
+        // 삭제 = 기존 - 유지
+        Set<Long> keepIds = keepEdits.stream()
+                .map(MemoUpdateRequest.ImageEdit::imageId)
+                .collect(Collectors.toSet());
+        List<MemoImage> toRemove = memo.getMemoImages().stream()
+                .filter(mi -> !keepIds.contains(mi.getId()))
+                .toList();
+        List<Long> removedIds = toRemove.stream().map(MemoImage::getId).toList();
+        List<String> removedKeys = toRemove.stream().map(MemoImage::getImageS3Key).toList();
+        if (!removedIds.isEmpty()) {
+            memoImageRepository.deleteAllByIdInBatch(removedIds);
+        }
+
+        // 추가 저장 + 임베딩 이벤트 (신규 첨부만 재임베딩)
+        if (!addEdits.isEmpty()) {
+            List<MemoImage> added = addEdits.stream()
+                    .map(e -> createMemoImageFromEdit(memo, e, userId))
+                    .toList();
+            memoImageRepository.saveAll(added);
+            eventPublisher.publishEvent(new MemoImageCreatedEvent(
+                    memo.getId(), userId,
+                    added.stream().map(MemoImage::getId).toList()
+            ));
+        }
+
+        return new RemovedMedia(removedIds, removedKeys);
+    }
+
+    private MemoImage createMemoImageFromEdit(Memo memo, MemoUpdateRequest.ImageEdit edit, Long userId) {
+        s3KeyUtil.validateS3KeyOwner(userId, edit.s3Key());
+
+        return MemoImage.builder()
+                .memo(memo)
+                .imageS3Key(edit.s3Key())
+                .imageName(edit.imageName())
+                .imageBytes(edit.bytes())
+                .imageExtension(edit.extension())
+                .imagePriority(edit.priority())
+                .build();
+    }
+
+    /**
+     * 파일 최종 상태(edits)를 현재 메모와 비교해 유지/추가/삭제를 반영한다.
+     * edits == null 이면 파일을 건드리지 않는다. 반환값은 삭제된 파일 정보.
+     */
+    private RemovedMedia applyFileEdits(Memo memo, List<MemoUpdateRequest.FileEdit> edits, Long userId) {
+        if (edits == null) {
+            return RemovedMedia.empty();
+        }
+
+        Map<Long, MemoFile> existingById = memo.getMemoFiles().stream()
+                .collect(Collectors.toMap(MemoFile::getId, Function.identity()));
+
+        List<MemoUpdateRequest.FileEdit> keepEdits = edits.stream()
+                .filter(e -> e.fileId() != null)
+                .toList();
+        List<MemoUpdateRequest.FileEdit> addEdits = edits.stream()
+                .filter(e -> e.fileId() == null)
+                .toList();
+
+        for (MemoUpdateRequest.FileEdit keep : keepEdits) {
+            if (!existingById.containsKey(keep.fileId())) {
+                throw new MemoException(MemoErrorCode.MEMO_FILE_NOT_FOUND);
+            }
+        }
+
+        if (keepEdits.size() + addEdits.size() > MAX_FILE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
+        }
+        validateBytes(addEdits, MemoUpdateRequest.FileEdit::bytes, MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE);
+
+        keepEdits.forEach(e -> existingById.get(e.fileId()).updatePriority(e.priority()));
+
+        Set<Long> keepIds = keepEdits.stream()
+                .map(MemoUpdateRequest.FileEdit::fileId)
+                .collect(Collectors.toSet());
+        List<MemoFile> toRemove = memo.getMemoFiles().stream()
+                .filter(mf -> !keepIds.contains(mf.getId()))
+                .toList();
+        List<Long> removedIds = toRemove.stream().map(MemoFile::getId).toList();
+        List<String> removedKeys = toRemove.stream().map(MemoFile::getFileS3Key).toList();
+        if (!removedIds.isEmpty()) {
+            memoFileRepository.deleteAllByIdInBatch(removedIds);
+        }
+
+        if (!addEdits.isEmpty()) {
+            List<MemoFile> added = addEdits.stream()
+                    .map(e -> createMemoFileFromEdit(memo, e, userId))
+                    .toList();
+            memoFileRepository.saveAll(added);
+            eventPublisher.publishEvent(new MemoFileCreatedEvent(
+                    memo.getId(), userId,
+                    added.stream().map(MemoFile::getId).toList()
+            ));
+        }
+
+        return new RemovedMedia(removedIds, removedKeys);
+    }
+
+    private MemoFile createMemoFileFromEdit(Memo memo, MemoUpdateRequest.FileEdit edit, Long userId) {
+        s3KeyUtil.validateS3KeyOwner(userId, edit.s3Key());
+
+        return MemoFile.builder()
+                .memo(memo)
+                .fileS3Key(edit.s3Key())
+                .fileName(edit.fileName())
+                .fileBytes(edit.bytes())
+                .fileExtension(edit.extension())
+                .filePriority(edit.priority())
+                .build();
     }
 
     @Transactional
@@ -316,9 +517,9 @@ public class MemoServiceImpl implements MemoService {
             sourceMemos = memoRepository.findAllById(sourceIds);
         }
 
-        memo.markAsRead();
-        // 상세조회 = 열람으로 간주해 열람 시각 갱신 (최근 열람 목록/카드 날짜에 사용)
-        memo.markViewed();
+        // 상세조회 = 열람. 읽음 처리 + 열람 시각 갱신을 전용 UPDATE로 처리한다.
+        // 엔티티 dirty checking을 타지 않으므로 @LastModifiedDate(updatedAt)가 열람으로 오염되지 않는다.
+        memoRepository.touchViewed(memoId, LocalDateTime.now());
 
         return MemoDetailResponse.from(
                 memo,

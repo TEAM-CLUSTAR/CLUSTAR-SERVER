@@ -4,6 +4,7 @@ import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.*;
 
 import java.time.LocalDateTime;
@@ -17,6 +18,8 @@ public interface MemoService {
     );
 
     MemoResponse createMemo(Long userId, MemoCreateRequest request);
+
+    MemoResponse updateMemo(Long userId, Long memoId, MemoUpdateRequest request);
 
     MemoResponse createAiMemo(Long userId, MemoAiCreateRequest request);
 
