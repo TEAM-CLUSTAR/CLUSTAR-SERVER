@@ -123,6 +123,38 @@ public class VectorStoreRepository {
         return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
     }
 
+    /**
+     * 특정 이미지 첨부의 벡터 document id를 조회한다.
+     * 메모 수정으로 이미지가 제거되면 그 이미지의 벡터만 콕 집어 삭제하기 위해 사용한다.
+     * (metadata->>'imageId' 기준 — {@code MemoImageDocumentReader}가 벡터에 imageId를 심어둔다.)
+     */
+    public List<UUID> findDocumentIdsByImageId(Long imageId) {
+        String sql = """
+                SELECT id FROM vector_store
+                WHERE CAST(metadata->>'imageId' AS BIGINT) = :imageId
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("imageId", imageId);
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
+    }
+
+    /**
+     * 특정 파일 첨부의 벡터 document id를 조회한다. (metadata->>'fileId' 기준)
+     */
+    public List<UUID> findDocumentIdsByFileId(Long fileId) {
+        String sql = """
+                SELECT id FROM vector_store
+                WHERE CAST(metadata->>'fileId' AS BIGINT) = :fileId
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("fileId", fileId);
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
+    }
+
     public void deleteByIds(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return;

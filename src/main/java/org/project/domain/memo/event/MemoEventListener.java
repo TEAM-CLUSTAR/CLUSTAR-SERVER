@@ -26,4 +26,18 @@ public class MemoEventListener {
         log.info("S3 파일 삭제 완료: memoId={}", event.getMemoId());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleAttachmentsRemoved(MemoAttachmentsRemovedEvent event) {
+        log.info("메모 수정 - 제거된 첨부 S3 삭제 시작: memoId={}", event.memoId());
+
+        event.removedImageKeys().forEach(key ->
+                s3DeletionHandler.deleteOrRecord(key, event.memoId(), "image")
+        );
+        event.removedFileKeys().forEach(key ->
+                s3DeletionHandler.deleteOrRecord(key, event.memoId(), "file")
+        );
+
+        log.info("메모 수정 - 제거된 첨부 S3 삭제 완료: memoId={}", event.memoId());
+    }
+
 }
