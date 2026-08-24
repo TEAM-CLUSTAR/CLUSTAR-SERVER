@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
@@ -360,7 +361,8 @@ class MemoControllerTest {
             MemoResponse expectedResponse = new MemoResponse(
                     100L,                             // memoId
                     "SOPT 세미나",                    // title
-                    LocalDateTime.now()               // createdAt
+                    LocalDateTime.now(),              // createdAt
+                    LocalDateTime.now()               // updatedAt
             );
 
             when(memoService.createMemo(eq(userId), any(MemoCreateRequest.class)))
@@ -399,6 +401,7 @@ class MemoControllerTest {
             MemoResponse expectedResponse = new MemoResponse(
                     101L,
                     "SOPT 세미나",
+                    LocalDateTime.now(),
                     LocalDateTime.now()
             );
 
@@ -454,6 +457,7 @@ class MemoControllerTest {
             MemoResponse expectedResponse = new MemoResponse(
                     102L,
                     "이미지가 포함된 메모",
+                    LocalDateTime.now(),
                     LocalDateTime.now()
             );
 
@@ -501,6 +505,7 @@ class MemoControllerTest {
             MemoResponse expectedResponse = new MemoResponse(
                     103L,
                     "파일이 포함된 메모",
+                    LocalDateTime.now(),
                     LocalDateTime.now()
             );
 
@@ -556,6 +561,7 @@ class MemoControllerTest {
             MemoResponse expectedResponse = new MemoResponse(
                     104L,
                     "완전한 메모",
+                    LocalDateTime.now(),
                     LocalDateTime.now()
             );
 
@@ -1205,6 +1211,64 @@ class MemoControllerTest {
 
             verify(memoService, times(1))
                     .deleteMemo(eq(userId), eq(memoId));
+        }
+    }
+
+    @Nested
+    @DisplayName("메모 수정 테스트")
+    class UpdateMemoTest {
+
+        @Test
+        @DisplayName("메모 수정 성공 시 200과 수정된 메모(updatedAt 포함)를 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void updateMemo_Success() throws Exception {
+            // given
+            Long userId = 1L;
+            Long memoId = 100L;
+
+            MemoUpdateRequest request = new MemoUpdateRequest(
+                    "새 제목", "새 내용", List.of("SOPT"), List.of(), List.of());
+
+            MemoResponse expected = new MemoResponse(
+                    memoId, "새 제목", LocalDateTime.now(), LocalDateTime.now());
+
+            when(memoService.updateMemo(eq(userId), eq(memoId), any(MemoUpdateRequest.class)))
+                    .thenReturn(expected);
+
+            // when & then
+            mockMvc.perform(patch("/api/v1/memo/{memoId}", memoId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memoId").value(100))
+                    .andExpect(jsonPath("$.data.title").value("새 제목"))
+                    .andExpect(jsonPath("$.data.updatedAt").exists());
+
+            verify(memoService, times(1))
+                    .updateMemo(eq(userId), eq(memoId), any(MemoUpdateRequest.class));
+        }
+
+        @Test
+        @DisplayName("제목이 비어 있으면 400을 반환하고 서비스는 호출되지 않는다")
+        @WithMockCustomUser(userId = 1L)
+        void updateMemo_BlankTitle_BadRequest() throws Exception {
+            // given: title 공백 (@NotBlank 위반)
+            String requestJson = """
+                    {
+                        "title": "",
+                        "content": "내용"
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(patch("/api/v1/memo/{memoId}", 100L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).updateMemo(anyLong(), anyLong(), any());
         }
     }
 }

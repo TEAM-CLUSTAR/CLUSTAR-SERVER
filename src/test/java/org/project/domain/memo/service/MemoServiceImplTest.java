@@ -16,6 +16,7 @@ import org.project.domain.memo.config.MemoSearchProperties;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
@@ -27,7 +28,11 @@ import org.project.domain.memo.dto.response.SearchType;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.event.MemoAttachmentsRemovedEvent;
 import org.project.domain.memo.event.MemoDeletedEvent;
+import org.project.domain.memo.event.MemoImageCreatedEvent;
+import org.project.domain.memo.event.MemoTextUpdatedEvent;
+import org.project.domain.tag.entity.Tag;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.domain.memo.repository.MemoTagRepository;
@@ -608,6 +613,21 @@ class MemoServiceImplTest {
             verify(memoRepository, times(1)).findByIdAndNotDeleted(memoId);
         }
 
+        @DisplayName("상세조회는 열람 기록을 touchViewed 쿼리로 남긴다 (updatedAt 오염 방지)")
+        @Test
+        void getOneMemoDetail_recordsViewViaTouchViewed() {
+            // given
+            User user = User.builder().id(userId).build();
+            Memo memo = Memo.createMemo("제목", "내용", user);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when
+            memoService.getOneMemoDetail(userId, memoId);
+
+            // then: 엔티티를 dirty하게 만들지 않고 전용 쿼리로 열람 시각을 남긴다
+            verify(memoRepository).touchViewed(eq(memoId), any(LocalDateTime.class));
+        }
+
         @DisplayName("존재하지 않는 메모리를 조회하면 MEMO_NOT_FOUND 예외가 발생한다.")
         @Test
         void getOneMemoDetail_NotFound() {
@@ -1029,6 +1049,252 @@ class MemoServiceImplTest {
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
 
             verify(vectorStoreRepository, never()).computeSelectionCohesion(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("메모 수정 테스트")
+    class UpdateMemo {
+
+        private User user;
+
+        @BeforeEach
+        void setUp() {
+            user = User.builder().id(userId).build();
+        }
+
+        private Memo ownedMemo(String title, String content) {
+            Memo memo = Memo.createMemo(title, content, user);
+            ReflectionTestUtils.setField(memo, "id", memoId);
+            return memo;
+        }
+
+        private MemoUpdateRequest request(String title, String content) {
+            return new MemoUpdateRequest(title, content, List.of(), List.of(), List.of());
+        }
+
+        @Test
+        @DisplayName("제목/본문을 수정하고 응답에 updatedAt을 담아 반환한다")
+        void updateMemo_updatesTitleAndContent() {
+            // given
+            Memo memo = ownedMemo("옛 제목", "옛 내용");
+            LocalDateTime updatedAt = LocalDateTime.of(2026, 8, 24, 12, 0);
+            ReflectionTestUtils.setField(memo, "updatedAt", updatedAt);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when
+            MemoResponse response = memoService.updateMemo(userId, memoId, request("새 제목", "새 내용"));
+
+            // then
+            assertThat(memo.getTitle()).isEqualTo("새 제목");
+            assertThat(memo.getContent()).isEqualTo("새 내용");
+            assertThat(response.memoId()).isEqualTo(memoId);
+            assertThat(response.title()).isEqualTo("새 제목");
+            assertThat(response.updatedAt()).isEqualTo(updatedAt);
+        }
+
+        @Test
+        @DisplayName("제목/본문이 바뀌면 텍스트 재임베딩 이벤트를 발행한다")
+        void updateMemo_contentChanged_publishesTextUpdatedEvent() {
+            // given
+            Memo memo = ownedMemo("옛 제목", "옛 내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when
+            memoService.updateMemo(userId, memoId, request("옛 제목", "완전 다른 내용"));
+
+            // then
+            verify(eventPublisher).publishEvent(any(MemoTextUpdatedEvent.class));
+        }
+
+        @Test
+        @DisplayName("제목/본문이 그대로면 텍스트 재임베딩 이벤트를 발행하지 않는다 (임베딩 쿼터 절약)")
+        void updateMemo_contentUnchanged_doesNotPublishTextUpdatedEvent() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when: 제목/본문 동일, 태그만 다르게
+            memoService.updateMemo(userId, memoId,
+                    new MemoUpdateRequest("제목", "내용", List.of("새태그"), List.of(), List.of()));
+
+            // then
+            verify(eventPublisher, never()).publishEvent(any(MemoTextUpdatedEvent.class));
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 메모를 수정하면 MEMO_NOT_FOUND 예외가 발생한다")
+        void updateMemo_notFound_throws() {
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, request("t", "c")))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MEMO_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("본인 메모가 아니면 FORBIDDEN_MEMO 예외가 발생하고 아무것도 바꾸지 않는다")
+        void updateMemo_notOwner_throws() {
+            // given: 메모 주인은 userId, 침입자는 999
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(999L, memoId, request("해킹", "해킹")))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
+
+            assertThat(memo.getTitle()).isEqualTo("제목");
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("태그를 전체 교체한다 (기존 태그 제거 후 새 태그 부착)")
+        void updateMemo_replacesTags() {
+            // given: 기존 태그 하나 달린 메모
+            Memo memo = ownedMemo("제목", "내용");
+            Tag oldTag = Tag.create("옛태그", user);
+            memo.addTag(oldTag, 0);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(tagRepository.findAllByNameInAndUser(anyList(), any())).willReturn(List.of());
+            given(tagRepository.saveAll(anyList()))
+                    .willAnswer(inv -> inv.getArgument(0));
+
+            // when
+            memoService.updateMemo(userId, memoId,
+                    new MemoUpdateRequest("제목", "내용", List.of("새태그"), List.of(), List.of()));
+
+            // then
+            assertThat(memo.getTags()).extracting(Tag::getName).containsExactly("새태그");
+        }
+
+        @Test
+        @DisplayName("새 이미지를 추가하면 저장하고 이미지 임베딩 이벤트를 발행한다")
+        void updateMemo_addsNewImage() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(memoImageRepository.saveAll(anyList()))
+                    .willAnswer(inv -> {
+                        List<MemoImage> imgs = inv.getArgument(0);
+                        long id = 500L;
+                        for (MemoImage img : imgs) {
+                            ReflectionTestUtils.setField(img, "id", id++);
+                        }
+                        return imgs;
+                    });
+
+            MemoUpdateRequest.ImageEdit newImage =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 1024L, "png", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of());
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            verify(s3KeyUtil).validateS3KeyOwner(userId, "memo-image/1/new.png");
+            verify(memoImageRepository).saveAll(anyList());
+            verify(eventPublisher).publishEvent(any(MemoImageCreatedEvent.class));
+        }
+
+        @Test
+        @DisplayName("빠진 이미지는 삭제하고 첨부 제거 이벤트(벡터/S3 정리)를 발행한다")
+        void updateMemo_removesImage() {
+            // given: 이미지 2개 달린 메모, 요청엔 하나만 유지
+            Memo memo = ownedMemo("제목", "내용");
+            MemoImage keep = MemoImage.builder()
+                    .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
+            MemoImage remove = MemoImage.builder()
+                    .id(11L).memo(memo).imageS3Key("memo-image/1/remove.png").imagePriority(1).build();
+            memo.getMemoImages().add(keep);
+            memo.getMemoImages().add(remove);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit keepEdit =
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, null, 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            verify(memoImageRepository).deleteAllByIdInBatch(List.of(11L));
+
+            ArgumentCaptor<MemoAttachmentsRemovedEvent> captor =
+                    ArgumentCaptor.forClass(MemoAttachmentsRemovedEvent.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            MemoAttachmentsRemovedEvent event = captor.getValue();
+            assertThat(event.removedImageIds()).containsExactly(11L);
+            assertThat(event.removedImageKeys()).containsExactly("memo-image/1/remove.png");
+        }
+
+        @Test
+        @DisplayName("유지하는 이미지의 정렬 우선순위를 갱신한다")
+        void updateMemo_keepImage_updatesPriority() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            MemoImage keep = MemoImage.builder()
+                    .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
+            memo.getMemoImages().add(keep);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit keepEdit =
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, null, 3);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            assertThat(keep.getImagePriority()).isEqualTo(3);
+            verify(memoImageRepository, never()).deleteAllByIdInBatch(anyList());
+            verify(eventPublisher, never()).publishEvent(any(MemoAttachmentsRemovedEvent.class));
+        }
+
+        @Test
+        @DisplayName("유지+추가 이미지 합이 5개를 초과하면 TOO_MANY_IMAGES 예외가 발생한다")
+        void updateMemo_tooManyImages_throws() {
+            // given: 기존 3개 유지 + 신규 3개 = 6개
+            Memo memo = ownedMemo("제목", "내용");
+            List<MemoUpdateRequest.ImageEdit> edits = new java.util.ArrayList<>();
+            for (long i = 1; i <= 3; i++) {
+                MemoImage img = MemoImage.builder()
+                        .id(i).memo(memo).imageS3Key("memo-image/1/" + i + ".png").imagePriority((int) i).build();
+                memo.getMemoImages().add(img);
+                edits.add(new MemoUpdateRequest.ImageEdit(i, null, null, null, null, (int) i));
+            }
+            for (int i = 0; i < 3; i++) {
+                edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", 1L, "png", i));
+            }
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest req = new MemoUpdateRequest("제목", "내용", List.of(), edits, List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TOO_MANY_IMAGES);
+        }
+
+        @Test
+        @DisplayName("이 메모의 것이 아닌 imageId를 유지 대상으로 보내면 MEMO_IMAGE_NOT_FOUND 예외가 발생한다")
+        void updateMemo_keepUnknownImageId_throws() {
+            // given: 메모엔 이미지가 없는데 존재하지 않는 imageId 유지 요청
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit ghost =
+                    new MemoUpdateRequest.ImageEdit(999L, null, null, null, null, 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(ghost), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MEMO_IMAGE_NOT_FOUND);
         }
     }
 }

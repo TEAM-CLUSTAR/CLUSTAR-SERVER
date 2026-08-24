@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,5 +95,42 @@ class MemoRepositoryTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("touchViewed는 lastViewedAt·isNew만 갱신하고 updatedAt은 건드리지 않는다")
+    void touchViewed_doesNotBumpUpdatedAt() {
+        // given: isNew=true, 아직 열람하지 않은 메모
+        User user = userRepository.save(
+                User.createSocialUser(
+                        "test" + UUID.randomUUID() + "@test.com",
+                        "테스트 유저",
+                        "profile.png",
+                        "google"
+                )
+        );
+        Memo memo = Memo.builder()
+                .title("제목").content("내용").user(user).isNew(true)
+                .build();
+        memoRepository.save(memo);
+        em.flush();
+        em.clear();
+
+        Memo before = memoRepository.findById(memo.getId()).orElseThrow();
+        LocalDateTime originalUpdatedAt = before.getUpdatedAt();
+        assertThat(before.getLastViewedAt()).isNull();
+        assertThat(before.getIsNew()).isTrue();
+
+        // when: 열람 기록
+        LocalDateTime viewedAt = LocalDateTime.of(2026, 8, 24, 15, 0, 0);
+        memoRepository.touchViewed(memo.getId(), viewedAt);
+        em.flush();
+        em.clear();
+
+        // then
+        Memo after = memoRepository.findById(memo.getId()).orElseThrow();
+        assertThat(after.getLastViewedAt()).isEqualTo(viewedAt);
+        assertThat(after.getIsNew()).isFalse();
+        assertThat(after.getUpdatedAt()).isEqualTo(originalUpdatedAt); // 열람으로 오염되지 않음
     }
 }
