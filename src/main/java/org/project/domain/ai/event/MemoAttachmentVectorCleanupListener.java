@@ -13,11 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 메모 수정으로 제거된 이미지/파일 첨부의 벡터를 정리한다.
- * imageId/fileId 단위로 벡터 document id를 찾아 삭제한다(첨부는 벡터 metadata에 개별 id가 심겨 있음).
- * 실패는 로그만 남기고 삼킨다(발행 트랜잭션은 이미 커밋됨). 벡터 삭제 실패는 검색 정확도에만 영향.
- */
+// 메모 수정으로 제거된 첨부의 벡터를 imageId/fileId 단위로 찾아 삭제.
+// 실패는 로그만 남긴다(커밋 후 실행이라 롤백 불가, 검색 정확도에만 영향).
 @Slf4j
 @Component
 @RequiredArgsConstructor

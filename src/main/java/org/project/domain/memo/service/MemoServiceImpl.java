@@ -211,10 +211,7 @@ public class MemoServiceImpl implements MemoService {
         }
     }
 
-    /**
-     * 이미지 최종 상태(edits)를 현재 메모와 비교해 유지/추가/삭제를 반영한다.
-     * edits == null 이면 이미지를 건드리지 않는다(부분 수정 허용). 반환값은 삭제된 이미지 정보.
-     */
+    // 이미지 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. edits==null이면 손대지 않음. 반환=삭제된 이미지 정보.
     private RemovedMedia applyImageEdits(Memo memo, List<MemoUpdateRequest.ImageEdit> edits, Long userId) {
         if (edits == null) {
             return RemovedMedia.empty();
@@ -287,10 +284,7 @@ public class MemoServiceImpl implements MemoService {
                 .build();
     }
 
-    /**
-     * 파일 최종 상태(edits)를 현재 메모와 비교해 유지/추가/삭제를 반영한다.
-     * edits == null 이면 파일을 건드리지 않는다. 반환값은 삭제된 파일 정보.
-     */
+    // 파일 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. edits==null이면 손대지 않음. 반환=삭제된 파일 정보.
     private RemovedMedia applyFileEdits(Memo memo, List<MemoUpdateRequest.FileEdit> edits, Long userId) {
         if (edits == null) {
             return RemovedMedia.empty();
@@ -517,8 +511,7 @@ public class MemoServiceImpl implements MemoService {
             sourceMemos = memoRepository.findAllById(sourceIds);
         }
 
-        // 상세조회 = 열람. 읽음 처리 + 열람 시각 갱신을 전용 UPDATE로 처리한다.
-        // 엔티티 dirty checking을 타지 않으므로 @LastModifiedDate(updatedAt)가 열람으로 오염되지 않는다.
+        // 열람 기록은 전용 UPDATE로 (dirty checking 회피 → updatedAt이 열람으로 오염되지 않음)
         memoRepository.touchViewed(memoId, LocalDateTime.now());
 
         return MemoDetailResponse.from(

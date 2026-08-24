@@ -21,13 +21,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 메모 제목/본문 수정 시 텍스트 벡터를 재색인한다.
- * <p>
- * "새 벡터 적재 성공 → 그 뒤 기존 벡터 삭제" 순서를 지킨다.
- * 적재 전에 기존 document id를 먼저 캡처해두는 이유: 적재는 새 UUID로 들어가므로,
- * 옛 id만 정확히 지우기 위해서다. 적재가 실패하면 기존 벡터를 남겨(구버전이라도 검색 가능) 실패 기록만 남긴다.
- */
+// 제목/본문 수정 시 텍스트 벡터 재색인.
+// 순서: 옛 벡터 id 먼저 캡처 → 새 벡터 적재 → 성공 후 옛 id 삭제 (적재는 새 UUID라 옛 id만 정확히 지움).
+// 적재 실패 시 옛 벡터는 남겨두고(구버전이라도 검색 가능) 실패 기록만 남긴다.
 @Slf4j
 @Component
 @RequiredArgsConstructor

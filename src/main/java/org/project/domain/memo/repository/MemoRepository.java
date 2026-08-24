@@ -14,11 +14,7 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     @Query("SELECT m FROM Memo m WHERE m.id = :memoId AND m.isDeleted = false")
     Optional<Memo> findByIdAndNotDeleted(@Param("memoId") Long memoId);
 
-    /**
-     * 상세조회(열람) 시 열람 시각과 읽음 여부만 직접 UPDATE한다.
-     * 엔티티 dirty checking을 타지 않아 {@code @LastModifiedDate}(updatedAt)가 발동하지 않는다.
-     * → "열람"이 "수정 시각(updatedAt)"을 오염시키지 않도록 분리한 것.
-     */
+    // 열람 시각·읽음 여부만 직접 UPDATE. dirty checking을 안 타서 updatedAt(@LastModifiedDate)이 열람으로 오염되지 않는다.
     @Modifying
     @Query("UPDATE Memo m SET m.lastViewedAt = :viewedAt, m.isNew = false WHERE m.id = :memoId")
     void touchViewed(@Param("memoId") Long memoId, @Param("viewedAt") LocalDateTime viewedAt);
