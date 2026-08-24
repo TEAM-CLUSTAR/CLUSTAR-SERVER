@@ -23,5 +23,7 @@ public interface MemoRepositoryCustom {
             Pageable pageable
     );
 
-    List<Memo> searchByText(Long userId, String query, int limit);
+    List<Memo> searchByText(Long userId, String query);
+
+    List<Memo> findRecentViewed(Long userId, int limit);
 }

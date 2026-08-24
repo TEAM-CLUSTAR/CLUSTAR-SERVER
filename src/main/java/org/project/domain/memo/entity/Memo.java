@@ -6,6 +6,7 @@ import org.project.domain.tag.entity.Tag;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -56,6 +57,11 @@ public class Memo extends BaseEntity {
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
+
+    // 마지막으로 열람(상세조회)한 시각. 한 번도 열지 않은 메모는 null.
+    // 검색 모달의 "최근 열람한 메모" 목록 정렬/카드 날짜 표기에 사용된다.
+    @Column(name = "last_viewed_at")
+    private LocalDateTime lastViewedAt;
 
     @OneToMany(mappedBy = "memo", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("imagePriority ASC")
@@ -127,5 +133,10 @@ public class Memo extends BaseEntity {
 
     public void markAsRead() {
         this.isNew = false;
+    }
+
+    // 상세조회 시 열람 시각을 현재 시각으로 갱신한다.
+    public void markViewed() {
+        this.lastViewedAt = LocalDateTime.now();
     }
 }

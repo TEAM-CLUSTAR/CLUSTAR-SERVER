@@ -127,7 +127,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     }
 
     @Override
-    public List<Memo> searchByText(Long userId, String query, int limit) {
+    public List<Memo> searchByText(Long userId, String query) {
         QMemo memo = QMemo.memo;
         QMemoTag memoTag = QMemoTag.memoTag;
         QTag tag = QTag.tag;
@@ -158,20 +158,21 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 )
                 .fetch();
 
-        // 랭킹: 정확한 구절 > 여러 단어 매칭 > 한 단어 매칭. 동점은 최신순.
+        // 6: 제목 온전 > 5: 제목 부분 > 4: 태그 온전 > 3: 태그 부분 > 2: 본문 온전 > 1: 본문 부분
+        // 매칭되는 모든 메모를 반환(무한 스크롤 가능하게)
         String phrase = String.join(" ", tokens).toLowerCase();
         List<Memo> ranked = new ArrayList<>(candidates);
         ranked.sort(
-                Comparator.comparingInt((Memo m) -> textScore(m, tokens, phrase)).reversed()
+                Comparator.comparingInt((Memo m) -> matchRank(m, tokens, phrase)).reversed()
                         .thenComparing(Memo::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Memo::getId, Comparator.reverseOrder())
         );
 
-        return ranked.stream().limit(limit).toList();
+        return ranked;
     }
 
-    // 텍스트 검색 다중 일치로 순위매겨서 상위에 나오게
-    private int textScore(Memo m, List<String> tokens, String phrase) {
+    // 필드 우선순위(제목>태그>본문) + 필드 내 "온전 키워드 우선"을 하나의 순위값으로 환산. 높을수록 상위.
+    private int matchRank(Memo m, List<String> tokens, String phrase) {
         String title = m.getTitle() == null ? "" : m.getTitle().toLowerCase();
         String content = m.getContent() == null ? "" : m.getContent().toLowerCase();
         List<String> tagNames = m.getTags().stream()
@@ -180,17 +181,56 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .map(String::toLowerCase)
                 .toList();
 
-        int matchedTokens = 0;
+        if (title.contains(phrase)) return 6;                                        // 제목 - 온전한 키워드
+        if (containsAnyToken(title, tokens)) return 5;                               // 제목 - 부분 매칭
+        if (tagNames.stream().anyMatch(n -> n.contains(phrase))) return 4;           // 태그 - 온전한 키워드
+        if (tagNames.stream().anyMatch(n -> containsAnyToken(n, tokens))) return 3;  // 태그 - 부분 매칭
+        if (content.contains(phrase)) return 2;                                      // 본문 - 온전한 키워드
+        if (containsAnyToken(content, tokens)) return 1;                             // 본문 - 부분 매칭
+        return 0; // 후보 쿼리를 통과했으므로 정상적으로는 도달하지 않음
+    }
+
+    private boolean containsAnyToken(String field, List<String> tokens) {
         for (String token : tokens) {
-            String t = token.toLowerCase();
-            boolean hit = title.contains(t) || content.contains(t)
-                    || tagNames.stream().anyMatch(n -> n.contains(t));
-            if (hit) {
-                matchedTokens++;
+            if (field.contains(token.toLowerCase())) {
+                return true;
             }
         }
-        int phraseBoost = (title.contains(phrase) || content.contains(phrase)) ? 1000 : 0;
-        return phraseBoost + matchedTokens * 10;
+        return false;
+    }
+
+    @Override
+    public List<Memo> findRecentViewed(Long userId, int limit) {
+        QMemo memo = QMemo.memo;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
+
+        // 열람 이력이 있는(lastViewedAt != null) 메모를 최신 열람순으로 상위 limit개.
+        // 컬렉션 fetchJoin + limit의 인메모리 페이징을 피하려고 id 먼저 조회 후 페치조인(findMemos와 동일 패턴).
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
+                        memo.lastViewedAt.isNotNull()
+                )
+                .orderBy(memo.lastViewedAt.desc(), memo.id.desc())
+                .limit(limit)
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(memo.lastViewedAt.desc(), memo.id.desc())
+                .fetch();
     }
 
     /**

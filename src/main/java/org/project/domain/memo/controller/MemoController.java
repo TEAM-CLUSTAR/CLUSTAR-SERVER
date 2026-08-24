@@ -216,15 +216,27 @@ public class MemoController {
 
     @GetMapping("/search")
     @Operation(summary = "메모 검색", description = """
-            검색어를 입력하면 최대 5개의 메모를 반환합니다.
-            - 텍스트 매칭(제목/본문/태그) 최대 3개
-            - 의미 기반 벡터 검색 최대 2개
+            키워드가 제목/태그/본문에 포함된 모든 메모를 반환합니다.
+            정렬: 필드 우선순위(제목 > 태그 > 본문) + 필드 내 온전한 키워드 매칭 우선, 동점은 최신순.
+            (의미 기반 검색은 기획 결정으로 비활성화되었습니다.)
             """)
     public ResponseEntity<ApiResponse<MemoSearchResponse>> searchMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String query
     ) {
         MemoSearchResponse response = memoService.searchMemos(userDetails.getUserId(), query);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping("/recent-viewed")
+    @Operation(summary = "최근 열람한 메모", description = """
+            검색 모달 [입력 완료 전] 화면용. 사용자가 최근에 열람한 메모를 최신 열람순으로 반환합니다.
+            (열람 = 메모 상세조회. 한 번도 열람하지 않은 메모는 포함되지 않습니다.)
+            """)
+    public ResponseEntity<ApiResponse<MemoRecentViewedResponse>> getRecentViewedMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

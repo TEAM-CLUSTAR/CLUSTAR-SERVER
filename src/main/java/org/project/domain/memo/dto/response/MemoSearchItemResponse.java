@@ -16,6 +16,9 @@ public record MemoSearchItemResponse(
         String content,
         List<MemoListDashboardResponse.TagResponse> tagList,
         LocalDateTime createdAt,
+        // 마지막 열람 시각(카드 날짜 표기용). 한 번도 열람하지 않은 메모는 null 이때, 어떻게 응답을 내려줄 지는 추후 결정 예정
+        @Schema(nullable = true)
+        LocalDateTime lastViewedAt,
         SearchType searchType
 ) {
     public static MemoSearchItemResponse from(Memo memo, SearchType searchType) {
@@ -28,6 +31,7 @@ public record MemoSearchItemResponse(
                         .map(MemoListDashboardResponse.TagResponse::from)
                         .toList(),
                 memo.getCreatedAt(),
+                memo.getLastViewedAt(),
                 searchType
         );
     }

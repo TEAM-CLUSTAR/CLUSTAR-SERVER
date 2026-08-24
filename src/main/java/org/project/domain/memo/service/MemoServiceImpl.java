@@ -317,6 +317,8 @@ public class MemoServiceImpl implements MemoService {
         }
 
         memo.markAsRead();
+        // 상세조회 = 열람으로 간주해 열람 시각 갱신 (최근 열람 목록/카드 날짜에 사용)
+        memo.markViewed();
 
         return MemoDetailResponse.from(
                 memo,
@@ -372,54 +374,81 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.EMPTY_SEARCH_QUERY);
         }
 
-        // 텍스트 검색 (병렬) — 실패해도 의미 검색 결과라도 주도록 빈 리스트로 degrade
-        CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
-                () -> {
-                    try {
-                        return memoRepository.searchByText(userId, query, 3);
-                    } catch (Exception e) {
-                        log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} errorType={}",
-                                userId, e.getClass().getSimpleName());
-                        return List.<Memo>of();
-                    }
-                }, ioExecutor
-        );
+        // 키워드(텍스트) 기반 검색: 검색어가 제목/태그/본문에 포함된 모든 메모를
+        // 필드 우선순위(제목>태그>본문) + 온전한 키워드 매칭 여부 + 최신순으로 정렬해 반환한다.
+        List<Memo> textResults = memoRepository.searchByText(userId, query);
 
-        // 의미 기반 벡터 검색 (병렬)
-        CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
-                () -> memoSearchVectorRetriever.retrieve(userId, query), ioExecutor
-        );
+        List<MemoSearchItemResponse> results = textResults.stream()
+                .map(memo -> MemoSearchItemResponse.from(memo, SearchType.TEXT))
+                .toList();
 
-        CompletableFuture.allOf(textFuture, vectorFuture).join();
+        // [보존] 추후 이용될 수도 있으므로 의미 기반 검색 보존
+        /*
+         * // 텍스트 검색 (병렬) — 실패해도 의미 검색 결과라도 주도록 빈 리스트로 degrade
+         * CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
+         *         () -> {
+         *             try {
+         *                 return memoRepository.searchByText(userId, query); // (구: searchByText(userId, query, 3))
+         *             } catch (Exception e) {
+         *                 log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} errorType={}",
+         *                         userId, e.getClass().getSimpleName());
+         *                 return List.<Memo>of();
+         *             }
+         *         }, ioExecutor
+         * );
+         *
+         * // 의미 기반 벡터 검색 (병렬)
+         * CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
+         *         () -> memoSearchVectorRetriever.retrieve(userId, query), ioExecutor
+         * );
+         *
+         * CompletableFuture.allOf(textFuture, vectorFuture).join();
+         *
+         * List<Memo> textResults = textFuture.join();
+         * List<Memo> vectorResults = vectorFuture.join();
+         *
+         * // 텍스트 결과 먼저, 중복 memoId 제거하며 벡터 결과 추가
+         * Set<Long> seenIds = new LinkedHashSet<>();
+         * List<MemoSearchItemResponse> results = new ArrayList<>();
+         *
+         * textResults.forEach(memo -> {
+         *     if (seenIds.add(memo.getId())) {
+         *         results.add(MemoSearchItemResponse.from(memo, SearchType.TEXT));
+         *     }
+         * });
+         *
+         * // 벡터 결과는 텍스트와 중복 제거를 먼저 한 뒤 상위 maxMemoResults개만 가져가게
+         * int maxSemantic = memoSearchProperties.getMaxMemoResults();
+         * int semanticAdded = 0;
+         * for (Memo memo : vectorResults) {
+         *     if (semanticAdded >= maxSemantic) {
+         *         break;
+         *     }
+         *     if (seenIds.add(memo.getId())) {
+         *         results.add(MemoSearchItemResponse.from(memo, SearchType.SEMANTIC));
+         *         semanticAdded++;
+         *     }
+         * }
+         *
+         * String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
+         * return MemoSearchResponse.of(results, message);
+         */
 
-        List<Memo> textResults = textFuture.join();
-        List<Memo> vectorResults = vectorFuture.join();
-
-        // 텍스트 결과 먼저, 중복 memoId 제거하며 벡터 결과 추가
-        Set<Long> seenIds = new LinkedHashSet<>();
-        List<MemoSearchItemResponse> results = new ArrayList<>();
-
-        textResults.forEach(memo -> {
-            if (seenIds.add(memo.getId())) {
-                results.add(MemoSearchItemResponse.from(memo, SearchType.TEXT));
-            }
-        });
-
-        // 벡터 결과는 텍스트와 중복 제거를 먼저 한 뒤 상위 maxMemoResults개만 가져가게
-        int maxSemantic = memoSearchProperties.getMaxMemoResults();
-        int semanticAdded = 0;
-        for (Memo memo : vectorResults) {
-            if (semanticAdded >= maxSemantic) {
-                break;
-            }
-            if (seenIds.add(memo.getId())) {
-                results.add(MemoSearchItemResponse.from(memo, SearchType.SEMANTIC));
-                semanticAdded++;
-            }
-        }
-
-         String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
+        String message = results.isEmpty() ? "검색 결과가 없어요." : null;
         return MemoSearchResponse.of(results, message);
+    }
+
+    @Override
+    public MemoRecentViewedResponse getRecentViewedMemos(Long userId) {
+        // 검색 모달 [입력 완료 전] — 최근 열람한 메모를 최신 열람순으로 상위 N개 반환.
+        List<Memo> memos = memoRepository.findRecentViewed(
+                userId, memoSearchProperties.getRecentViewedLimit());
+
+        List<MemoRecentViewedResponse.Item> items = memos.stream()
+                .map(MemoRecentViewedResponse.Item::from)
+                .toList();
+
+        return MemoRecentViewedResponse.of(items);
     }
 
     @Override
