@@ -9,6 +9,7 @@ import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
@@ -74,6 +75,31 @@ public class MemoController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(response));
+    }
+
+    @Operation(
+            summary = "메모 수정",
+            description = """
+                메모의 제목/본문/태그와 이미지·파일 첨부를 수정합니다.
+                - 제목/본문/태그: 전달된 값으로 전체 교체합니다.
+                - 이미지/파일: 최종 상태를 전달하면 서버가 유지/추가/삭제를 계산합니다.
+                  유지할 첨부는 id로, 새로 추가하는 첨부는 presigned 업로드 후 s3Key로 전달합니다.
+                  images/files를 생략(null)하면 첨부는 변경하지 않습니다.
+                """
+    )
+    @PatchMapping("/{memoId}")
+    @BusinessExceptionDescription(SwaggerResponseDescription.UPDATE_MEMO)
+    public ResponseEntity<ApiResponse<MemoResponse>> updateMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId,
+            @Valid @RequestBody MemoUpdateRequest request
+    ) {
+
+        Long userId = userDetails.getUserId();
+
+        MemoResponse response = memoService.updateMemo(userId, memoId, request);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @Operation(
