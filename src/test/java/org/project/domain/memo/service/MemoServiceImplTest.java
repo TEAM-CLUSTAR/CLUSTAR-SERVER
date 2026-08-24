@@ -583,14 +583,16 @@ class MemoServiceImplTest {
     }
 
     @Nested
-    @DisplayName("메모 상세조회(모달창) 테스트")
+    @DisplayName("메모 상세조회 테스트")
     class getOneMemoDetail {
-        @DisplayName("메모 모달창을 상세 조회할 수 있어야 한다.")
+        @DisplayName("메모를 상세 조회할 수 있어야 한다.")
         @Test
         void getOneMemoDetail_Success() {
             // given 준비
             User user = User.builder().id(userId).build();
             Memo memo = Memo.createMemo("테스트 제목", "테스트 내용", user);
+            LocalDateTime updatedAt = LocalDateTime.of(2026, 8, 24, 10, 30);
+            ReflectionTestUtils.setField(memo, "updatedAt", updatedAt);
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             // when 실행
@@ -600,6 +602,7 @@ class MemoServiceImplTest {
             assertThat(response).isNotNull();
             assertThat(response.title()).isEqualTo("테스트 제목");
             assertThat(response.content()).isEqualTo("테스트 내용");
+            assertThat(response.updatedAt()).isEqualTo(updatedAt);
             verify(memoRepository, times(1)).findByIdAndNotDeleted(memoId);
         }
 

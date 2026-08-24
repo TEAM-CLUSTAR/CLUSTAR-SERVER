@@ -1057,6 +1057,7 @@ class MemoControllerTest {
                             new MemoListDashboardResponse.TagResponse(3L, "레퍼런스", "purple")
                     ),
                     LocalDateTime.of(2026, 1, 16, 10, 30),
+                    LocalDateTime.of(2026, 1, 16, 11, 30),
                     false,  // AI 생성 아님
                     List.of()  // sourceList 비어있음
             );
@@ -1087,6 +1088,7 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.tagList[0].name").value("SOPT"))
                     .andExpect(jsonPath("$.data.tagList[0].color").value("light-blue"))
+                    .andExpect(jsonPath("$.data.updatedAt").value("2026-01-16T11:30:00"))
                     .andExpect(jsonPath("$.data.isAiGenerated").value(false))
                     .andExpect(jsonPath("$.data.sourceMemoTitleList").isArray())
                     .andExpect(jsonPath("$.data.sourceMemoTitleList.length()").value(0));
@@ -1111,6 +1113,7 @@ class MemoControllerTest {
                     List.of(),
                     List.of(new MemoListDashboardResponse.TagResponse(1L, "개인", "magenta")),
                     LocalDateTime.of(2026, 1, 16, 12, 0),
+                    LocalDateTime.of(2026, 1, 16, 12, 30),
                     false,  // AI 생성 아님
                     List.of()  // sourceList 비어있음
             );
@@ -1150,6 +1153,7 @@ class MemoControllerTest {
                     List.of(),  // 파일 없음
                     List.of(new MemoListDashboardResponse.TagResponse(1L, "메모", "pink")),
                     LocalDateTime.of(2026, 1, 16, 13, 0),
+                    LocalDateTime.of(2026, 1, 16, 13, 30),
                     false,
                     List.of()
             );

@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
-@Schema(requiredProperties = {"memoId", "title", "content", "images", "files", "tagList", "createdAt", "isAiGenerated", "sourceMemoTitleList"})
+@Schema(requiredProperties = {"memoId", "title", "content", "images", "files", "tagList", "createdAt", "updatedAt", "isAiGenerated", "sourceMemoTitleList"})
 public record MemoDetailResponse(
 
         @Schema(description = "메모 ID", example = "1")
@@ -31,6 +31,9 @@ public record MemoDetailResponse(
 
         @Schema(description = "메모 생성 시각", example = "2026-01-13T10:30:00")
         LocalDateTime createdAt,
+
+        @Schema(description = "메모 마지막 수정 시각", example = "2026-01-13T11:00:00")
+        LocalDateTime updatedAt,
 
         @Schema(description = "AI 생성 여부", example = "false")
         Boolean isAiGenerated,
@@ -99,6 +102,7 @@ public record MemoDetailResponse(
                         .map(MemoListDashboardResponse.TagResponse::from)
                         .toList(),
                 memo.getCreatedAt(),
+                memo.getUpdatedAt(),
                 memo.getIsAiGenerated(),
                 memo.getIsAiGenerated()
                         ? extractSourceTitles(sourceMemos)

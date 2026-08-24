@@ -179,7 +179,7 @@ public class MemoController {
     }
 
     @GetMapping("/{memoId}")
-    @Operation(summary = "메모 전체 조회(모달창)", description = """
+    @Operation(summary = "메모 상세 조회", description = """
             하나의 메모를 상세조회 합니다.
             AI가 생성한 메모일 경우 선택한 메모의 ID를 리스트로 반환합니다.
             AI가 생성한 메모가 아닐 경우 선택한 메모가 없으므로 빈 리스트를 반환합니다.
