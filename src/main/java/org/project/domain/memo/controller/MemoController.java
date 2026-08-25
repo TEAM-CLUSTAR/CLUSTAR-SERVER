@@ -231,7 +231,9 @@ public class MemoController {
     @GetMapping("/recent-viewed")
     @Operation(summary = "최근 열람한 메모", description = """
             검색 모달 [입력 완료 전] 화면용. 사용자가 최근에 열람한 메모를 최신 열람순으로 반환합니다.
-            (열람 = 메모 상세조회. 한 번도 열람하지 않은 메모는 포함되지 않습니다.)
+            (열람 = 메모 상세조회.)
+            열람 이력이 하나도 없으면 최근 생성 메모(생성 최신순)로 폴백합니다.
+            목록 출처는 data.source로 구분합니다. RECENT_VIEWED / RECENT_CREATED
             """)
     public ResponseEntity<ApiResponse<MemoRecentViewedResponse>> getRecentViewedMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails

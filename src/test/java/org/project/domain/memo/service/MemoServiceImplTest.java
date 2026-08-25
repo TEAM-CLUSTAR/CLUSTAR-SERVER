@@ -20,6 +20,7 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoRecentViewedResponse;
+import org.project.domain.memo.dto.response.RecentViewedSource;
 import org.project.domain.memo.dto.response.MemoRecommendationResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.dto.response.MemoSearchResponse;
@@ -868,12 +869,14 @@ class MemoServiceImplTest {
     class RecentViewedMemos {
 
         @Test
-        @DisplayName("최근 열람한 메모를 리포지토리 정렬 순서대로 반환한다")
+        @DisplayName("최근 열람한 메모가 있으면 폴백 없이 열람 메모를 반환한다")
         void getRecentViewedMemos_returnsItems() {
             // given
             User user = User.builder().id(userId).build();
-            Memo m1 = Memo.builder().id(1L).title("최근1").content("내용").user(user).isDeleted(false).build();
-            Memo m2 = Memo.builder().id(2L).title("최근2").content("내용").user(user).isDeleted(false).build();
+            Memo m1 = Memo.builder().id(1L).title("최근1").content("내용").user(user)
+                    .isDeleted(false).lastViewedAt(LocalDateTime.now()).build();
+            Memo m2 = Memo.builder().id(2L).title("최근2").content("내용").user(user)
+                    .isDeleted(false).lastViewedAt(LocalDateTime.now().minusMinutes(1)).build();
 
             given(memoSearchProperties.getRecentViewedLimit()).willReturn(6);
             given(memoRepository.findRecentViewed(eq(userId), eq(6)))
@@ -883,21 +886,56 @@ class MemoServiceImplTest {
             MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userId);
 
             // then
+            assertThat(response.source()).isEqualTo(RecentViewedSource.RECENT_VIEWED);
             assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+            assertThat(response.results()).allMatch(item -> item.lastViewedAt() != null);
+            // 열람 이력이 있으므로 최근 생성 폴백은 조회하지 않는다
+            verify(memoRepository, never()).findRecentCreated(anyLong(), anyInt());
         }
 
         @Test
-        @DisplayName("열람 이력이 없으면 빈 리스트를 반환한다")
-        void getRecentViewedMemos_empty() {
+        @DisplayName("열람 이력이 없으면 최근 생성 메모로 폴백한다 (lastViewedAt=null, createdAt 채움)")
+        void getRecentViewedMemos_fallbackToRecentCreated() {
             // given
+            User user = User.builder().id(userId).build();
+            LocalDateTime created = LocalDateTime.now().minusDays(1);
+            Memo created1 = Memo.builder().id(10L).title("생성1").content("내용").user(user)
+                    .isDeleted(false).build(); // lastViewedAt == null (한 번도 열람 안 함)
+            ReflectionTestUtils.setField(created1, "createdAt", created);
+
             given(memoSearchProperties.getRecentViewedLimit()).willReturn(6);
             given(memoRepository.findRecentViewed(eq(userId), eq(6)))
                     .willReturn(List.of());
+            given(memoRepository.findRecentCreated(eq(userId), eq(6)))
+                    .willReturn(List.of(created1));
 
             // when
             MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userId);
 
             // then
+            assertThat(response.source()).isEqualTo(RecentViewedSource.RECENT_CREATED);
+            assertThat(response.results()).hasSize(1);
+            MemoRecentViewedResponse.Item item = response.results().get(0);
+            assertThat(item.memoId()).isEqualTo(10L);
+            assertThat(item.lastViewedAt()).isNull();
+            assertThat(item.createdAt()).isEqualTo(created);
+        }
+
+        @Test
+        @DisplayName("열람 이력도 생성 메모도 없으면 빈 리스트를 반환한다")
+        void getRecentViewedMemos_empty() {
+            // given
+            given(memoSearchProperties.getRecentViewedLimit()).willReturn(6);
+            given(memoRepository.findRecentViewed(eq(userId), eq(6)))
+                    .willReturn(List.of());
+            given(memoRepository.findRecentCreated(eq(userId), eq(6)))
+                    .willReturn(List.of());
+
+            // when
+            MemoRecentViewedResponse response = memoService.getRecentViewedMemos(userId);
+
+            // then — 열람 이력이 없어 생성 폴백을 시도했으므로 source는 RECENT_CREATED
+            assertThat(response.source()).isEqualTo(RecentViewedSource.RECENT_CREATED);
             assertThat(response.results()).isEmpty();
         }
     }

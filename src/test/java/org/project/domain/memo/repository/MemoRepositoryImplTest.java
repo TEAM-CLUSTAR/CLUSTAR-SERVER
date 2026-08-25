@@ -222,4 +222,90 @@ class MemoRepositoryImplTest {
         // then
         assertThat(result).isEmpty();
     }
+
+    @Test
+    @DisplayName("최근 생성 메모를 열람 여부와 무관하게 생성 최신순으로 조회한다")
+    void findRecentCreated_orderByCreatedAtDesc() {
+        // given
+        User user = userRepository.save(
+                User.createSocialUser("created@test.com", "유저", "profile.png", "google")
+        );
+
+        LocalDateTime base = LocalDateTime.now();
+        Memo oldMemo = Memo.createMemo("old", "old", user);
+        Memo newMemo = Memo.createMemo("new", "new", user);
+        em.persist(oldMemo);
+        em.persist(newMemo);
+        em.flush();
+
+        forceCreatedAt(oldMemo.getId(), base.minusMinutes(1));
+        forceCreatedAt(newMemo.getId(), base);
+        em.clear();
+
+        // when
+        List<Memo> result = memoRepository.findRecentCreated(user.getId(), 6);
+
+        // then — 열람 이력이 없어도(lastViewedAt == null) 최신 생성순으로 조회된다
+        assertThat(result)
+                .extracting(Memo::getTitle)
+                .containsExactly("new", "old");
+        assertThat(result).allMatch(m -> m.getLastViewedAt() == null);
+    }
+
+    @Test
+    @DisplayName("삭제된 메모는 최근 생성 조회에서 제외된다")
+    void findRecentCreated_deletedExcluded() {
+        // given
+        User user = userRepository.save(
+                User.createSocialUser("created-del@test.com", "유저", "profile.png", "google")
+        );
+
+        Memo alive = Memo.createMemo("살아있음", "content", user);
+        Memo deleted = Memo.createMemo("삭제됨", "content", user);
+        em.persist(alive);
+        em.persist(deleted);
+        deleted.delete();
+        em.flush();
+        em.clear();
+
+        // when
+        List<Memo> result = memoRepository.findRecentCreated(user.getId(), 6);
+
+        // then
+        assertThat(result)
+                .extracting(Memo::getTitle)
+                .containsExactly("살아있음");
+    }
+
+    @Test
+    @DisplayName("최근 생성 조회는 limit 개수만큼만 반환한다")
+    void findRecentCreated_respectsLimit() {
+        // given
+        User user = userRepository.save(
+                User.createSocialUser("created-limit@test.com", "유저", "profile.png", "google")
+        );
+
+        for (int i = 0; i < 5; i++) {
+            em.persist(Memo.createMemo("memo" + i, "content", user));
+        }
+        em.flush();
+        em.clear();
+
+        // when
+        List<Memo> result = memoRepository.findRecentCreated(user.getId(), 3);
+
+        // then
+        assertThat(result).hasSize(3);
+    }
+
+    private void forceCreatedAt(Long memoId, LocalDateTime createdAt) {
+        em.getEntityManager().createQuery("""
+                    update Memo m
+                    set m.createdAt = :createdAt
+                    where m.id = :id
+                """)
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", memoId)
+                .executeUpdate();
+    }
 }

@@ -26,4 +26,6 @@ public interface MemoRepositoryCustom {
     List<Memo> searchByText(Long userId, String query);
 
     List<Memo> findRecentViewed(Long userId, int limit);
+
+    List<Memo> findRecentCreated(Long userId, int limit);
 }

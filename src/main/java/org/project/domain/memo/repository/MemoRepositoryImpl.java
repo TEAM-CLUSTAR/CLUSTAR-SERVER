@@ -233,6 +233,39 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .fetch();
     }
 
+    @Override
+    public List<Memo> findRecentCreated(Long userId, int limit) {
+        QMemo memo = QMemo.memo;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
+
+        // 최근 열람 메모가 없을 때의 폴백 — 열람 여부와 무관하게 생성 최신순으로 상위 limit개.
+        // 컬렉션 fetchJoin + limit의 인메모리 페이징을 피하려고 id 먼저 조회 후 페치조인(findRecentViewed와 동일 패턴).
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false)
+                )
+                .orderBy(memo.createdAt.desc(), memo.id.desc())
+                .limit(limit)
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(memo.createdAt.desc(), memo.id.desc())
+                .fetch();
+    }
+
     /**
      * tagIds가 있을 때
      */

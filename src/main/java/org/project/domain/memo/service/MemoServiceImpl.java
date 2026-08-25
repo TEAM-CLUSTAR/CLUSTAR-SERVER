@@ -441,14 +441,21 @@ public class MemoServiceImpl implements MemoService {
     @Override
     public MemoRecentViewedResponse getRecentViewedMemos(Long userId) {
         // 검색 모달 [입력 완료 전] — 최근 열람한 메모를 최신 열람순으로 상위 N개 반환.
-        List<Memo> memos = memoRepository.findRecentViewed(
-                userId, memoSearchProperties.getRecentViewedLimit());
+        int limit = memoSearchProperties.getRecentViewedLimit();
+        List<Memo> memos = memoRepository.findRecentViewed(userId, limit);
+
+        // 열람 이력이 하나도 없으면 검색 진입 화면이 비지 않도록 최근 생성 메모로 폴백한다.
+        RecentViewedSource source = RecentViewedSource.RECENT_VIEWED;
+        if (memos.isEmpty()) {
+            source = RecentViewedSource.RECENT_CREATED;
+            memos = memoRepository.findRecentCreated(userId, limit);
+        }
 
         List<MemoRecentViewedResponse.Item> items = memos.stream()
                 .map(MemoRecentViewedResponse.Item::from)
                 .toList();
 
-        return MemoRecentViewedResponse.of(items);
+        return MemoRecentViewedResponse.of(source, items);
     }
 
     @Override
