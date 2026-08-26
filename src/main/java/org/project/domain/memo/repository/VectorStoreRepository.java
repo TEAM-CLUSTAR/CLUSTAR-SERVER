@@ -149,6 +149,13 @@ public class VectorStoreRepository {
         return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
     }
 
+    // 메모의 모든 벡터(text/image/file)를 memoId 기준으로 삭제. 메모 삭제 시 유령 벡터를 남기지 않기 위해 사용한다.
+    public void deleteByMemoId(Long memoId) {
+        String sql = "DELETE FROM vector_store WHERE CAST(metadata->>'memoId' AS BIGINT) = :memoId";
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("memoId", memoId);
+        jdbcTemplate.update(sql, params);
+    }
+
     public void deleteByIds(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return;
