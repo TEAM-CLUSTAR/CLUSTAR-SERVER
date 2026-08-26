@@ -213,9 +213,9 @@ public class MemoServiceImpl implements MemoService {
 
     // 이미지 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 이미지 정보. (edits는 @NotNull 보장)
     private RemovedMedia applyImageEdits(Memo memo, List<MemoUpdateRequest.ImageEdit> edits, Long userId) {
-        // 각 항목은 유지(imageId) 또는 추가(s3Key) 중 하나여야 한다 (둘 다 null = 정체불명 → 거부)
+        // 각 항목은 유지(imageId) 또는 추가(s3Key) 중 "정확히 하나"만 가져야 한다.
         for (MemoUpdateRequest.ImageEdit e : edits) {
-            if (e.imageId() == null && e.s3Key() == null) {
+            if ((e.imageId() == null) == (e.s3Key() == null)) {
                 throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
             }
         }
@@ -289,9 +289,10 @@ public class MemoServiceImpl implements MemoService {
 
     // 파일 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 파일 정보. (edits는 @NotNull 보장)
     private RemovedMedia applyFileEdits(Memo memo, List<MemoUpdateRequest.FileEdit> edits, Long userId) {
-        // 각 항목은 유지(fileId) 또는 추가(s3Key) 중 하나여야 한다 (둘 다 null = 정체불명 → 거부)
+        // 각 항목은 유지(fileId) 또는 추가(s3Key) 중 "정확히 하나"만 가져야 한다.
+        // 둘 다 null(정체불명) 또는 둘 다 있음(유지/추가 모호) → 거부.
         for (MemoUpdateRequest.FileEdit e : edits) {
-            if (e.fileId() == null && e.s3Key() == null) {
+            if ((e.fileId() == null) == (e.s3Key() == null)) {
                 throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
             }
         }

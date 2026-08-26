@@ -1314,6 +1314,27 @@ class MemoServiceImplTest {
         }
 
         @Test
+        @DisplayName("이미지 항목이 imageId와 s3Key를 동시에 가지면 INVALID_ATTACHMENT_EDIT 예외가 발생한다")
+        void updateMemo_imageEditBothPresent_throws() {
+            // given: 한 항목이 유지(id)와 추가(s3Key)를 동시에 가짐 → 모호
+            Memo memo = ownedMemo("제목", "내용");
+            MemoImage existing = MemoImage.builder()
+                    .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
+            memo.getMemoImages().add(existing);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit ambiguous =
+                    new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", 1L, "png", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(ambiguous), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+        }
+
+        @Test
         @DisplayName("파일 항목이 fileId도 s3Key도 없으면 INVALID_ATTACHMENT_EDIT 예외가 발생한다")
         void updateMemo_fileEditBothNull_throws() {
             // given
