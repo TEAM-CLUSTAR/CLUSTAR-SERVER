@@ -1149,6 +1149,23 @@ class MemoServiceImplTest {
         }
 
         @Test
+        @DisplayName("tagNames가 현재 태그와 동일하면 태그를 재생성하지 않는다 (자동저장 불필요 churn 방지)")
+        void updateMemo_tagNamesUnchanged_skipsReplacement() {
+            // given: 현재 태그 ["SOPT"], 요청도 동일
+            Memo memo = ownedMemo("제목", "내용");
+            memo.addTag(Tag.create("SOPT", user), 0);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when
+            memoService.updateMemo(userId, memoId,
+                    new MemoUpdateRequest("제목", "내용", List.of("SOPT"), List.of(), List.of()));
+
+            // then: 태그 그대로 유지 + 태그 조회/생성 로직 미호출
+            assertThat(memo.getTags()).extracting(Tag::getName).containsExactly("SOPT");
+            verify(tagRepository, never()).findAllByNameInAndUser(anyList(), any());
+        }
+
+        @Test
         @DisplayName("tagNames가 빈 배열이면 태그를 전부 제거한다")
         void updateMemo_tagNamesEmpty_removesAll() {
             // given

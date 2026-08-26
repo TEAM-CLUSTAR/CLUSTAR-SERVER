@@ -174,9 +174,13 @@ public class MemoServiceImpl implements MemoService {
                 || !Objects.equals(memo.getContent(), request.content());
         memo.update(request.title(), request.content());
 
-        // 2) 태그 전체 교체 (항상 최종 상태를 받으므로 무조건 교체, 태그는 임베딩에 영향 없음)
-        memo.getMemoTags().clear();
-        attachTags(memo, request.tagNames(), user);
+        // 2) 태그 — 최종 상태가 현재와 다를 때만 교체 (자동저장 시 불필요한 삭제/재생성·updatedAt 갱신 방지)
+        //    순서=우선순위라 순서 민감 비교. 태그는 임베딩에 영향 없음.
+        List<String> currentTagNames = memo.getTags().stream().map(Tag::getName).toList();
+        if (!currentTagNames.equals(request.tagNames())) {
+            memo.getMemoTags().clear();
+            attachTags(memo, request.tagNames(), user);
+        }
 
         // 3) 첨부(이미지/파일) diff — 유지/추가/삭제
         RemovedMedia removedImages = applyImageEdits(memo, request.images(), userId);
