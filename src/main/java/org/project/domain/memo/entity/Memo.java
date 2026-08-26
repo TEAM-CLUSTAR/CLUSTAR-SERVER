@@ -127,16 +127,14 @@ public class Memo extends BaseEntity {
         this.memoTags.add(memoTag);
     }
 
+    // 제목·본문 수정. 태그/첨부는 Service에서 컬렉션을 재구성한다.
+    public void update(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+
     public void delete() {
         this.isDeleted = true;
     }
 
-    public void markAsRead() {
-        this.isNew = false;
-    }
-
-    // 상세조회 시 열람 시각을 현재 시각으로 갱신한다.
-    public void markViewed() {
-        this.lastViewedAt = LocalDateTime.now();
-    }
 }

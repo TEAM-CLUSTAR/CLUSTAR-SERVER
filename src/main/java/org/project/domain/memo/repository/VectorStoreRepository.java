@@ -123,6 +123,39 @@ public class VectorStoreRepository {
         return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
     }
 
+    // 특정 이미지 첨부의 벡터 id 조회 (metadata->>'imageId' 기준). 이미지 제거 시 그 벡터만 골라 삭제하는 데 쓴다.
+    public List<UUID> findDocumentIdsByImageId(Long imageId) {
+        String sql = """
+                SELECT id FROM vector_store
+                WHERE CAST(metadata->>'imageId' AS BIGINT) = :imageId
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("imageId", imageId);
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
+    }
+
+    // 특정 파일 첨부의 벡터 id 조회 (metadata->>'fileId' 기준).
+    public List<UUID> findDocumentIdsByFileId(Long fileId) {
+        String sql = """
+                SELECT id FROM vector_store
+                WHERE CAST(metadata->>'fileId' AS BIGINT) = :fileId
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("fileId", fileId);
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
+    }
+
+    // 메모의 모든 벡터(text/image/file)를 memoId 기준으로 삭제. 메모 삭제 시 유령 벡터를 남기지 않기 위해 사용한다.
+    public void deleteByMemoId(Long memoId) {
+        String sql = "DELETE FROM vector_store WHERE CAST(metadata->>'memoId' AS BIGINT) = :memoId";
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("memoId", memoId);
+        jdbcTemplate.update(sql, params);
+    }
+
     public void deleteByIds(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return;

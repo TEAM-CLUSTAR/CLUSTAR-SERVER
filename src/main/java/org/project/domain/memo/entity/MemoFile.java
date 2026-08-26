@@ -34,4 +34,9 @@ public class MemoFile {
 
     @Column(name = "file_priority", nullable = false)
     private Integer filePriority;
+
+    // 메모 수정 시 유지되는 파일의 정렬 우선순위 갱신
+    public void updatePriority(Integer filePriority) {
+        this.filePriority = filePriority;
+    }
 }

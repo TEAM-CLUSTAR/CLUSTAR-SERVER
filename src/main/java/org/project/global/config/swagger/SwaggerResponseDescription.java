@@ -18,6 +18,20 @@ public enum SwaggerResponseDescription {
             UserErrorCode.NOT_FOUND_USER
     ))),
 
+    UPDATE_MEMO(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            MemoErrorCode.MEMO_IMAGE_NOT_FOUND,
+            MemoErrorCode.MEMO_FILE_NOT_FOUND,
+            MemoErrorCode.INVALID_ATTACHMENT_EDIT,
+            MemoErrorCode.TOO_MANY_IMAGES,
+            MemoErrorCode.TOO_MANY_FILES,
+            MemoErrorCode.IMAGE_TOO_LARGE,
+            MemoErrorCode.FILE_TOO_LARGE,
+            MemoErrorCode.INVALID_S3_KEY_FORMAT,
+            MemoErrorCode.S3_KEY_USER_MISMATCH
+    ))),
+
     GOOGLE_LOGIN(new LinkedHashSet<>(Set.of(
 
     ))),

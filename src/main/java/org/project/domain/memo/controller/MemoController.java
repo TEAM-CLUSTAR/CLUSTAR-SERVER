@@ -9,6 +9,7 @@ import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
+import org.project.domain.memo.dto.request.MemoUpdateRequest;
 import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
@@ -74,6 +75,36 @@ public class MemoController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(response));
+    }
+
+    @Operation(
+            summary = "메모 수정",
+            description = """
+                    제목/본문/태그/첨부를 **항상 최종 상태로** 보내면 서버가 현재와 비교해 반영합니다. (모든 필드 null 금지 — 빈 건 ""/[])
+
+                    - **title/content**: 값으로 교체 (빈 문자열 허용)
+                    - **tagNames**: 목록으로 태그 교체 (순서=우선순위, 없는 이름은 자동 생성, 없으면 [])
+                    - **images/files**: 최종 목록 전송 → 서버가 유지/추가/삭제 계산
+                      - 유지: `imageId`(또는 `fileId`)만  |  추가: presigned 업로드 후 `s3Key`+메타  |  삭제: 목록에서 빠뜨림
+                      - 안 바꿔도 현재 목록 그대로, 없으면 []
+                      - 제약: 각 최대 5개, 이미지 5MB/파일 10MB
+
+                    응답의 `updatedAt`은 수정 시각으로 갱신됩니다.
+                    """
+    )
+    @PatchMapping("/{memoId}")
+    @BusinessExceptionDescription(SwaggerResponseDescription.UPDATE_MEMO)
+    public ResponseEntity<ApiResponse<MemoResponse>> updateMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId,
+            @Valid @RequestBody MemoUpdateRequest request
+    ) {
+
+        Long userId = userDetails.getUserId();
+
+        MemoResponse response = memoService.updateMemo(userId, memoId, request);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @Operation(

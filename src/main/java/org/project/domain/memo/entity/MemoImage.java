@@ -34,5 +34,10 @@ public class MemoImage {
 
     @Column(name = "image_priority", nullable = false)
     private Integer imagePriority;
+
+    // 메모 수정 시 유지되는 이미지의 정렬 우선순위 갱신
+    public void updatePriority(Integer imagePriority) {
+        this.imagePriority = imagePriority;
+    }
 }
 
