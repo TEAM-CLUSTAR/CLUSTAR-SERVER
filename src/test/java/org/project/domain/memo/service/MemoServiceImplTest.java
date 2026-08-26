@@ -1149,6 +1149,22 @@ class MemoServiceImplTest {
         }
 
         @Test
+        @DisplayName("tagNames가 빈 배열이면 태그를 전부 제거한다")
+        void updateMemo_tagNamesEmpty_removesAll() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            memo.addTag(Tag.create("기존태그", user), 0);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            // when
+            memoService.updateMemo(userId, memoId,
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of()));
+
+            // then
+            assertThat(memo.getTags()).isEmpty();
+        }
+
+        @Test
         @DisplayName("태그를 전체 교체한다 (기존 태그 제거 후 새 태그 부착)")
         void updateMemo_replacesTags() {
             // given: 기존 태그 하나 달린 메모
@@ -1277,6 +1293,42 @@ class MemoServiceImplTest {
             assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
                     .isInstanceOf(MemoException.class)
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TOO_MANY_IMAGES);
+        }
+
+        @Test
+        @DisplayName("이미지 항목이 imageId도 s3Key도 없으면 INVALID_ATTACHMENT_EDIT 예외가 발생한다")
+        void updateMemo_imageEditBothNull_throws() {
+            // given: 배열 안 원소가 유지(id)도 추가(s3Key)도 아님
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit bad =
+                    new MemoUpdateRequest.ImageEdit(null, null, null, null, null, 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(bad), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+        }
+
+        @Test
+        @DisplayName("파일 항목이 fileId도 s3Key도 없으면 INVALID_ATTACHMENT_EDIT 예외가 발생한다")
+        void updateMemo_fileEditBothNull_throws() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.FileEdit bad =
+                    new MemoUpdateRequest.FileEdit(null, null, null, null, null, 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(bad));
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_ATTACHMENT_EDIT);
         }
 
         @Test

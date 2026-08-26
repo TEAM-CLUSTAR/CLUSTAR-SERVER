@@ -1,18 +1,18 @@
 package org.project.domain.memo.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 public record MemoCreateRequest(
 
-        @Schema(description = "제목", example = "SOPT 세미나")
-        @NotBlank(message = "제목은 필수입니다.")
+        @Schema(description = "제목 (빈 문자열 허용)", example = "SOPT 세미나")
+        @NotNull(message = "title은 null일 수 없습니다. 제목이 없으면 빈 문자열(\"\")로 보내주세요.")
         String title,
 
-        @Schema(description = "내용", example = "7차 세미나 내용은 ~가 중요~.")
-        @NotBlank(message = "내용을 입력해주세요.")
+        @Schema(description = "내용 (빈 문자열 허용)", example = "7차 세미나 내용은 ~가 중요~.")
+        @NotNull(message = "content는 null일 수 없습니다. 내용이 없으면 빈 문자열(\"\")로 보내주세요.")
         String content,
 
         @Schema(description = "태그 이름 목록", example = "[\"SOPT\", \"교양\", \"레퍼런스\"]")

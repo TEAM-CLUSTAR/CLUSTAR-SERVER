@@ -23,6 +23,7 @@ public enum SwaggerResponseDescription {
             MemoErrorCode.FORBIDDEN_MEMO,
             MemoErrorCode.MEMO_IMAGE_NOT_FOUND,
             MemoErrorCode.MEMO_FILE_NOT_FOUND,
+            MemoErrorCode.INVALID_ATTACHMENT_EDIT,
             MemoErrorCode.TOO_MANY_IMAGES,
             MemoErrorCode.TOO_MANY_FILES,
             MemoErrorCode.IMAGE_TOO_LARGE,

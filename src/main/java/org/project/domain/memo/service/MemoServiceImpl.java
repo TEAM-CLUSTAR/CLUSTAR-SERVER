@@ -174,11 +174,11 @@ public class MemoServiceImpl implements MemoService {
                 || !Objects.equals(memo.getContent(), request.content());
         memo.update(request.title(), request.content());
 
-        // 2) 태그 전체 교체 (태그는 임베딩에 영향 없음)
+        // 2) 태그 전체 교체 (항상 최종 상태를 받으므로 무조건 교체, 태그는 임베딩에 영향 없음)
         memo.getMemoTags().clear();
         attachTags(memo, request.tagNames(), user);
 
-        // 3) 첨부(이미지/파일) diff — 유지/추가/삭제 (null이면 첨부를 건드리지 않는다)
+        // 3) 첨부(이미지/파일) diff — 유지/추가/삭제
         RemovedMedia removedImages = applyImageEdits(memo, request.images(), userId);
         RemovedMedia removedFiles = applyFileEdits(memo, request.files(), userId);
 
@@ -211,10 +211,13 @@ public class MemoServiceImpl implements MemoService {
         }
     }
 
-    // 이미지 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. edits==null이면 손대지 않음. 반환=삭제된 이미지 정보.
+    // 이미지 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 이미지 정보. (edits는 @NotNull 보장)
     private RemovedMedia applyImageEdits(Memo memo, List<MemoUpdateRequest.ImageEdit> edits, Long userId) {
-        if (edits == null) {
-            return RemovedMedia.empty();
+        // 각 항목은 유지(imageId) 또는 추가(s3Key) 중 하나여야 한다 (둘 다 null = 정체불명 → 거부)
+        for (MemoUpdateRequest.ImageEdit e : edits) {
+            if (e.imageId() == null && e.s3Key() == null) {
+                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+            }
         }
 
         Map<Long, MemoImage> existingById = memo.getMemoImages().stream()
@@ -284,10 +287,13 @@ public class MemoServiceImpl implements MemoService {
                 .build();
     }
 
-    // 파일 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. edits==null이면 손대지 않음. 반환=삭제된 파일 정보.
+    // 파일 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 파일 정보. (edits는 @NotNull 보장)
     private RemovedMedia applyFileEdits(Memo memo, List<MemoUpdateRequest.FileEdit> edits, Long userId) {
-        if (edits == null) {
-            return RemovedMedia.empty();
+        // 각 항목은 유지(fileId) 또는 추가(s3Key) 중 하나여야 한다 (둘 다 null = 정체불명 → 거부)
+        for (MemoUpdateRequest.FileEdit e : edits) {
+            if (e.fileId() == null && e.s3Key() == null) {
+                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+            }
         }
 
         Map<Long, MemoFile> existingById = memo.getMemoFiles().stream()

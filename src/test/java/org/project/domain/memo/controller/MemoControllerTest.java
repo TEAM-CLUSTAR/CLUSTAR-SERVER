@@ -609,10 +609,13 @@ class MemoControllerTest {
         }
 
         @Test
-        @DisplayName("title이 빈 문자열이면 실패해야 한다.")
+        @DisplayName("title이 빈 문자열이어도 저장된다 (자동저장 - '제목없음' 케이스)")
         @WithMockCustomUser(userId = 1L)
-        void createMemo_TitleEmpty_Fail() throws Exception {
-            // given
+        void createMemo_TitleEmpty_Success() throws Exception {
+            // given: 제목 빈 문자열은 허용(null만 금지)
+            when(memoService.createMemo(anyLong(), any(MemoCreateRequest.class)))
+                    .thenReturn(new MemoResponse(1L, "", LocalDateTime.now(), LocalDateTime.now()));
+
             String requestJson = """
                     {
                         "title": "",
@@ -628,35 +631,9 @@ class MemoControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(requestJson))
                     .andDo(print())
-                    .andExpect(status().isBadRequest());  // 400
+                    .andExpect(status().isCreated());
 
-            verify(memoService, never()).createMemo(anyLong(), any());
-        }
-
-
-        @Test
-        @DisplayName("title이 공백만 있으면 실패해야 한다.")
-        @WithMockCustomUser(userId = 1L)
-        void createMemo_TitleBlank_Fail() throws Exception {
-            // given
-            String requestJson = """
-                    {
-                        "title": "   ",
-                        "content": "내용입니다.",
-                        "tagNames": [],
-                        "images": [],
-                        "files": []
-                    }
-                    """;
-
-            // when & then
-            mockMvc.perform(post("/api/v1/memo")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(requestJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());  // 400
-
-            verify(memoService, never()).createMemo(anyLong(), any());
+            verify(memoService).createMemo(anyLong(), any(MemoCreateRequest.class));
         }
 
         @Test
@@ -668,56 +645,6 @@ class MemoControllerTest {
                     {
                         "title": "제목입니다.",
                         "content": null,
-                        "tagNames": [],
-                        "images": [],
-                        "files": []
-                    }
-                    """;
-
-            // when & then
-            mockMvc.perform(post("/api/v1/memo")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(requestJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());  // 400
-
-            verify(memoService, never()).createMemo(anyLong(), any());
-        }
-
-        @Test
-        @DisplayName("content가 빈 문자열이면 실패해야 한다.")
-        @WithMockCustomUser(userId = 1L)
-        void createMemo_ContentEmpty_Fail() throws Exception {
-            // given
-            String requestJson = """
-                    {
-                        "title": "제목입니다.",
-                        "content": "",
-                        "tagNames": [],
-                        "images": [],
-                        "files": []
-                    }
-                    """;
-
-            // when & then
-            mockMvc.perform(post("/api/v1/memo")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(requestJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());  // 400
-
-            verify(memoService, never()).createMemo(anyLong(), any());
-        }
-
-        @Test
-        @DisplayName("content가 공백만 있으면 실패해야 한다.")
-        @WithMockCustomUser(userId = 1L)
-        void createMemo_ContentBlank_Fail() throws Exception {
-            // given
-            String requestJson = """
-                    {
-                        "title": "제목입니다.",
-                        "content": "   ",
                         "tagNames": [],
                         "images": [],
                         "files": []
@@ -1250,14 +1177,45 @@ class MemoControllerTest {
         }
 
         @Test
-        @DisplayName("제목이 비어 있으면 400을 반환하고 서비스는 호출되지 않는다")
+        @DisplayName("제목이 빈 문자열이어도 수정된다 (자동저장 - '제목없음' 케이스)")
         @WithMockCustomUser(userId = 1L)
-        void updateMemo_BlankTitle_BadRequest() throws Exception {
-            // given: title 공백 (@NotBlank 위반)
+        void updateMemo_EmptyTitle_Success() throws Exception {
+            // given: 빈 제목 허용(null만 금지). 옵션2라 배열 필드는 항상 전달
+            when(memoService.updateMemo(anyLong(), anyLong(), any(MemoUpdateRequest.class)))
+                    .thenReturn(new MemoResponse(100L, "", LocalDateTime.now(), LocalDateTime.now()));
+
             String requestJson = """
                     {
                         "title": "",
-                        "content": "내용"
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(patch("/api/v1/memo/{memoId}", 100L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isOk());
+
+            verify(memoService).updateMemo(anyLong(), anyLong(), any(MemoUpdateRequest.class));
+        }
+
+        @Test
+        @DisplayName("images/files/tagNames를 null로 보내면 400을 반환한다 (항상 최종 상태 명시)")
+        @WithMockCustomUser(userId = 1L)
+        void updateMemo_NullArrays_BadRequest() throws Exception {
+            // given: 배열 필드를 null로 (옵션2에서는 금지 — 빈 건 []로 보내야 함)
+            String requestJson = """
+                    {
+                        "title": "새 제목",
+                        "content": "새 내용",
+                        "tagNames": null,
+                        "images": null,
+                        "files": null
                     }
                     """;
 
