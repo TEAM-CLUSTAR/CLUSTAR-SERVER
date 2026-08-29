@@ -706,6 +706,101 @@ class MemoControllerTest {
             verify(memoService, never()).createMemo(anyLong(), any());
         }
 
+        @Test
+        @DisplayName("이미지 항목의 imageName이 누락되면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ImageNameMissing_BadRequest() throws Exception {
+            // given: 첨부를 보낼 경우 파일명·확장자는 필수
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [
+                            {
+                                "s3Key": "memo-image/1/uuid.png",
+                                "extension": "png",
+                                "priority": 0
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("이미지 항목의 extension이 공백이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ImageExtensionBlank_BadRequest() throws Exception {
+            // given: 빈 문자열·공백도 거부한다 (@NotBlank)
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [
+                            {
+                                "s3Key": "memo-image/1/uuid.png",
+                                "imageName": "seminar_slide.png",
+                                "extension": "  ",
+                                "priority": 0
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("파일 항목의 fileName이 null이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_FileNameNull_BadRequest() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [],
+                        "files": [
+                            {
+                                "s3Key": "memo-file/1/uuid.pdf",
+                                "fileName": null,
+                                "extension": "pdf",
+                                "priority": 0
+                            }
+                        ]
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
     }
 
     @Nested

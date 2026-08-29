@@ -122,7 +122,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.ImageRequest(
                             "memo-image/1/test.png",
                             "test.png",
-                            1024L,
                             "png",
                             1
                     );
@@ -131,7 +130,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.FileRequest(
                             "memo-file/1/test.pdf",
                             "test.pdf",
-                            2048L,
                             "pdf",
                             1
                     );
@@ -172,12 +170,12 @@ class MemoServiceImplTest {
             given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
 
             List<MemoCreateRequest.ImageRequest> images = List.of(
-                    new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", 100L, "png", 1),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", 100L, "png", 2),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/3.png", "3.png", 100L, "png", 3),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/4.png", "4.png", 100L, "png", 4),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/5.png", "5.png", 100L, "png", 5),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/6.png", "6.png", 100L, "png", 6)
+                    new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", "png", 1),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", "png", 2),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/3.png", "3.png", "png", 3),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/4.png", "4.png", "png", 4),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/5.png", "5.png", "png", 5),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/6.png", "6.png", "png", 6)
             );
 
             MemoCreateRequest tooManyImagesRequest = new MemoCreateRequest(
@@ -199,7 +197,7 @@ class MemoServiceImplTest {
             given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
 
             List<MemoCreateRequest.FileRequest> files = List.of(
-                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", 1L, "pdf", 1)
+                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", "pdf", 1)
             );
             given(s3Util.getObjectMetadata("memo-file/1/1.pdf"))
                     .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
@@ -293,7 +291,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.ImageRequest(
                             "memo-image/999/invalid.png",
                             "invalid.png",
-                            1024L,
                             "png",
                             1
                     );
@@ -329,7 +326,7 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("요청 bytes가 아닌 S3 실제 크기를 저장한다")
+        @DisplayName("S3 실제 객체 크기를 조회해 저장한다")
         void createMemo_savesActualS3ObjectSize() {
             when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
             when(memoRepository.save(any(Memo.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -1122,6 +1119,9 @@ class MemoServiceImplTest {
         @BeforeEach
         void setUp() {
             user = User.builder().id(userId).build();
+            ReflectionTestUtils.setField(memoService, "ioExecutor", (Executor) Runnable::run);
+            lenient().when(s3Util.getObjectMetadata(anyString()))
+                    .thenReturn(new S3Util.S3ObjectMetadata(1_024L, "application/octet-stream"));
         }
 
         private Memo ownedMemo(String title, String content) {
@@ -1279,7 +1279,7 @@ class MemoServiceImplTest {
                     });
 
             MemoUpdateRequest.ImageEdit newImage =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 1024L, "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of());
 
@@ -1287,7 +1287,7 @@ class MemoServiceImplTest {
             memoService.updateMemo(userId, memoId, req);
 
             // then
-            verify(s3KeyUtil).validateS3KeyOwner(userId, "memo-image/1/new.png");
+            verify(s3KeyUtil).validateS3Key(userId, "memo-image", "memo-image/1/new.png");
             verify(memoImageRepository).saveAll(anyList());
             verify(eventPublisher).publishEvent(any(MemoImageCreatedEvent.class));
         }
@@ -1306,7 +1306,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit keepEdit =
-                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
 
@@ -1335,7 +1335,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit keepEdit =
-                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, null, 3);
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 3);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
 
@@ -1358,10 +1358,10 @@ class MemoServiceImplTest {
                 MemoImage img = MemoImage.builder()
                         .id(i).memo(memo).imageS3Key("memo-image/1/" + i + ".png").imagePriority((int) i).build();
                 memo.getMemoImages().add(img);
-                edits.add(new MemoUpdateRequest.ImageEdit(i, null, null, null, null, (int) i));
+                edits.add(new MemoUpdateRequest.ImageEdit(i, null, null, null, (int) i));
             }
             for (int i = 0; i < 3; i++) {
-                edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", 1L, "png", i));
+                edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", "png", i));
             }
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
@@ -1381,7 +1381,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit bad =
-                    new MemoUpdateRequest.ImageEdit(null, null, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(null, null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(bad), List.of());
 
@@ -1402,7 +1402,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit ambiguous =
-                    new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", 1L, "png", 0);
+                    new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", "png", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(ambiguous), List.of());
 
@@ -1420,7 +1420,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.FileEdit bad =
-                    new MemoUpdateRequest.FileEdit(null, null, null, null, null, 0);
+                    new MemoUpdateRequest.FileEdit(null, null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(bad));
 
@@ -1438,7 +1438,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit ghost =
-                    new MemoUpdateRequest.ImageEdit(999L, null, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(999L, null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(ghost), List.of());
 
@@ -1446,6 +1446,236 @@ class MemoServiceImplTest {
             assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
                     .isInstanceOf(MemoException.class)
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MEMO_IMAGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("새 첨부는 S3 실제 객체 크기를 조회해 저장한다")
+        void updateMemo_addsAttachment_savesActualS3ObjectSize() {
+            // given: 요청은 1KB라고 주장하지만 S3 실제 크기는 다름
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(s3Util.getObjectMetadata("memo-image/1/new.png"))
+                    .willReturn(new S3Util.S3ObjectMetadata(3_000L, "image/png"));
+            given(s3Util.getObjectMetadata("memo-file/1/new.pdf"))
+                    .willReturn(new S3Util.S3ObjectMetadata(4_000L, "application/pdf"));
+
+            MemoUpdateRequest.ImageEdit newImage =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
+            MemoUpdateRequest.FileEdit newFile =
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of(newFile));
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            ArgumentCaptor<List<MemoImage>> imageCaptor = ArgumentCaptor.forClass(List.class);
+            ArgumentCaptor<List<MemoFile>> fileCaptor = ArgumentCaptor.forClass(List.class);
+            verify(memoImageRepository).saveAll(imageCaptor.capture());
+            verify(memoFileRepository).saveAll(fileCaptor.capture());
+
+            assertThat(imageCaptor.getValue().get(0).getImageBytes()).isEqualTo(3_000L);
+            assertThat(fileCaptor.getValue().get(0).getFileBytes()).isEqualTo(4_000L);
+        }
+
+        @Test
+        @DisplayName("새 이미지의 S3 실제 크기가 5MB를 초과하면 IMAGE_TOO_LARGE 예외가 발생한다")
+        void updateMemo_addedImageActuallyTooLarge_throws() {
+            // given: 실제 객체가 5MB 초과
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(s3Util.getObjectMetadata("memo-image/1/huge.png"))
+                    .willReturn(new S3Util.S3ObjectMetadata(5L * 1024 * 1024 + 1, "image/png"));
+
+            MemoUpdateRequest.ImageEdit huge =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/huge.png", "huge.png", "png", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(huge), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.IMAGE_TOO_LARGE);
+
+            verify(memoImageRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("새 파일의 S3 실제 크기가 10MB를 초과하면 FILE_TOO_LARGE 예외가 발생한다")
+        void updateMemo_addedFileActuallyTooLarge_throws() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(s3Util.getObjectMetadata("memo-file/1/huge.pdf"))
+                    .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
+
+            MemoUpdateRequest.FileEdit huge =
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/huge.pdf", "huge.pdf", "pdf", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(huge));
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FILE_TOO_LARGE);
+
+            verify(memoFileRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("새 첨부의 s3Key를 용도별 prefix까지 검증한다")
+        void updateMemo_validatesS3KeyPrefixByMediaType() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit newImage =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
+            MemoUpdateRequest.FileEdit newFile =
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of(newFile));
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            verify(s3KeyUtil).validateS3Key(userId, "memo-image", "memo-image/1/new.png");
+            verify(s3KeyUtil).validateS3Key(userId, "memo-file", "memo-file/1/new.pdf");
+        }
+
+        @Test
+        @DisplayName("prefix 검증에 실패하면 첨부를 저장하지 않는다")
+        void updateMemo_invalidS3KeyPrefix_doesNotSave() {
+            // given: 이미지 자리에 파일 key를 넣은 요청
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            doThrow(new MemoException(MemoErrorCode.INVALID_S3_KEY_FORMAT))
+                    .when(s3KeyUtil)
+                    .validateS3Key(eq(userId), eq("memo-image"), anyString());
+
+            MemoUpdateRequest.ImageEdit crossed =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(crossed), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_S3_KEY_FORMAT);
+
+            verify(memoImageRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("새 이미지에 imageName이 없으면 MISSING_ATTACHMENT_METADATA 예외가 발생한다")
+        void updateMemo_addImageWithoutName_throws() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit noName =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", null, "png", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(noName), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+
+            verify(memoImageRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("새 이미지에 extension이 비어 있으면 MISSING_ATTACHMENT_METADATA 예외가 발생한다")
+        void updateMemo_addImageWithBlankExtension_throws() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit blankExt =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "  ", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(blankExt), List.of());
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+        }
+
+        @Test
+        @DisplayName("새 파일에 fileName이 없으면 MISSING_ATTACHMENT_METADATA 예외가 발생한다")
+        void updateMemo_addFileWithoutName_throws() {
+            // given
+            Memo memo = ownedMemo("제목", "내용");
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.FileEdit noName =
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", null, "pdf", 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(noName));
+
+            // when & then
+            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+
+            verify(memoFileRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("유지 항목은 name·extension이 없어도 정상 처리한다")
+        void updateMemo_keepWithoutMetadata_succeeds() {
+            // given: 자동저장은 유지 항목에 id와 priority만 실어 보낸다
+            Memo memo = ownedMemo("제목", "내용");
+            MemoImage keepImage = MemoImage.builder()
+                    .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
+            MemoFile keepFile = MemoFile.builder()
+                    .id(20L).memo(memo).fileS3Key("memo-file/1/keep.pdf").filePriority(0).build();
+            memo.getMemoImages().add(keepImage);
+            memo.getMemoFiles().add(keepFile);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest req = new MemoUpdateRequest(
+                    "제목", "내용", List.of(),
+                    List.of(new MemoUpdateRequest.ImageEdit(10L, null, null, null, 1)),
+                    List.of(new MemoUpdateRequest.FileEdit(20L, null, null, null, 2))
+            );
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            assertThat(keepImage.getImagePriority()).isEqualTo(1);
+            assertThat(keepFile.getFilePriority()).isEqualTo(2);
+            verify(memoImageRepository, never()).deleteAllByIdInBatch(anyList());
+            verify(memoFileRepository, never()).deleteAllByIdInBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("유지 항목만 있으면 S3 메타데이터를 조회하지 않는다")
+        void updateMemo_keepOnly_doesNotQueryS3Metadata() {
+            // given: 자동저장처럼 첨부 변경 없이 본문만 수정
+            Memo memo = ownedMemo("제목", "내용");
+            MemoImage keep = MemoImage.builder()
+                    .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
+            memo.getMemoImages().add(keep);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoUpdateRequest.ImageEdit keepEdit =
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 0);
+            MemoUpdateRequest req =
+                    new MemoUpdateRequest("제목", "새 내용", List.of(), List.of(keepEdit), List.of());
+
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            verify(s3Util, never()).getObjectMetadata(anyString());
+            verify(s3KeyUtil, never()).validateS3Key(anyLong(), anyString(), anyString());
         }
     }
 }
