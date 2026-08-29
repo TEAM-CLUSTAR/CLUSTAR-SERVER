@@ -222,6 +222,10 @@ public class MemoServiceImpl implements MemoService {
             if ((e.imageId() == null) == (e.s3Key() == null)) {
                 throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
             }
+            // 신규 추가분은 파일명·확장자가 필수. 유지분은 서버가 이미 보관하므로 요구하지 않는다.
+            if (e.s3Key() != null && (isBlank(e.imageName()) || isBlank(e.extension()))) {
+                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+            }
         }
 
         Map<Long, MemoImage> existingById = memo.getMemoImages().stream()
@@ -245,7 +249,12 @@ public class MemoServiceImpl implements MemoService {
         if (keepEdits.size() + addEdits.size() > MAX_IMAGE_COUNT) {
             throw new MemoException(MemoErrorCode.TOO_MANY_IMAGES);
         }
-        validateBytes(addEdits, MemoUpdateRequest.ImageEdit::bytes, MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE);
+        // 신규 추가분만 S3 실제 객체 기준으로 검증 (유지분은 저장 시점에 검증 완료)
+        Map<String, Long> actualBytesByKey = validateUploadedMedia(
+                userId,
+                extractS3Keys(addEdits, MemoUpdateRequest.ImageEdit::s3Key),
+                List.of()
+        );
 
         // 유지 이미지 우선순위 갱신
         keepEdits.forEach(e -> existingById.get(e.imageId()).updatePriority(e.priority()));
@@ -266,7 +275,7 @@ public class MemoServiceImpl implements MemoService {
         // 추가 저장 + 임베딩 이벤트 (신규 첨부만 재임베딩)
         if (!addEdits.isEmpty()) {
             List<MemoImage> added = addEdits.stream()
-                    .map(e -> createMemoImageFromEdit(memo, e, userId))
+                    .map(e -> createMemoImageFromEdit(memo, e, actualBytesByKey.get(e.s3Key())))
                     .toList();
             memoImageRepository.saveAll(added);
             eventPublisher.publishEvent(new MemoImageCreatedEvent(
@@ -278,14 +287,12 @@ public class MemoServiceImpl implements MemoService {
         return new RemovedMedia(removedIds, removedKeys);
     }
 
-    private MemoImage createMemoImageFromEdit(Memo memo, MemoUpdateRequest.ImageEdit edit, Long userId) {
-        s3KeyUtil.validateS3KeyOwner(userId, edit.s3Key());
-
+    private MemoImage createMemoImageFromEdit(Memo memo, MemoUpdateRequest.ImageEdit edit, Long actualBytes) {
         return MemoImage.builder()
                 .memo(memo)
                 .imageS3Key(edit.s3Key())
                 .imageName(edit.imageName())
-                .imageBytes(edit.bytes())
+                .imageBytes(actualBytes)
                 .imageExtension(edit.extension())
                 .imagePriority(edit.priority())
                 .build();
@@ -298,6 +305,10 @@ public class MemoServiceImpl implements MemoService {
         for (MemoUpdateRequest.FileEdit e : edits) {
             if ((e.fileId() == null) == (e.s3Key() == null)) {
                 throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+            }
+            // 신규 추가분은 파일명·확장자가 필수. 유지분은 서버가 이미 보관하므로 요구하지 않는다.
+            if (e.s3Key() != null && (isBlank(e.fileName()) || isBlank(e.extension()))) {
+                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
             }
         }
 
@@ -320,7 +331,12 @@ public class MemoServiceImpl implements MemoService {
         if (keepEdits.size() + addEdits.size() > MAX_FILE_COUNT) {
             throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
         }
-        validateBytes(addEdits, MemoUpdateRequest.FileEdit::bytes, MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE);
+        // 신규 추가분만 S3 실제 객체 기준으로 검증 (유지분은 저장 시점에 검증 완료)
+        Map<String, Long> actualBytesByKey = validateUploadedMedia(
+                userId,
+                List.of(),
+                extractS3Keys(addEdits, MemoUpdateRequest.FileEdit::s3Key)
+        );
 
         keepEdits.forEach(e -> existingById.get(e.fileId()).updatePriority(e.priority()));
 
@@ -338,7 +354,7 @@ public class MemoServiceImpl implements MemoService {
 
         if (!addEdits.isEmpty()) {
             List<MemoFile> added = addEdits.stream()
-                    .map(e -> createMemoFileFromEdit(memo, e, userId))
+                    .map(e -> createMemoFileFromEdit(memo, e, actualBytesByKey.get(e.s3Key())))
                     .toList();
             memoFileRepository.saveAll(added);
             eventPublisher.publishEvent(new MemoFileCreatedEvent(
@@ -350,14 +366,12 @@ public class MemoServiceImpl implements MemoService {
         return new RemovedMedia(removedIds, removedKeys);
     }
 
-    private MemoFile createMemoFileFromEdit(Memo memo, MemoUpdateRequest.FileEdit edit, Long userId) {
-        s3KeyUtil.validateS3KeyOwner(userId, edit.s3Key());
-
+    private MemoFile createMemoFileFromEdit(Memo memo, MemoUpdateRequest.FileEdit edit, Long actualBytes) {
         return MemoFile.builder()
                 .memo(memo)
                 .fileS3Key(edit.s3Key())
                 .fileName(edit.fileName())
-                .fileBytes(edit.bytes())
+                .fileBytes(actualBytes)
                 .fileExtension(edit.extension())
                 .filePriority(edit.priority())
                 .build();
@@ -944,20 +958,43 @@ public class MemoServiceImpl implements MemoService {
     }
 
     private Map<String, Long> validateUploadedMedia(Long userId, MemoCreateRequest request) {
+        return validateUploadedMedia(
+                userId,
+                extractS3Keys(request.images(), MemoCreateRequest.ImageRequest::s3Key),
+                extractS3Keys(request.files(), MemoCreateRequest.FileRequest::s3Key)
+        );
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private <T> List<String> extractS3Keys(List<T> items, Function<T, String> keyExtractor) {
+        if (items == null) {
+            return List.of();
+        }
+        return items.stream().map(keyExtractor).toList();
+    }
+
+    /**
+     * 신규 업로드된 첨부의 s3Key(소유자·용도별 prefix)와 S3 실제 객체 크기를 검증한다.
+     * 메모 생성/수정 양쪽에서 공용으로 쓰며, 반환값은 s3Key → 실제 바이트 수.
+     */
+    private Map<String, Long> validateUploadedMedia(
+            Long userId,
+            List<String> imageS3Keys,
+            List<String> fileS3Keys
+    ) {
         List<CompletableFuture<UploadedMedia>> validations = new ArrayList<>();
 
-        if (request.images() != null) {
-            request.images().forEach(image -> validations.add(CompletableFuture.supplyAsync(
-                    () -> validateUploadedMedia(userId, "memo-image", image.s3Key(), MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE),
-                    ioExecutor
-            )));
-        }
-        if (request.files() != null) {
-            request.files().forEach(file -> validations.add(CompletableFuture.supplyAsync(
-                    () -> validateUploadedMedia(userId, "memo-file", file.s3Key(), MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE),
-                    ioExecutor
-            )));
-        }
+        imageS3Keys.forEach(s3Key -> validations.add(CompletableFuture.supplyAsync(
+                () -> validateUploadedMedia(userId, "memo-image", s3Key, MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE),
+                ioExecutor
+        )));
+        fileS3Keys.forEach(s3Key -> validations.add(CompletableFuture.supplyAsync(
+                () -> validateUploadedMedia(userId, "memo-file", s3Key, MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE),
+                ioExecutor
+        )));
 
         try {
             return validations.stream()

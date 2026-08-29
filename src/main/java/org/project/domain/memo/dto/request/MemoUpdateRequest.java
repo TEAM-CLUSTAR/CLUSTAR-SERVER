@@ -1,6 +1,7 @@
 package org.project.domain.memo.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
@@ -20,10 +21,12 @@ public record MemoUpdateRequest(
         @NotNull(message = "tagNames는 null일 수 없습니다. 태그가 없으면 빈 배열([])로 보내주세요.")
         List<String> tagNames,
 
+        @Valid
         @Schema(description = "이미지 최종 상태 목록 (유지=imageId, 추가=s3Key, 없으면 [])")
         @NotNull(message = "images는 null일 수 없습니다. 이미지가 없으면 빈 배열([])로 보내주세요.")
         List<ImageEdit> images,
 
+        @Valid
         @Schema(description = "파일 최종 상태 목록 (유지=fileId, 추가=s3Key, 없으면 [])")
         @NotNull(message = "files는 null일 수 없습니다. 파일이 없으면 빈 배열([])로 보내주세요.")
         List<FileEdit> files
@@ -36,16 +39,14 @@ public record MemoUpdateRequest(
                 @Schema(description = "새로 추가하는 이미지의 S3 key. 기존 유지 시 null", example = "memo-image/1/uuid.png", nullable = true)
                 String s3Key,
 
-                @Schema(description = "원본 이미지 파일명 (추가 시)", example = "seminar_slide.png", nullable = true)
+                @Schema(description = "원본 이미지 파일명. 추가(s3Key) 시 필수, 유지 시 null", example = "seminar_slide.png", nullable = true)
                 String imageName,
 
-                @Schema(description = "파일 크기(bytes) (추가 시)", example = "245678", nullable = true)
-                Long bytes,
-
-                @Schema(description = "확장자 (추가 시)", example = "png", nullable = true)
+                @Schema(description = "확장자. 추가(s3Key) 시 필수, 유지 시 null", example = "png", nullable = true)
                 String extension,
 
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (유지·추가 모두 필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }
@@ -57,16 +58,14 @@ public record MemoUpdateRequest(
                 @Schema(description = "새로 추가하는 파일의 S3 key. 기존 유지 시 null", example = "memo-file/1/uuid.pdf", nullable = true)
                 String s3Key,
 
-                @Schema(description = "원본 파일명 (추가 시)", example = "SOPT_7th_seminar.pdf", nullable = true)
+                @Schema(description = "원본 파일명. 추가(s3Key) 시 필수, 유지 시 null", example = "SOPT_7th_seminar.pdf", nullable = true)
                 String fileName,
 
-                @Schema(description = "파일 크기(bytes) (추가 시)", example = "1048576", nullable = true)
-                Long bytes,
-
-                @Schema(description = "확장자 (추가 시)", example = "pdf", nullable = true)
+                @Schema(description = "확장자. 추가(s3Key) 시 필수, 유지 시 null", example = "pdf", nullable = true)
                 String extension,
 
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (유지·추가 모두 필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }
