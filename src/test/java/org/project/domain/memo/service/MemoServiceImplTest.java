@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,6 +99,10 @@ class MemoServiceImplTest {
 
         @BeforeEach
         void setUp() {
+            ReflectionTestUtils.setField(memoService, "ioExecutor", (Executor) Runnable::run);
+            lenient().when(s3Util.getObjectMetadata(anyString()))
+                    .thenReturn(new S3Util.S3ObjectMetadata(1_024L, "application/octet-stream"));
+
             // 사용자 더미
             user = User.builder()
                     .id(1L)
@@ -189,14 +194,15 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("파일 용량이 제한을 초과하면 예외가 발생한다.")
+        @DisplayName("S3 실제 파일 용량이 제한을 초과하면 예외가 발생한다.")
         void createMemo_FileTooLarge() {
             given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
 
-            long overLimit = 10L * 1024 * 1024 + 1;
             List<MemoCreateRequest.FileRequest> files = List.of(
-                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", overLimit, "pdf", 1)
+                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", 1L, "pdf", 1)
             );
+            given(s3Util.getObjectMetadata("memo-file/1/1.pdf"))
+                    .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
 
             MemoCreateRequest tooLargeFileRequest = new MemoCreateRequest(
                     "제목",
@@ -304,26 +310,43 @@ class MemoServiceImplTest {
             when(userRepository.findById(userId))
                     .thenReturn(Optional.of(user));
 
-            // memo save는 호출되지만
-            when(memoRepository.save(any(Memo.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-
             // S3Key 검증 실패 강제
             doThrow(new MemoException(MemoErrorCode.S3_KEY_USER_MISMATCH))
                     .when(s3KeyUtil)
-                    .validateS3KeyOwner(eq(userId), anyString());
+                    .validateS3Key(eq(userId), eq("memo-image"), anyString());
 
             // when & then
             assertThatThrownBy(() -> memoService.createMemo(userId, request))
                     .isInstanceOf(MemoException.class)
                     .hasMessage(MemoErrorCode.S3_KEY_USER_MISMATCH.getMsg());
 
-            // 메모 저장은 시도됨
-            verify(memoRepository, times(1)).save(any(Memo.class));
+            // S3 검증이 선행되므로 메모는 저장되지 않음
+            verify(memoRepository, never()).save(any());
 
             // 이미지/파일 저장 로직은 중단됨
             verify(memoImageRepository, never()).saveAll(any());
             verify(memoFileRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("요청 bytes가 아닌 S3 실제 크기를 저장한다")
+        void createMemo_savesActualS3ObjectSize() {
+            when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+            when(memoRepository.save(any(Memo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            given(s3Util.getObjectMetadata("memo-image/1/test.png"))
+                    .willReturn(new S3Util.S3ObjectMetadata(3_000L, "image/png"));
+            given(s3Util.getObjectMetadata("memo-file/1/test.pdf"))
+                    .willReturn(new S3Util.S3ObjectMetadata(4_000L, "application/pdf"));
+
+            memoService.createMemo(user.getId(), request);
+
+            ArgumentCaptor<List<MemoImage>> imageCaptor = ArgumentCaptor.forClass(List.class);
+            ArgumentCaptor<List<MemoFile>> fileCaptor = ArgumentCaptor.forClass(List.class);
+            verify(memoImageRepository).saveAll(imageCaptor.capture());
+            verify(memoFileRepository).saveAll(fileCaptor.capture());
+
+            assertThat(imageCaptor.getValue().get(0).getImageBytes()).isEqualTo(3_000L);
+            assertThat(fileCaptor.getValue().get(0).getFileBytes()).isEqualTo(4_000L);
         }
     }
 

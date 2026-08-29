@@ -18,6 +18,8 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -95,6 +97,52 @@ public class S3Util {
             log.error("파일 삭제 중 예상치 못한 에러 - Key: {}", key, e);
             throw new S3CustomException(S3ErrorCode.FILE_DELETE_FAILED);
         }
+    }
+
+    /**
+     * S3 객체 본문을 내려받지 않고 업로드 검증에 필요한 메타데이터를 조회한다.
+     */
+    public S3ObjectMetadata getObjectMetadata(String key) {
+        try {
+            HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build());
+
+            return new S3ObjectMetadata(response.contentLength(), response.contentType());
+        } catch (NoSuchKeyException e) {
+            throw new S3CustomException(S3ErrorCode.FILE_NOT_FOUND);
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                throw new S3CustomException(S3ErrorCode.FILE_NOT_FOUND);
+            }
+            log.error("S3 객체 메타데이터 조회 실패 - Key: {}, ErrorCode: {}", key, e.awsErrorDetails().errorCode(), e);
+            throw new S3CustomException(S3ErrorCode.FILE_DOWNLOAD_FAILED);
+        }
+    }
+
+    /**
+     * prefix 아래 객체를 모두 조회한다. 고아 객체 정리 용도이며 객체 본문은 조회하지 않는다.
+     */
+    public List<S3Object> listObjects(String prefix) {
+        try {
+            List<S3Object> objects = new ArrayList<>();
+            ListObjectsV2Request request = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix)
+                    .build();
+
+            for (ListObjectsV2Response page : s3Client.listObjectsV2Paginator(request)) {
+                objects.addAll(page.contents());
+            }
+            return objects;
+        } catch (S3Exception e) {
+            log.error("S3 객체 목록 조회 실패 - Prefix: {}, ErrorCode: {}", prefix, e.awsErrorDetails().errorCode(), e);
+            throw new S3CustomException(S3ErrorCode.FILE_DOWNLOAD_FAILED);
+        }
+    }
+
+    public record S3ObjectMetadata(long contentLength, String contentType) {
     }
 
     /**

@@ -49,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -128,8 +129,7 @@ public class MemoServiceImpl implements MemoService {
 
         validateImageCount(request.images());
         validateFileCount(request.files());
-        validateBytes(request.images(), MemoCreateRequest.ImageRequest::bytes, MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE);
-        validateBytes(request.files(), MemoCreateRequest.FileRequest::bytes, MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE);
+        Map<String, Long> actualBytesByKey = validateUploadedMedia(userId, request);
 
         // 메모 생성
         Memo memo = Memo.createMemo(
@@ -152,10 +152,10 @@ public class MemoServiceImpl implements MemoService {
         );
 
         // 이미지 메타데이터 저장 (optional)
-        saveMemoImages(savedMemo, request.images(), userId);
+        saveMemoImages(savedMemo, request.images(), userId, actualBytesByKey);
 
         // 파일 메타데이터 저장 (optional)
-        saveMemoFiles(savedMemo, request.files(), userId);
+        saveMemoFiles(savedMemo, request.files(), userId, actualBytesByKey);
 
         return MemoResponse.from(savedMemo);
     }
@@ -800,13 +800,18 @@ public class MemoServiceImpl implements MemoService {
         return List.of(commonTag);
     }
 
-    private void saveMemoImages(Memo memo, List<MemoCreateRequest.ImageRequest> images, Long userId) {
+    private void saveMemoImages(
+            Memo memo,
+            List<MemoCreateRequest.ImageRequest> images,
+            Long userId,
+            Map<String, Long> actualBytesByKey
+    ) {
         if (images == null || images.isEmpty()) {
             return;
         }
 
         List<MemoImage> memoImages = images.stream()
-                .map(r -> createMemoImage(memo, r, userId))
+                .map(r -> createMemoImage(memo, r, userId, actualBytesByKey.get(r.s3Key())))
                 .toList();
 
         memoImageRepository.saveAll(memoImages);
@@ -822,26 +827,34 @@ public class MemoServiceImpl implements MemoService {
         );
     }
 
-    private MemoImage createMemoImage(Memo memo, MemoCreateRequest.ImageRequest request, Long userId) {
-        s3KeyUtil.validateS3KeyOwner(userId, request.s3Key());
-
+    private MemoImage createMemoImage(
+            Memo memo,
+            MemoCreateRequest.ImageRequest request,
+            Long userId,
+            Long actualBytes
+    ) {
         return MemoImage.builder()
                 .memo(memo)
                 .imageS3Key(request.s3Key())
                 .imageName(request.imageName())
-                .imageBytes(request.bytes())
+                .imageBytes(actualBytes)
                 .imageExtension(request.extension())
                 .imagePriority(request.priority())
                 .build();
     }
 
-    private void saveMemoFiles(Memo memo, List<MemoCreateRequest.FileRequest> files, Long userId) {
+    private void saveMemoFiles(
+            Memo memo,
+            List<MemoCreateRequest.FileRequest> files,
+            Long userId,
+            Map<String, Long> actualBytesByKey
+    ) {
         if (files == null || files.isEmpty()) {
             return;
         }
 
         List<MemoFile> memoFiles = files.stream()
-                .map(r -> createMemoFile(memo, r, userId))
+                .map(r -> createMemoFile(memo, r, userId, actualBytesByKey.get(r.s3Key())))
                 .toList();
 
         memoFileRepository.saveAll(memoFiles);
@@ -857,14 +870,17 @@ public class MemoServiceImpl implements MemoService {
         );
     }
 
-    private MemoFile createMemoFile(Memo memo, MemoCreateRequest.FileRequest request, Long userId) {
-        s3KeyUtil.validateS3KeyOwner(userId, request.s3Key());
-
+    private MemoFile createMemoFile(
+            Memo memo,
+            MemoCreateRequest.FileRequest request,
+            Long userId,
+            Long actualBytes
+    ) {
         return MemoFile.builder()
                 .memo(memo)
                 .fileS3Key(request.s3Key())
                 .fileName(request.fileName())
-                .fileBytes(request.bytes())
+                .fileBytes(actualBytes)
                 .fileExtension(request.extension())
                 .filePriority(request.priority())
                 .build();
@@ -925,6 +941,52 @@ public class MemoServiceImpl implements MemoService {
         if (files != null && files.size() > MAX_FILE_COUNT) {
             throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
         }
+    }
+
+    private Map<String, Long> validateUploadedMedia(Long userId, MemoCreateRequest request) {
+        List<CompletableFuture<UploadedMedia>> validations = new ArrayList<>();
+
+        if (request.images() != null) {
+            request.images().forEach(image -> validations.add(CompletableFuture.supplyAsync(
+                    () -> validateUploadedMedia(userId, "memo-image", image.s3Key(), MAX_IMAGE_BYTES, MemoErrorCode.IMAGE_TOO_LARGE),
+                    ioExecutor
+            )));
+        }
+        if (request.files() != null) {
+            request.files().forEach(file -> validations.add(CompletableFuture.supplyAsync(
+                    () -> validateUploadedMedia(userId, "memo-file", file.s3Key(), MAX_FILE_BYTES, MemoErrorCode.FILE_TOO_LARGE),
+                    ioExecutor
+            )));
+        }
+
+        try {
+            return validations.stream()
+                    .map(CompletableFuture::join)
+                    .collect(Collectors.toMap(UploadedMedia::s3Key, UploadedMedia::bytes, (first, ignored) -> first));
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw e;
+        }
+    }
+
+    private UploadedMedia validateUploadedMedia(
+            Long userId,
+            String prefix,
+            String s3Key,
+            long maxBytes,
+            MemoErrorCode errorCode
+    ) {
+        s3KeyUtil.validateS3Key(userId, prefix, s3Key);
+        long actualBytes = s3Util.getObjectMetadata(s3Key).contentLength();
+        if (actualBytes > maxBytes) {
+            throw new MemoException(errorCode);
+        }
+        return new UploadedMedia(s3Key, actualBytes);
+    }
+
+    private record UploadedMedia(String s3Key, long bytes) {
     }
 
     private <T> void validateBytes(
