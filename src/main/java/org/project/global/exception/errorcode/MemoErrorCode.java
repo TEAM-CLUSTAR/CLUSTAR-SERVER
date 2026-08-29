@@ -17,7 +17,8 @@ public enum MemoErrorCode implements ErrorCode {
     MEMO_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 이미지를 찾을 수 없습니다."),
     MEMO_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 메모 파일을 찾을 수 없습니다."),
     INVALID_ATTACHMENT_EDIT(HttpStatus.BAD_REQUEST, 400, "각 첨부 항목은 유지(imageId/fileId) 또는 추가(s3Key) 중 하나를 포함해야 합니다. 이미지·파일이 없으면 빈 배열([])로 보내주세요."),
-    MISSING_ATTACHMENT_METADATA(HttpStatus.BAD_REQUEST, 400, "새로 추가하는 첨부는 파일명(imageName/fileName)과 확장자(extension)를 함께 보내주세요."),
+    MISSING_ATTACHMENT_METADATA(HttpStatus.BAD_REQUEST, 400, "새로 추가하는 첨부는 파일명(imageName/fileName)을 함께 보내주세요."),
+    UNSUPPORTED_EXTENSION(HttpStatus.BAD_REQUEST, 400, "지원하지 않는 확장자입니다."),
     EMPTY_SEARCH_QUERY(HttpStatus.BAD_REQUEST, 400, "검색어를 입력해주세요."),
     EMPTY_MEMO_IDS(HttpStatus.BAD_REQUEST, 400, "선택된 메모가 없습니다.");
 

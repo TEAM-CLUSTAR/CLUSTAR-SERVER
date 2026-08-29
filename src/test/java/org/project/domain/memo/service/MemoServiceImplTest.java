@@ -122,7 +122,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.ImageRequest(
                             "memo-image/1/test.png",
                             "test.png",
-                            "png",
                             1
                     );
 
@@ -130,7 +129,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.FileRequest(
                             "memo-file/1/test.pdf",
                             "test.pdf",
-                            "pdf",
                             1
                     );
 
@@ -170,12 +168,12 @@ class MemoServiceImplTest {
             given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
 
             List<MemoCreateRequest.ImageRequest> images = List.of(
-                    new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", "png", 1),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", "png", 2),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/3.png", "3.png", "png", 3),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/4.png", "4.png", "png", 4),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/5.png", "5.png", "png", 5),
-                    new MemoCreateRequest.ImageRequest("memo-image/1/6.png", "6.png", "png", 6)
+                    new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", 1),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", 2),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/3.png", "3.png", 3),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/4.png", "4.png", 4),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/5.png", "5.png", 5),
+                    new MemoCreateRequest.ImageRequest("memo-image/1/6.png", "6.png", 6)
             );
 
             MemoCreateRequest tooManyImagesRequest = new MemoCreateRequest(
@@ -197,7 +195,7 @@ class MemoServiceImplTest {
             given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
 
             List<MemoCreateRequest.FileRequest> files = List.of(
-                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", "pdf", 1)
+                    new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", 1)
             );
             given(s3Util.getObjectMetadata("memo-file/1/1.pdf"))
                     .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
@@ -291,7 +289,6 @@ class MemoServiceImplTest {
                     new MemoCreateRequest.ImageRequest(
                             "memo-image/999/invalid.png",
                             "invalid.png",
-                            "png",
                             1
                     );
 
@@ -749,6 +746,70 @@ class MemoServiceImplTest {
     @Nested
     @DisplayName("Presigned URL 발급 테스트")
     class issuePresignedUrls {
+
+        @Test
+        @DisplayName("이미지 확장자가 허용 목록에 없으면 UNSUPPORTED_EXTENSION 예외가 발생한다")
+        void issuePresignedUrls_UnsupportedImageExtension_throws() {
+            // given: 확장자는 그대로 s3Key에 박히고 저장 시 다시 읽히므로 발급 시점에 막는다
+            var request = new MemoPresignedUrlRequest(
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("exe", 1024L, 1)),
+                    List.of()
+            );
+
+            // when & then
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.UNSUPPORTED_EXTENSION);
+
+            verify(s3Util, never()).createPresignedPutUrl(anyLong(), anyString(), anyString(), anyLong(), anyInt());
+        }
+
+        @Test
+        @DisplayName("파일 확장자가 허용 목록에 없으면 UNSUPPORTED_EXTENSION 예외가 발생한다")
+        void issuePresignedUrls_UnsupportedFileExtension_throws() {
+            // given
+            var request = new MemoPresignedUrlRequest(
+                    List.of(),
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("sh", 1024L, 1))
+            );
+
+            // when & then
+            assertThatThrownBy(() -> memoService.issuePresignedUrls(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.UNSUPPORTED_EXTENSION);
+        }
+
+        @Test
+        @DisplayName("hwp 등 문서 확장자는 허용한다")
+        void issuePresignedUrls_DocumentExtensions_allowed() {
+            // given: Tika가 파싱하지 못하더라도 첨부 자체는 허용한다
+            var request = new MemoPresignedUrlRequest(
+                    List.of(),
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("hwp", 1024L, 1))
+            );
+            given(s3Util.createPresignedPutUrl(eq(userId), eq("memo-file"), eq("hwp"), eq(1024L), eq(1)))
+                    .willReturn(new MemoPresignedUrlResponse.PresignedUrlResponse(
+                            "memo-file/1/uuid.hwp", "https://s3.url/file", 1024L, "hwp", 1));
+
+            // when & then
+            assertThat(memoService.issuePresignedUrls(userId, request).files()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("확장자 대소문자는 구분하지 않는다 (PNG 허용)")
+        void issuePresignedUrls_UpperCaseExtension_allowed() {
+            // given
+            var request = new MemoPresignedUrlRequest(
+                    List.of(new MemoPresignedUrlRequest.UploadRequest("PNG", 1024L, 1)),
+                    List.of()
+            );
+            given(s3Util.createPresignedPutUrl(eq(userId), eq("memo-image"), eq("PNG"), eq(1024L), eq(1)))
+                    .willReturn(new MemoPresignedUrlResponse.PresignedUrlResponse(
+                            "memo-image/1/uuid.PNG", "https://s3.url/image", 1024L, "PNG", 1));
+
+            // when & then
+            assertThat(memoService.issuePresignedUrls(userId, request).images()).hasSize(1);
+        }
 
         @Test
         @DisplayName("이미지와 파일 확장자 정보를 보내면 S3Util을 통해 URL 목록을 발급한다.")
@@ -1279,7 +1340,7 @@ class MemoServiceImplTest {
                     });
 
             MemoUpdateRequest.ImageEdit newImage =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of());
 
@@ -1306,7 +1367,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit keepEdit =
-                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
 
@@ -1335,7 +1396,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit keepEdit =
-                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 3);
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, 3);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(keepEdit), List.of());
 
@@ -1358,10 +1419,10 @@ class MemoServiceImplTest {
                 MemoImage img = MemoImage.builder()
                         .id(i).memo(memo).imageS3Key("memo-image/1/" + i + ".png").imagePriority((int) i).build();
                 memo.getMemoImages().add(img);
-                edits.add(new MemoUpdateRequest.ImageEdit(i, null, null, null, (int) i));
+                edits.add(new MemoUpdateRequest.ImageEdit(i, null, null, (int) i));
             }
             for (int i = 0; i < 3; i++) {
-                edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", "png", i));
+                edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", i));
             }
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
@@ -1381,7 +1442,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit bad =
-                    new MemoUpdateRequest.ImageEdit(null, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(bad), List.of());
 
@@ -1402,7 +1463,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit ambiguous =
-                    new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", "png", 0);
+                    new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(ambiguous), List.of());
 
@@ -1420,7 +1481,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.FileEdit bad =
-                    new MemoUpdateRequest.FileEdit(null, null, null, null, 0);
+                    new MemoUpdateRequest.FileEdit(null, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(bad));
 
@@ -1438,7 +1499,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit ghost =
-                    new MemoUpdateRequest.ImageEdit(999L, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(999L, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(ghost), List.of());
 
@@ -1460,9 +1521,9 @@ class MemoServiceImplTest {
                     .willReturn(new S3Util.S3ObjectMetadata(4_000L, "application/pdf"));
 
             MemoUpdateRequest.ImageEdit newImage =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest.FileEdit newFile =
-                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of(newFile));
 
@@ -1489,7 +1550,7 @@ class MemoServiceImplTest {
                     .willReturn(new S3Util.S3ObjectMetadata(5L * 1024 * 1024 + 1, "image/png"));
 
             MemoUpdateRequest.ImageEdit huge =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/huge.png", "huge.png", "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/huge.png", "huge.png", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(huge), List.of());
 
@@ -1511,7 +1572,7 @@ class MemoServiceImplTest {
                     .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
 
             MemoUpdateRequest.FileEdit huge =
-                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/huge.pdf", "huge.pdf", "pdf", 0);
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/huge.pdf", "huge.pdf", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(huge));
 
@@ -1531,9 +1592,9 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit newImage =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest.FileEdit newFile =
-                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", "new.pdf", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of(newFile));
 
@@ -1556,7 +1617,7 @@ class MemoServiceImplTest {
                     .validateS3Key(eq(userId), eq("memo-image"), anyString());
 
             MemoUpdateRequest.ImageEdit crossed =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-file/1/new.pdf", "new.pdf", "pdf", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-file/1/new.pdf", "new.pdf", 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(crossed), List.of());
 
@@ -1576,7 +1637,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit noName =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", null, "png", 0);
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(noName), List.of());
 
@@ -1589,21 +1650,27 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("새 이미지에 extension이 비어 있으면 MISSING_ATTACHMENT_METADATA 예외가 발생한다")
-        void updateMemo_addImageWithBlankExtension_throws() {
+        @DisplayName("새 첨부의 확장자는 요청이 아니라 s3Key에서 뽑아 저장한다")
+        void updateMemo_addedAttachment_extensionParsedFromS3Key() {
             // given
             Memo memo = ownedMemo("제목", "내용");
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+            given(s3Util.getObjectMetadata("memo-image/1/new.png"))
+                    .willReturn(new S3Util.S3ObjectMetadata(3_000L, "image/png"));
+            given(s3KeyUtil.extractExtension("memo-image/1/new.png")).willReturn("png");
 
-            MemoUpdateRequest.ImageEdit blankExt =
-                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", "  ", 0);
+            MemoUpdateRequest.ImageEdit newImage =
+                    new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest req =
-                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(blankExt), List.of());
+                    new MemoUpdateRequest("제목", "내용", List.of(), List.of(newImage), List.of());
 
-            // when & then
-            assertThatThrownBy(() -> memoService.updateMemo(userId, memoId, req))
-                    .isInstanceOf(MemoException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+            // when
+            memoService.updateMemo(userId, memoId, req);
+
+            // then
+            ArgumentCaptor<List<MemoImage>> captor = ArgumentCaptor.forClass(List.class);
+            verify(memoImageRepository).saveAll(captor.capture());
+            assertThat(captor.getValue().get(0).getImageExtension()).isEqualTo("png");
         }
 
         @Test
@@ -1614,7 +1681,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.FileEdit noName =
-                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", null, "pdf", 0);
+                    new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "내용", List.of(), List.of(), List.of(noName));
 
@@ -1641,8 +1708,8 @@ class MemoServiceImplTest {
 
             MemoUpdateRequest req = new MemoUpdateRequest(
                     "제목", "내용", List.of(),
-                    List.of(new MemoUpdateRequest.ImageEdit(10L, null, null, null, 1)),
-                    List.of(new MemoUpdateRequest.FileEdit(20L, null, null, null, 2))
+                    List.of(new MemoUpdateRequest.ImageEdit(10L, null, null, 1)),
+                    List.of(new MemoUpdateRequest.FileEdit(20L, null, null, 2))
             );
 
             // when
@@ -1666,7 +1733,7 @@ class MemoServiceImplTest {
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             MemoUpdateRequest.ImageEdit keepEdit =
-                    new MemoUpdateRequest.ImageEdit(10L, null, null, null, 0);
+                    new MemoUpdateRequest.ImageEdit(10L, null, null, 0);
             MemoUpdateRequest req =
                     new MemoUpdateRequest("제목", "새 내용", List.of(), List.of(keepEdit), List.of());
 

@@ -40,11 +40,8 @@ public record MemoCreateRequest(
                 @NotBlank(message = "imageName은 비어 있을 수 없습니다.")
                 String imageName,
 
-                @Schema(description = "확장자 (필수)", example = "png")
-                @NotBlank(message = "extension은 비어 있을 수 없습니다.")
-                String extension,
-
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }
@@ -60,11 +57,8 @@ public record MemoCreateRequest(
                 @NotBlank(message = "fileName은 비어 있을 수 없습니다.")
                 String fileName,
 
-                @Schema(description = "확장자 (필수)", example = "pdf")
-                @NotBlank(message = "extension은 비어 있을 수 없습니다.")
-                String extension,
-
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }

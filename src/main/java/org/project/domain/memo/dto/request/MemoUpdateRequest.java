@@ -42,9 +42,6 @@ public record MemoUpdateRequest(
                 @Schema(description = "원본 이미지 파일명. 추가(s3Key) 시 필수, 유지 시 null", example = "seminar_slide.png", nullable = true)
                 String imageName,
 
-                @Schema(description = "확장자. 추가(s3Key) 시 필수, 유지 시 null", example = "png", nullable = true)
-                String extension,
-
                 @Schema(description = "정렬 우선순위 (유지·추가 모두 필수)", example = "0")
                 @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
@@ -60,9 +57,6 @@ public record MemoUpdateRequest(
 
                 @Schema(description = "원본 파일명. 추가(s3Key) 시 필수, 유지 시 null", example = "SOPT_7th_seminar.pdf", nullable = true)
                 String fileName,
-
-                @Schema(description = "확장자. 추가(s3Key) 시 필수, 유지 시 null", example = "pdf", nullable = true)
-                String extension,
 
                 @Schema(description = "정렬 우선순위 (유지·추가 모두 필수)", example = "0")
                 @NotNull(message = "priority는 null일 수 없습니다.")

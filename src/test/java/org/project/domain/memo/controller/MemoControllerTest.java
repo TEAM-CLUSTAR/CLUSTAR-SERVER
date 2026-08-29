@@ -433,14 +433,12 @@ class MemoControllerTest {
             MemoCreateRequest.ImageRequest image1 = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/53238404-f89d-4728-9dc0-efb2a3c7787b.png",
                     "seminar_slide.png",
-                    "png",
                     1
             );
 
             MemoCreateRequest.ImageRequest image2 = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/another-uuid.jpg",
                     "photo.jpg",
-                    "jpg",
                     2
             );
 
@@ -487,7 +485,6 @@ class MemoControllerTest {
             MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
                     "memo-file/1/780fd26c-8ab7-4762-b148-b9c8c071795b.pdf",
                     "SOPT_7th_seminar.pdf",
-                    "pdf",
                     1
             );
 
@@ -534,14 +531,12 @@ class MemoControllerTest {
             MemoCreateRequest.ImageRequest image = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/uuid-image.png",
                     "slide.png",
-                    "png",
                     1
             );
 
             MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
                     "memo-file/1/uuid-file.pdf",
                     "document.pdf",
-                    "pdf",
                     1
             );
 
@@ -738,10 +733,10 @@ class MemoControllerTest {
         }
 
         @Test
-        @DisplayName("이미지 항목의 extension이 공백이면 400을 반환한다")
+        @DisplayName("이미지 항목의 priority가 null이면 400을 반환한다")
         @WithMockCustomUser(userId = 1L)
-        void createMemo_ImageExtensionBlank_BadRequest() throws Exception {
-            // given: 빈 문자열·공백도 거부한다 (@NotBlank)
+        void createMemo_ImagePriorityNull_BadRequest() throws Exception {
+            // given: priority는 DB 컬럼이 nullable = false라 요청 단계에서 막는다
             String requestJson = """
                     {
                         "title": "제목",
@@ -751,8 +746,7 @@ class MemoControllerTest {
                             {
                                 "s3Key": "memo-image/1/uuid.png",
                                 "imageName": "seminar_slide.png",
-                                "extension": "  ",
-                                "priority": 0
+                                "priority": null
                             }
                         ],
                         "files": []
