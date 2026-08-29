@@ -433,16 +433,12 @@ class MemoControllerTest {
             MemoCreateRequest.ImageRequest image1 = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/53238404-f89d-4728-9dc0-efb2a3c7787b.png",
                     "seminar_slide.png",
-                    245678L,
-                    "png",
                     1
             );
 
             MemoCreateRequest.ImageRequest image2 = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/another-uuid.jpg",
                     "photo.jpg",
-                    532198L,
-                    "jpg",
                     2
             );
 
@@ -489,8 +485,6 @@ class MemoControllerTest {
             MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
                     "memo-file/1/780fd26c-8ab7-4762-b148-b9c8c071795b.pdf",
                     "SOPT_7th_seminar.pdf",
-                    1048576L,
-                    "pdf",
                     1
             );
 
@@ -537,16 +531,12 @@ class MemoControllerTest {
             MemoCreateRequest.ImageRequest image = new MemoCreateRequest.ImageRequest(
                     "memo-image/1/uuid-image.png",
                     "slide.png",
-                    245678L,
-                    "png",
                     1
             );
 
             MemoCreateRequest.FileRequest file = new MemoCreateRequest.FileRequest(
                     "memo-file/1/uuid-file.pdf",
                     "document.pdf",
-                    1048576L,
-                    "pdf",
                     1
             );
 
@@ -707,6 +697,100 @@ class MemoControllerTest {
                             .content(requestJson))
                     .andDo(print())
                     .andExpect(status().isBadRequest());  // 400
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("이미지 항목의 imageName이 누락되면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ImageNameMissing_BadRequest() throws Exception {
+            // given: 첨부를 보낼 경우 파일명·확장자는 필수
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [
+                            {
+                                "s3Key": "memo-image/1/uuid.png",
+                                "extension": "png",
+                                "priority": 0
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("이미지 항목의 priority가 null이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_ImagePriorityNull_BadRequest() throws Exception {
+            // given: priority는 DB 컬럼이 nullable = false라 요청 단계에서 막는다
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [
+                            {
+                                "s3Key": "memo-image/1/uuid.png",
+                                "imageName": "seminar_slide.png",
+                                "priority": null
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).createMemo(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("파일 항목의 fileName이 null이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void createMemo_FileNameNull_BadRequest() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "제목",
+                        "content": "내용",
+                        "tagNames": [],
+                        "images": [],
+                        "files": [
+                            {
+                                "s3Key": "memo-file/1/uuid.pdf",
+                                "fileName": null,
+                                "extension": "pdf",
+                                "priority": 0
+                            }
+                        ]
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(post("/api/v1/memo")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
 
             verify(memoService, never()).createMemo(anyLong(), any());
         }
@@ -1216,6 +1300,66 @@ class MemoControllerTest {
                         "tagNames": null,
                         "images": null,
                         "files": null
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(patch("/api/v1/memo/{memoId}", 100L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).updateMemo(anyLong(), anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("이미지 항목의 priority가 null이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void updateMemo_ImagePriorityNull_BadRequest() throws Exception {
+            // given: priority는 유지/추가 무관하게 필수 (DB 컬럼이 nullable = false)
+            String requestJson = """
+                    {
+                        "title": "새 제목",
+                        "content": "새 내용",
+                        "tagNames": [],
+                        "images": [
+                            {
+                                "imageId": 10,
+                                "priority": null
+                            }
+                        ],
+                        "files": []
+                    }
+                    """;
+
+            // when & then
+            mockMvc.perform(patch("/api/v1/memo/{memoId}", 100L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(memoService, never()).updateMemo(anyLong(), anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("파일 항목의 priority가 null이면 400을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void updateMemo_FilePriorityNull_BadRequest() throws Exception {
+            // given
+            String requestJson = """
+                    {
+                        "title": "새 제목",
+                        "content": "새 내용",
+                        "tagNames": [],
+                        "images": [],
+                        "files": [
+                            {
+                                "fileId": 20,
+                                "priority": null
+                            }
+                        ]
                     }
                     """;
 

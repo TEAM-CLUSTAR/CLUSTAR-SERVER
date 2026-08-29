@@ -1,6 +1,8 @@
 package org.project.domain.memo.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
@@ -18,9 +20,11 @@ public record MemoCreateRequest(
         @Schema(description = "태그 이름 목록", example = "[\"SOPT\", \"교양\", \"레퍼런스\"]")
         List<String> tagNames,
 
+        @Valid
         @Schema(description = "이미지 메타데이터 목록 (선택)")
         List<ImageRequest> images,
 
+        @Valid
         @Schema(description = "파일 메타데이터 목록 (선택)")
         List<FileRequest> files
 ) {
@@ -30,18 +34,14 @@ public record MemoCreateRequest(
                 String s3Key,
 
                 @Schema(
-                        description = "원본 이미지 파일명",
+                        description = "원본 이미지 파일명 (필수)",
                         example = "seminar_slide.png"
                 )
+                @NotBlank(message = "imageName은 비어 있을 수 없습니다.")
                 String imageName,
 
-                @Schema(description = "파일 크기(bytes)", example = "245678")
-                Long bytes,
-
-                @Schema(description = "확장자", example = "png")
-                String extension,
-
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }
@@ -51,18 +51,14 @@ public record MemoCreateRequest(
                 String s3Key,
 
                 @Schema(
-                        description = "원본 파일명",
+                        description = "원본 파일명 (필수)",
                         example = "SOPT_7th_seminar.pdf"
                 )
+                @NotBlank(message = "fileName은 비어 있을 수 없습니다.")
                 String fileName,
 
-                @Schema(description = "파일 크기(bytes)", example = "1048576")
-                Long bytes,
-
-                @Schema(description = "확장자", example = "pdf")
-                String extension,
-
-                @Schema(description = "정렬 우선순위", example = "0")
+                @Schema(description = "정렬 우선순위 (필수)", example = "0")
+                @NotNull(message = "priority는 null일 수 없습니다.")
                 Integer priority
         ) {
         }
