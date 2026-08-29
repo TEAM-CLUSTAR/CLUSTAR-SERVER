@@ -108,8 +108,8 @@ class MemoControllerTest {
 
             // 예상 응답 데이터 생성
             MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
-                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("img-key", "http://s3/img", 1024L, "jpg", 1)),
-                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("file-key", "http://s3/file", 2048L, "pdf", 1))
+                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("img-key", "http://s3/img", "image/jpeg", 1024L, "jpg", 1)),
+                    List.of(new MemoPresignedUrlResponse.PresignedUrlResponse("file-key", "http://s3/file", "application/pdf", 2048L, "pdf", 1))
             );
 
             when(memoService.issuePresignedUrls(eq(userId), any(MemoPresignedUrlRequest.class)))
@@ -144,7 +144,7 @@ class MemoControllerTest {
             MemoPresignedUrlResponse expectedResponse = new MemoPresignedUrlResponse(
                     List.of(
                             new MemoPresignedUrlResponse.PresignedUrlResponse(
-                                    "img-key", "http://s3/img", 2048L, "png", 1)
+                                    "img-key", "http://s3/img", "image/png", 2048L, "png", 1)
                     ),
                     List.of()
             );
@@ -186,7 +186,7 @@ class MemoControllerTest {
                     List.of(),
                     List.of(
                             new MemoPresignedUrlResponse.PresignedUrlResponse(
-                                    "file-key", "http://s3/file", 5120L, "pdf", 1)
+                                    "file-key", "http://s3/file", "application/pdf", 5120L, "pdf", 1)
                     )
             );
 

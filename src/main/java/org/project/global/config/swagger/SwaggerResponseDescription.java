@@ -24,6 +24,7 @@ public enum SwaggerResponseDescription {
             MemoErrorCode.MEMO_IMAGE_NOT_FOUND,
             MemoErrorCode.MEMO_FILE_NOT_FOUND,
             MemoErrorCode.INVALID_ATTACHMENT_EDIT,
+            MemoErrorCode.MISSING_ATTACHMENT_METADATA,
             MemoErrorCode.TOO_MANY_IMAGES,
             MemoErrorCode.TOO_MANY_FILES,
             MemoErrorCode.IMAGE_TOO_LARGE,
@@ -86,7 +87,12 @@ public enum SwaggerResponseDescription {
     ))),
 
     GET_PRESIGNED_URLS(new LinkedHashSet<>(Set.of(
-            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED,
+            MemoErrorCode.UNSUPPORTED_EXTENSION,
+            MemoErrorCode.TOO_MANY_IMAGES,
+            MemoErrorCode.TOO_MANY_FILES,
+            MemoErrorCode.IMAGE_TOO_LARGE,
+            MemoErrorCode.FILE_TOO_LARGE
     )));
 
     private final Set<ErrorCode> errorCodeList;
