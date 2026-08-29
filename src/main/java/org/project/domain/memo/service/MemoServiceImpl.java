@@ -44,7 +44,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -70,6 +72,9 @@ public class MemoServiceImpl implements MemoService {
 
     private final S3KeyUtil s3KeyUtil;
     private final S3Util s3Util;
+
+    // S3 왕복을 트랜잭션 밖에서 끝내기 위해, 쓰기 구간만 명시적으로 트랜잭션에 넣는다.
+    private final TransactionTemplate transactionTemplate;
 
     private final ApplicationEventPublisher eventPublisher;
     private final MemoSearchVectorRetriever memoSearchVectorRetriever;
@@ -136,16 +141,29 @@ public class MemoServiceImpl implements MemoService {
         return new MemoPresignedUrlResponse(imageUrls, fileUrls);
     }
 
-    @Transactional
+    /**
+     * DB가 필요 없는 검증(개수·S3 실제 객체 확인)을 먼저 끝내고, 쓰기 구간만 트랜잭션으로 감싼다.
+     * S3 HeadObject는 네트워크 왕복이라, 트랜잭션 안에 두면 그 시간만큼 DB 커넥션을 점유한다.
+     * NOT_SUPPORTED는 클래스 레벨 @Transactional(readOnly = true)이 이 메서드에 걸리는 것을 막는다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
     public MemoResponse createMemo(Long userId, MemoCreateRequest request) {
-
-        // 사용자 조회
-        User user = getUserOrThrow(userId);
 
         validateImageCount(request.images());
         validateFileCount(request.files());
         Map<String, Long> actualBytesByKey = validateUploadedMedia(userId, request);
+
+        return transactionTemplate.execute(status -> createMemoInTx(userId, request, actualBytesByKey));
+    }
+
+    private MemoResponse createMemoInTx(
+            Long userId,
+            MemoCreateRequest request,
+            Map<String, Long> actualBytesByKey
+    ) {
+        // 사용자 조회
+        User user = getUserOrThrow(userId);
 
         // 메모 생성
         Memo memo = Memo.createMemo(
@@ -176,10 +194,36 @@ public class MemoServiceImpl implements MemoService {
         return MemoResponse.from(savedMemo);
     }
 
-    @Transactional
+    /**
+     * createMemo와 같은 이유로 검증(요청 형태·S3 실제 객체)을 트랜잭션 밖에서 먼저 수행한다.
+     * 형태 검증을 S3 검증보다 앞에 두어야 기존 에러코드(INVALID_ATTACHMENT_EDIT 등)가 유지된다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
     public MemoResponse updateMemo(Long userId, Long memoId, MemoUpdateRequest request) {
 
+        validateImageEditShape(request.images());
+        validateFileEditShape(request.files());
+
+        // 이미지·파일 신규 키를 한 번에 검증한다 (S3 왕복 1회)
+        Map<String, Long> actualBytesByKey = validateUploadedMedia(
+                userId,
+                newAttachmentKeys(request.images(),
+                        MemoUpdateRequest.ImageEdit::imageId, MemoUpdateRequest.ImageEdit::s3Key),
+                newAttachmentKeys(request.files(),
+                        MemoUpdateRequest.FileEdit::fileId, MemoUpdateRequest.FileEdit::s3Key)
+        );
+
+        return transactionTemplate.execute(
+                status -> updateMemoInTx(userId, memoId, request, actualBytesByKey));
+    }
+
+    private MemoResponse updateMemoInTx(
+            Long userId,
+            Long memoId,
+            MemoUpdateRequest request,
+            Map<String, Long> actualBytesByKey
+    ) {
         Memo memo = getMemoOrThrow(memoId);
         checkMyMemo(memo, userId);
 
@@ -199,8 +243,8 @@ public class MemoServiceImpl implements MemoService {
         }
 
         // 3) 첨부(이미지/파일) diff — 유지/추가/삭제
-        RemovedMedia removedImages = applyImageEdits(memo, request.images(), userId);
-        RemovedMedia removedFiles = applyFileEdits(memo, request.files(), userId);
+        RemovedMedia removedImages = applyImageEdits(memo, request.images(), userId, actualBytesByKey);
+        RemovedMedia removedFiles = applyFileEdits(memo, request.files(), userId, actualBytesByKey);
 
         // 4) updatedAt을 응답에 반영하기 위해 flush (dirty checking → @LastModifiedDate 발동)
         memoRepository.flush();
@@ -232,18 +276,13 @@ public class MemoServiceImpl implements MemoService {
     }
 
     // 이미지 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 이미지 정보. (edits는 @NotNull 보장)
-    private RemovedMedia applyImageEdits(Memo memo, List<MemoUpdateRequest.ImageEdit> edits, Long userId) {
-        // 각 항목은 유지(imageId) 또는 추가(s3Key) 중 "정확히 하나"만 가져야 한다.
-        for (MemoUpdateRequest.ImageEdit e : edits) {
-            if ((e.imageId() == null) == (e.s3Key() == null)) {
-                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
-            }
-            // 신규 추가분은 파일명이 필수(확장자는 s3Key에서 뽑는다). 유지분은 서버가 이미 보관하므로 요구하지 않는다.
-            if (e.s3Key() != null && isBlank(e.imageName())) {
-                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
-            }
-        }
-
+    private RemovedMedia applyImageEdits(
+            Memo memo,
+            List<MemoUpdateRequest.ImageEdit> edits,
+            Long userId,
+            Map<String, Long> actualBytesByKey
+    ) {
+        // 요청 형태·개수 검증과 S3 확인은 트랜잭션 밖(updateMemo)에서 이미 끝났다.
         Map<Long, MemoImage> existingById = memo.getMemoImages().stream()
                 .collect(Collectors.toMap(MemoImage::getId, Function.identity()));
 
@@ -260,17 +299,6 @@ public class MemoServiceImpl implements MemoService {
                 throw new MemoException(MemoErrorCode.MEMO_IMAGE_NOT_FOUND);
             }
         }
-
-        // 최종 개수/용량 검증
-        if (keepEdits.size() + addEdits.size() > MAX_IMAGE_COUNT) {
-            throw new MemoException(MemoErrorCode.TOO_MANY_IMAGES);
-        }
-        // 신규 추가분만 S3 실제 객체 기준으로 검증 (유지분은 저장 시점에 검증 완료)
-        Map<String, Long> actualBytesByKey = validateUploadedMedia(
-                userId,
-                extractS3Keys(addEdits, MemoUpdateRequest.ImageEdit::s3Key),
-                List.of()
-        );
 
         // 유지 이미지 우선순위 갱신
         keepEdits.forEach(e -> existingById.get(e.imageId()).updatePriority(e.priority()));
@@ -315,19 +343,13 @@ public class MemoServiceImpl implements MemoService {
     }
 
     // 파일 최종 상태를 현재 메모와 비교해 유지/추가/삭제 반영. 반환=삭제된 파일 정보. (edits는 @NotNull 보장)
-    private RemovedMedia applyFileEdits(Memo memo, List<MemoUpdateRequest.FileEdit> edits, Long userId) {
-        // 각 항목은 유지(fileId) 또는 추가(s3Key) 중 "정확히 하나"만 가져야 한다.
-        // 둘 다 null(정체불명) 또는 둘 다 있음(유지/추가 모호) → 거부.
-        for (MemoUpdateRequest.FileEdit e : edits) {
-            if ((e.fileId() == null) == (e.s3Key() == null)) {
-                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
-            }
-            // 신규 추가분은 파일명이 필수(확장자는 s3Key에서 뽑는다). 유지분은 서버가 이미 보관하므로 요구하지 않는다.
-            if (e.s3Key() != null && isBlank(e.fileName())) {
-                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
-            }
-        }
-
+    private RemovedMedia applyFileEdits(
+            Memo memo,
+            List<MemoUpdateRequest.FileEdit> edits,
+            Long userId,
+            Map<String, Long> actualBytesByKey
+    ) {
+        // 요청 형태·개수 검증과 S3 확인은 트랜잭션 밖(updateMemo)에서 이미 끝났다.
         Map<Long, MemoFile> existingById = memo.getMemoFiles().stream()
                 .collect(Collectors.toMap(MemoFile::getId, Function.identity()));
 
@@ -343,16 +365,6 @@ public class MemoServiceImpl implements MemoService {
                 throw new MemoException(MemoErrorCode.MEMO_FILE_NOT_FOUND);
             }
         }
-
-        if (keepEdits.size() + addEdits.size() > MAX_FILE_COUNT) {
-            throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
-        }
-        // 신규 추가분만 S3 실제 객체 기준으로 검증 (유지분은 저장 시점에 검증 완료)
-        Map<String, Long> actualBytesByKey = validateUploadedMedia(
-                userId,
-                List.of(),
-                extractS3Keys(addEdits, MemoUpdateRequest.FileEdit::s3Key)
-        );
 
         keepEdits.forEach(e -> existingById.get(e.fileId()).updatePriority(e.priority()));
 
@@ -983,6 +995,55 @@ public class MemoServiceImpl implements MemoService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    /**
+     * 요청만으로 판단 가능한 이미지 수정 항목 검증. DB·S3 접근이 없어 트랜잭션 밖에서 수행한다.
+     * 각 항목은 유지(imageId) 또는 추가(s3Key) 중 "정확히 하나"만 가져야 한다.
+     */
+    private void validateImageEditShape(List<MemoUpdateRequest.ImageEdit> edits) {
+        for (MemoUpdateRequest.ImageEdit e : edits) {
+            if ((e.imageId() == null) == (e.s3Key() == null)) {
+                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+            }
+            // 신규 추가분은 파일명이 필수(확장자는 s3Key에서 뽑는다). 유지분은 서버가 이미 보관하므로 요구하지 않는다.
+            if (e.s3Key() != null && isBlank(e.imageName())) {
+                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+            }
+        }
+        // 최종 개수 = 유지 + 추가 = 요청 항목 수
+        if (edits.size() > MAX_IMAGE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_IMAGES);
+        }
+    }
+
+    private void validateFileEditShape(List<MemoUpdateRequest.FileEdit> edits) {
+        for (MemoUpdateRequest.FileEdit e : edits) {
+            if ((e.fileId() == null) == (e.s3Key() == null)) {
+                throw new MemoException(MemoErrorCode.INVALID_ATTACHMENT_EDIT);
+            }
+            if (e.s3Key() != null && isBlank(e.fileName())) {
+                throw new MemoException(MemoErrorCode.MISSING_ATTACHMENT_METADATA);
+            }
+        }
+        if (edits.size() > MAX_FILE_COUNT) {
+            throw new MemoException(MemoErrorCode.TOO_MANY_FILES);
+        }
+    }
+
+    // 신규 추가분(기존 id가 없는 항목)의 s3Key만 모은다.
+    private <T> List<String> newAttachmentKeys(
+            List<T> edits,
+            Function<T, Long> idExtractor,
+            Function<T, String> keyExtractor
+    ) {
+        if (edits == null) {
+            return List.of();
+        }
+        return edits.stream()
+                .filter(e -> idExtractor.apply(e) == null)
+                .map(keyExtractor)
+                .toList();
     }
 
     private <T> List<String> extractS3Keys(List<T> items, Function<T, String> keyExtractor) {

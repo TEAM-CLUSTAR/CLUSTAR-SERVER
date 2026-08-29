@@ -48,6 +48,8 @@ import org.project.global.util.S3Util;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,6 +81,7 @@ class MemoServiceImplTest {
 
     @Mock private S3KeyUtil s3KeyUtil;
     @Mock private S3Util s3Util;
+    @Mock private TransactionTemplate transactionTemplate;
 
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private MemoSearchVectorRetriever memoSearchVectorRetriever;
@@ -89,6 +92,15 @@ class MemoServiceImplTest {
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
     private final Long memoId = 100L;
+
+    // 쓰기 경로는 트랜잭션 밖에서 검증한 뒤 TransactionTemplate으로 감싸므로,
+    // 단위 테스트에서는 콜백을 그 자리에서 실행시켜 기존과 같은 흐름으로 검증한다.
+    @BeforeEach
+    void runTransactionTemplateInline() {
+        lenient().when(transactionTemplate.execute(any()))
+                .thenAnswer(invocation -> ((TransactionCallback<?>) invocation.getArgument(0))
+                        .doInTransaction(null));
+    }
 
     @Nested
     @DisplayName("createMemo")
@@ -165,8 +177,6 @@ class MemoServiceImplTest {
         @Test
         @DisplayName("이미지 개수가 5개를 초과하면 예외가 발생한다.")
         void createMemo_TooManyImages() {
-            given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
-
             List<MemoCreateRequest.ImageRequest> images = List.of(
                     new MemoCreateRequest.ImageRequest("memo-image/1/1.png", "1.png", 1),
                     new MemoCreateRequest.ImageRequest("memo-image/1/2.png", "2.png", 2),
@@ -192,8 +202,6 @@ class MemoServiceImplTest {
         @Test
         @DisplayName("S3 실제 파일 용량이 제한을 초과하면 예외가 발생한다.")
         void createMemo_FileTooLarge() {
-            given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
-
             List<MemoCreateRequest.FileRequest> files = List.of(
                     new MemoCreateRequest.FileRequest("memo-file/1/1.pdf", "1.pdf", 1)
             );
@@ -299,10 +307,6 @@ class MemoServiceImplTest {
                     List.of(imageRequest),
                     List.of()
             );
-
-            // 사용자 조회 OK
-            when(userRepository.findById(userId))
-                    .thenReturn(Optional.of(user));
 
             // S3Key 검증 실패 강제
             doThrow(new MemoException(MemoErrorCode.S3_KEY_USER_MISMATCH))
@@ -1424,8 +1428,6 @@ class MemoServiceImplTest {
             for (int i = 0; i < 3; i++) {
                 edits.add(new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new" + i + ".png", "n.png", i));
             }
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest req = new MemoUpdateRequest("제목", "내용", List.of(), edits, List.of());
 
             // when & then
@@ -1439,8 +1441,6 @@ class MemoServiceImplTest {
         void updateMemo_imageEditBothNull_throws() {
             // given: 배열 안 원소가 유지(id)도 추가(s3Key)도 아님
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest.ImageEdit bad =
                     new MemoUpdateRequest.ImageEdit(null, null, null, 0);
             MemoUpdateRequest req =
@@ -1460,8 +1460,6 @@ class MemoServiceImplTest {
             MemoImage existing = MemoImage.builder()
                     .id(10L).memo(memo).imageS3Key("memo-image/1/keep.png").imagePriority(0).build();
             memo.getMemoImages().add(existing);
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest.ImageEdit ambiguous =
                     new MemoUpdateRequest.ImageEdit(10L, "memo-image/1/new.png", "new.png", 0);
             MemoUpdateRequest req =
@@ -1478,8 +1476,6 @@ class MemoServiceImplTest {
         void updateMemo_fileEditBothNull_throws() {
             // given
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest.FileEdit bad =
                     new MemoUpdateRequest.FileEdit(null, null, null, 0);
             MemoUpdateRequest req =
@@ -1545,7 +1541,6 @@ class MemoServiceImplTest {
         void updateMemo_addedImageActuallyTooLarge_throws() {
             // given: 실제 객체가 5MB 초과
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
             given(s3Util.getObjectMetadata("memo-image/1/huge.png"))
                     .willReturn(new S3Util.S3ObjectMetadata(5L * 1024 * 1024 + 1, "image/png"));
 
@@ -1567,7 +1562,6 @@ class MemoServiceImplTest {
         void updateMemo_addedFileActuallyTooLarge_throws() {
             // given
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
             given(s3Util.getObjectMetadata("memo-file/1/huge.pdf"))
                     .willReturn(new S3Util.S3ObjectMetadata(10L * 1024 * 1024 + 1, "application/pdf"));
 
@@ -1611,7 +1605,6 @@ class MemoServiceImplTest {
         void updateMemo_invalidS3KeyPrefix_doesNotSave() {
             // given: 이미지 자리에 파일 key를 넣은 요청
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
             doThrow(new MemoException(MemoErrorCode.INVALID_S3_KEY_FORMAT))
                     .when(s3KeyUtil)
                     .validateS3Key(eq(userId), eq("memo-image"), anyString());
@@ -1634,8 +1627,6 @@ class MemoServiceImplTest {
         void updateMemo_addImageWithoutName_throws() {
             // given
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest.ImageEdit noName =
                     new MemoUpdateRequest.ImageEdit(null, "memo-image/1/new.png", null, 0);
             MemoUpdateRequest req =
@@ -1678,8 +1669,6 @@ class MemoServiceImplTest {
         void updateMemo_addFileWithoutName_throws() {
             // given
             Memo memo = ownedMemo("제목", "내용");
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
             MemoUpdateRequest.FileEdit noName =
                     new MemoUpdateRequest.FileEdit(null, "memo-file/1/new.pdf", null, 0);
             MemoUpdateRequest req =
