@@ -789,7 +789,7 @@ class MemoServiceImplTest {
             );
             given(s3Util.createPresignedPutUrl(eq(userId), eq("memo-file"), eq("hwp"), eq(1024L), eq(1)))
                     .willReturn(new MemoPresignedUrlResponse.PresignedUrlResponse(
-                            "memo-file/1/uuid.hwp", "https://s3.url/file", 1024L, "hwp", 1));
+                            "memo-file/1/uuid.hwp", "https://s3.url/file", "application/octet-stream", 1024L, "hwp", 1));
 
             // when & then
             assertThat(memoService.issuePresignedUrls(userId, request).files()).hasSize(1);
@@ -805,7 +805,7 @@ class MemoServiceImplTest {
             );
             given(s3Util.createPresignedPutUrl(eq(userId), eq("memo-image"), eq("PNG"), eq(1024L), eq(1)))
                     .willReturn(new MemoPresignedUrlResponse.PresignedUrlResponse(
-                            "memo-image/1/uuid.PNG", "https://s3.url/image", 1024L, "PNG", 1));
+                            "memo-image/1/uuid.PNG", "https://s3.url/image", "image/png", 1024L, "PNG", 1));
 
             // when & then
             assertThat(memoService.issuePresignedUrls(userId, request).images()).hasSize(1);
@@ -825,9 +825,9 @@ class MemoServiceImplTest {
 
             // S3Util이 반환할 가짜 응답 데이터 준비
             var mockImageRes = new MemoPresignedUrlResponse.PresignedUrlResponse(
-                    "memo-image/1/uuid.jpg", "https://s3.url/image", 1024L, "jpg", 1);
+                    "memo-image/1/uuid.jpg", "https://s3.url/image", "image/jpeg", 1024L, "jpg", 1);
             var mockFileRes = new MemoPresignedUrlResponse.PresignedUrlResponse(
-                    "memo-file/1/uuid.pdf", "https://s3.url/file", 2048L, "pdf", 2);
+                    "memo-file/1/uuid.pdf", "https://s3.url/file", "application/pdf", 2048L, "pdf", 2);
 
             // Mock 행동 설정
             given(s3Util.createPresignedPutUrl(eq(userId), eq("memo-image"), eq("jpg"), eq(1024L), eq(1)))

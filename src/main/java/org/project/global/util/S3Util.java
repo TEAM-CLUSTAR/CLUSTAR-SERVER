@@ -164,10 +164,14 @@ public class S3Util {
                 extension
         );
 
+        // 이 값은 presigned URL 서명에 포함된다. 클라이언트가 PUT할 때 Content-Type 헤더로
+        // 똑같이 보내야 서명이 맞으므로, 응답에 그대로 실어 내려준다.
+        String contentType = resolveMimeTypeByExtension(extension).toString();
+
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(s3Key)
-                .contentType(resolveMimeTypeByExtension(extension).toString())
+                .contentType(contentType)
                 .build();
 
         PutObjectPresignRequest presignRequest =
@@ -184,6 +188,7 @@ public class S3Util {
         return new MemoPresignedUrlResponse.PresignedUrlResponse(
                 s3Key,
                 presignedUrl,
+                contentType,
                 bytes,
                 extension,
                 priority
