@@ -14,6 +14,7 @@ import org.project.domain.memo.dto.response.*;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.entity.MemoTag;
 import org.project.domain.memo.event.MemoAttachmentsRemovedEvent;
 import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.event.MemoFileCreatedEvent;
@@ -173,7 +174,7 @@ public class MemoServiceImpl implements MemoService {
         );
 
         // 태그 처리 (중복 제거 + 우선순위)
-        attachTags(memo, request.tagNames(), user);
+        syncTags(memo, request.tagNames(), user);
 
         // 메모 저장
         Memo savedMemo = memoRepository.save(memo);
@@ -238,8 +239,7 @@ public class MemoServiceImpl implements MemoService {
         //    순서=우선순위라 순서 민감 비교. 태그는 임베딩에 영향 없음.
         List<String> currentTagNames = memo.getTags().stream().map(Tag::getName).toList();
         if (!currentTagNames.equals(request.tagNames())) {
-            memo.getMemoTags().clear();
-            attachTags(memo, request.tagNames(), user);
+            syncTags(memo, request.tagNames(), user);
         }
 
         // 3) 첨부(이미지/파일) diff — 유지/추가/삭제
@@ -427,7 +427,7 @@ public class MemoServiceImpl implements MemoService {
                 sourceMemoIds
         );
 
-        attachTags(memo, resolveCommonTagNames(sourceMemos), user);
+        syncTags(memo, resolveCommonTagNames(sourceMemos), user);
 
         Memo savedMemo = memoRepository.save(memo);
 
@@ -768,23 +768,58 @@ public class MemoServiceImpl implements MemoService {
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
     }
 
-    // 태그 처리 (중복 제거 + 우선순위) — 이름 목록으로 기존 태그 일괄 조회 후, 없는 것만 일괄 생성
-    private void attachTags(Memo memo, List<String> tagNames, User user) {
-        if (tagNames == null || tagNames.isEmpty()) {
+    // 요청으로 온 태그 최종 상태를 메모에 반영한다 (유지=우선순위만 갱신, 추가=신규 생성, 빠진 것=삭제)
+    private void syncTags(Memo memo, List<String> tagNames, User user) {
+        List<String> desired = (tagNames == null)
+                ? List.of()
+                : tagNames.stream().distinct().toList();
+
+        if (desired.isEmpty()) {
+            memo.getMemoTags().clear();
             return;
         }
 
-        List<String> uniqueTagNames = tagNames.stream()
-                .distinct()
-                .toList();
+        Map<String, Tag> tagsByName = findOrCreateTags(desired, user);
 
-        Map<String, Tag> tagsByName = findOrCreateTags(uniqueTagNames, user);
+        // 삭제 = 현재 - 최종. 유지되는 행은 건드리지 않는다.
+        Set<String> desiredNames = Set.copyOf(desired);
+        memo.getMemoTags().removeIf(memoTag -> !desiredNames.contains(memoTag.getTag().getName()));
 
-        for (int priority = 0; priority < uniqueTagNames.size(); priority++) {
-            String tagName = uniqueTagNames.get(priority);
-            memo.addTag(tagsByName.get(tagName), priority);
+        Map<String, MemoTag> keptByName = memo.getMemoTags().stream()
+                .collect(Collectors.toMap(memoTag -> memoTag.getTag().getName(), Function.identity()));
+
+        for (int priority = 0; priority < desired.size(); priority++) {
+            String name = desired.get(priority);
+            MemoTag kept = keptByName.get(name);
+
+            if (kept != null) {
+                kept.updatePriority(priority);
+            } else {
+                memo.addTag(tagsByName.get(name), priority);
+            }
         }
+
+        // @OrderBy는 DB에서 로드할 때만 적용되므로, 같은 트랜잭션에서도 최종 순서가 보이도록 맞춘다.
+        memo.getMemoTags().sort(Comparator.comparing(MemoTag::getTagPriority));
     }
+
+    // 태그 처리 (중복 제거 + 우선순위) — syncTags로 대체됨
+//    private void attachTags(Memo memo, List<String> tagNames, User user) {
+//        if (tagNames == null || tagNames.isEmpty()) {
+//            return;
+//        }
+//
+//        List<String> uniqueTagNames = tagNames.stream()
+//                .distinct()
+//                .toList();
+//
+//        Map<String, Tag> tagsByName = findOrCreateTags(uniqueTagNames, user);
+//
+//        for (int priority = 0; priority < uniqueTagNames.size(); priority++) {
+//            String tagName = uniqueTagNames.get(priority);
+//            memo.addTag(tagsByName.get(tagName), priority);
+//        }
+//    }
 
     private Map<String, Tag> findOrCreateTags(List<String> tagNames, User user) {
         List<Tag> existingTags = tagRepository.findAllByNameInAndUser(tagNames, user);
@@ -797,8 +832,8 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         if (!newTags.isEmpty()) {
-            tagRepository.saveAll(newTags)
-                    .forEach(tag -> tagsByName.put(tag.getName(), tag));
+            tagRepository.saveAll(newTags);
+            newTags.forEach(tag -> tagsByName.put(tag.getName(), tag));
         }
 
         return tagsByName;
