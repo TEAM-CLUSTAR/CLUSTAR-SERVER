@@ -142,3 +142,7 @@ logging:
     org.springframework.ai: INFO
     org.springframework.web.client: WARN
     org.springframework.web.reactive.function.client: WARN
+
+ai:
+  chat-memory:
+    max-messages: 10

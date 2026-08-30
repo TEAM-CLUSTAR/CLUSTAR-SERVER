@@ -1,6 +1,7 @@
 package org.project.domain.ai.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.project.domain.ai.dto.request.MemoAiRequest;
 import org.project.domain.ai.dto.request.MemoAiRequestForPlan;
 import org.project.domain.ai.dto.response.AiEvaluationResult;
@@ -10,12 +11,14 @@ import org.project.domain.ai.rag.pipeline.RagPipeline;
 import org.project.global.exception.InsufficientRagContextException;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemoAiServiceImpl implements MemoAiService {
 
     private final RagPipeline ragPipeline;
     private final ChatRoomService chatRoomService;
+    private final ChatMessageService chatMessageService;
 
     private final AiEvaluationService aiEvaluationService;
 
@@ -29,9 +32,11 @@ public class MemoAiServiceImpl implements MemoAiService {
         // 접근 검증
         chatRoomService.validateAccess(userId, chatRoomId);
 
+        MemoAiResponse response;
+
         try {
             // 정상 RAG 파이프라인 실행
-            return ragPipeline.run(
+            response = ragPipeline.run(
                     userId,
                     chatRoomId,
                     request
@@ -39,12 +44,36 @@ public class MemoAiServiceImpl implements MemoAiService {
 
         } catch (InsufficientRagContextException e) {
 
-            return MemoAiResponse.of(
+            response = MemoAiResponse.of(
                     /* title */ "AI 응답을 생성할 수 없습니다",
                     /* content */ e.getMessage(),
                     /* option */ request.option(),
                     /* memoIds */ request.memoIds(),
                     /* debug */ null   // or "CONTEXT_TOO_SHORT"
+            );
+
+        } catch (Exception e) {
+            // AI 호출 실패도 대화에 남긴다. 저장이 실패하더라도
+            // 클라이언트에는 원래 AI 예외가 전달되어야 한다.
+            saveFailedTurnQuietly(chatRoomId, request);
+            throw e;
+        }
+
+        // 컨텍스트 부족 안내도 화면에는 AI 응답으로 노출되므로 함께 저장한다.
+        // RAG 호출이 끝난 뒤 호출되므로 저장만 짧은 트랜잭션으로 처리된다.
+        chatMessageService.saveTurn(chatRoomId, request, response);
+
+        return response;
+    }
+
+    private void saveFailedTurnQuietly(Long chatRoomId, MemoAiRequest request) {
+        try {
+            chatMessageService.saveFailedTurn(chatRoomId, request);
+        } catch (Exception saveError) {
+            log.error(
+                    "실패한 턴 저장에 실패 [chatRoomId={}]",
+                    chatRoomId,
+                    saveError
             );
         }
     }

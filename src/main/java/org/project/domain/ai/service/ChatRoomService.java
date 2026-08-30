@@ -1,9 +1,12 @@
 package org.project.domain.ai.service;
 
+import org.project.domain.ai.dto.response.ActiveChatRoomResponse;
 import org.project.domain.ai.dto.response.ChatRoomListResponse;
 import org.project.domain.ai.entity.ChatRoom;
 
 public interface ChatRoomService {
+
+    ActiveChatRoomResponse getActiveConversation(Long userId);
 
     ChatRoom create(Long userId);
 

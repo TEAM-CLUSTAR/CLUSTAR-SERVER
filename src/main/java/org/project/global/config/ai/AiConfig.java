@@ -22,10 +22,13 @@ public class AiConfig {
     }
 
     @Bean
-    public ChatMemory chatMemory(JdbcChatMemoryRepository repository) {
+    public ChatMemory chatMemory(
+            JdbcChatMemoryRepository repository,
+            ChatMemoryProperties properties
+    ) {
         return MessageWindowChatMemory.builder()
                 .chatMemoryRepository(repository)
-                .maxMessages(10)
+                .maxMessages(properties.getMaxMessages())
                 .build();
     }
 }
