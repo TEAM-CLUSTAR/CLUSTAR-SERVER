@@ -18,12 +18,9 @@ public final class MemoContentParser {
             throw new AiException(AiErrorCode.AI_RESPONSE_EMPTY);
         }
 
+        // 본문 없이 한 줄만 온 경우. 약속된 형식(1행 제목 / 2행부터 본문)을 지키지 않은 응답이다.
         int firstNewline = normalized.indexOf('\n');
         if (firstNewline < 0) {
-            String title = normalized.trim();
-            if (title.isEmpty()) {
-                title = "AI Memo";
-            }
             throw new AiException(AiErrorCode.AI_TITLE_EXTRACTION_FAILED);
         }
 
