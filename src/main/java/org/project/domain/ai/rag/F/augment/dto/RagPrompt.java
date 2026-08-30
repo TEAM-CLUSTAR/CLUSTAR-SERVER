@@ -1,5 +1,6 @@
 package org.project.domain.ai.rag.F.augment.dto;
 
+import org.project.domain.ai.util.ConversationIds;
 import org.project.global.exception.domainException.AiException;
 import org.project.global.exception.errorcode.AiErrorCode;
 
@@ -42,7 +43,7 @@ public record RagPrompt(
             throw new AiException(AiErrorCode.CONVERSATION_CONTEXT_NOT_SET);
         }
 
-        return "user:%d:room:%d".formatted(userId, chatRoomId);
+        return ConversationIds.of(userId, chatRoomId);
     }
 
     // systemPrompt만 교체 (Plan API 용)
