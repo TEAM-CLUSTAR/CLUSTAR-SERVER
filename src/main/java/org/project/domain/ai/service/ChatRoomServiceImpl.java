@@ -103,6 +103,9 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     /**
      * 공통 검증 메서드
+     * <p>
+     * ChatRoom의 @Where(is_deleted = false)로 삭제된 채팅방은 조회되지 않으므로,
+     * 삭제된 채팅방에 접근하면 CHAT_ROOM_NOT_FOUND로 응답한다.
      */
     @Override
     public ChatRoom validateAccess(Long userId, Long chatRoomId) {
@@ -114,10 +117,6 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
         if (!chatRoom.getUser().getId().equals(userId)) {
             throw new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED);
-        }
-
-        if (Boolean.TRUE.equals(chatRoom.getIsDeleted())) {
-            throw new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_ALREADY_DELETED);
         }
 
         return chatRoom;
