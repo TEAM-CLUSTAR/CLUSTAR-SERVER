@@ -146,3 +146,7 @@ logging:
   level:
     org.hibernate.stat: DEBUG
     org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: DEBUG
+
+ai:
+  chat-memory:
+    max-messages: 10

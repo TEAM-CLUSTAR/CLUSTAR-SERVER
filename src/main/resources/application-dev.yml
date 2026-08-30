@@ -146,3 +146,7 @@ swagger:
   auth:
     username: ${SWAGGER_USERNAME}
     password: ${SWAGGER_PASSWORD}
+
+ai:
+  chat-memory:
+    max-messages: 10

@@ -101,3 +101,7 @@ cloud:
   aws:
     s3:
       bucket: test-bucket
+
+ai:
+  chat-memory:
+    max-messages: 10
