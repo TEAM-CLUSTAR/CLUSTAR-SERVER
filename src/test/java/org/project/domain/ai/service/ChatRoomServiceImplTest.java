@@ -7,6 +7,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.ai.dto.response.ActiveChatRoomResponse;
+import org.project.domain.ai.dto.response.ChatRoomListResponse;
+import org.project.global.exception.domainException.ChatRoomException;
+import org.project.global.exception.errorcode.ChatRoomErrorCode;
 import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.repository.ChatRoomRepository;
 import org.project.domain.user.entity.User;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
@@ -133,6 +137,90 @@ class ChatRoomServiceImplTest {
         // then
         assertThat(chatRoom.getIsDeleted()).isTrue();
         verify(chatMemory).clear("user:1:room:7");
+    }
+
+    @Test
+    @DisplayName("채팅방 목록은 삭제되지 않은 방만 반환한다")
+    void findAllByUser_returnsActiveRooms() {
+        // given
+        User user = createUser();
+        when(chatRoomRepository.findAllByUserIdAndIsDeletedFalse(1L))
+                .thenReturn(List.of(
+                        withId(ChatRoom.builder().user(user).build(), 7L),
+                        withId(ChatRoom.builder().user(user).build(), 8L)
+                ));
+
+        // when
+        ChatRoomListResponse response = chatRoomService.findAllByUser(1L);
+
+        // then
+        assertThat(response.chatRooms())
+                .extracting(ChatRoomListResponse.ChatRoomResponse::chatRoomId)
+                .containsExactly(7L, 8L);
+    }
+
+    @Test
+    @DisplayName("최근 채팅방을 조회한다")
+    void findLatestChatRoomByUser_returnsActiveRoom() {
+        // given
+        when(chatRoomRepository.findTopByUserIdOrderByIdDesc(1L))
+                .thenReturn(Optional.of(withId(ChatRoom.builder().user(createUser()).build(), 7L)));
+
+        // when & then
+        assertThat(chatRoomService.findLatestChatRoomByUser(1L).chatRoomId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("채팅방이 하나도 없으면 최근 채팅방 조회는 실패한다")
+    void findLatestChatRoomByUser_noRoom_throws() {
+        // given
+        when(chatRoomRepository.findTopByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> chatRoomService.findLatestChatRoomByUser(1L))
+                .isInstanceOf(ChatRoomException.class)
+                .extracting(e -> ((ChatRoomException) e).getErrorCode())
+                .isEqualTo(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 채팅방에 접근하면 CHAT_ROOM_NOT_FOUND를 던진다")
+    void validateAccess_notFound() {
+        // given
+        when(chatRoomRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> chatRoomService.validateAccess(1L, 99L))
+                .isInstanceOf(ChatRoomException.class)
+                .extracting(e -> ((ChatRoomException) e).getErrorCode())
+                .isEqualTo(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 채팅방에 접근하면 CHAT_ROOM_ACCESS_DENIED를 던진다")
+    void validateAccess_otherUsersRoom() {
+        // given
+        ChatRoom othersRoom = withId(
+                ChatRoom.builder().user(withUserId(createUser(), 2L)).build(), 7L);
+        when(chatRoomRepository.findById(7L)).thenReturn(Optional.of(othersRoom));
+
+        // when & then
+        assertThatThrownBy(() -> chatRoomService.validateAccess(1L, 7L))
+                .isInstanceOf(ChatRoomException.class)
+                .extracting(e -> ((ChatRoomException) e).getErrorCode())
+                .isEqualTo(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("본인 채팅방이면 그대로 반환한다")
+    void validateAccess_ownRoom() {
+        // given
+        ChatRoom ownRoom = withId(
+                ChatRoom.builder().user(withUserId(createUser(), 1L)).build(), 7L);
+        when(chatRoomRepository.findById(7L)).thenReturn(Optional.of(ownRoom));
+
+        // when & then
+        assertThat(chatRoomService.validateAccess(1L, 7L).getId()).isEqualTo(7L);
     }
 
     private ChatRoom withId(ChatRoom chatRoom, Long id) {

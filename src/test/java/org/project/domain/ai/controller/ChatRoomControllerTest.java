@@ -4,7 +4,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.project.domain.ai.dto.MemoAiOptions;
 import org.project.domain.ai.dto.response.ActiveChatRoomResponse;
+import org.project.domain.ai.dto.response.ChatRoomListResponse;
+import org.project.domain.ai.entity.ChatRoom;
 import org.project.domain.ai.service.ChatRoomService;
+import org.project.global.exception.domainException.ChatRoomException;
+import org.project.global.exception.errorcode.ChatRoomErrorCode;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.entity.User;
 import org.project.global.security.filter.JWTFilter;
@@ -24,8 +29,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -108,6 +118,79 @@ class ChatRoomControllerTest {
                 .andExpect(jsonPath("$.data.messages[0].memoIds[0]").value(11L))
                 .andExpect(jsonPath("$.data.messages[1].status").value("FAILED"))
                 .andExpect(jsonPath("$.data.messages[1].content").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("새 대화를 시작하면 생성된 채팅방 ID를 반환한다")
+    @WithMockCustomUser
+    void createChatRoom_returnsNewChatRoomId() throws Exception {
+        // given
+        ChatRoom created = ChatRoom.builder().build();
+        ReflectionTestUtils.setField(created, "id", 8L);
+        when(chatRoomService.create(1L)).thenReturn(created);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/chat-rooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chatRoomId").value(8L));
+    }
+
+    @Test
+    @DisplayName("채팅방 목록을 반환한다")
+    @WithMockCustomUser
+    void getChatRooms_returnsList() throws Exception {
+        // given
+        when(chatRoomService.findAllByUser(1L)).thenReturn(
+                ChatRoomListResponse.of(List.of(
+                        ChatRoomListResponse.ChatRoomResponse.of(7L, LocalDateTime.now()),
+                        ChatRoomListResponse.ChatRoomResponse.of(8L, LocalDateTime.now())
+                ))
+        );
+
+        // when & then
+        mockMvc.perform(get("/api/v1/chat-rooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chatRooms.length()").value(2))
+                .andExpect(jsonPath("$.data.chatRooms[0].chatRoomId").value(7L));
+    }
+
+    @Test
+    @DisplayName("최근 채팅방이 없으면 404를 반환한다")
+    @WithMockCustomUser
+    void findLatestChatRoom_notFound() throws Exception {
+        // given
+        when(chatRoomService.findLatestChatRoomByUser(1L))
+                .thenThrow(new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/chat-rooms/latest"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    @DisplayName("채팅방을 삭제한다")
+    @WithMockCustomUser
+    void deleteChatRoom_success() throws Exception {
+        // when & then
+        mockMvc.perform(delete("/api/v1/chat-rooms/7"))
+                .andExpect(status().isOk());
+
+        verify(chatRoomService).delete(1L, 7L);
+    }
+
+    @Test
+    @DisplayName("남의 채팅방을 삭제하면 403을 반환한다")
+    @WithMockCustomUser
+    void deleteChatRoom_accessDenied() throws Exception {
+        // given
+        doThrow(new ChatRoomException(ChatRoomErrorCode.CHAT_ROOM_ACCESS_DENIED))
+                .when(chatRoomService).delete(anyLong(), anyLong());
+
+        // when & then
+        mockMvc.perform(delete("/api/v1/chat-rooms/7"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
     }
 
     @Retention(RetentionPolicy.RUNTIME)
