@@ -38,4 +38,8 @@ public class MemoTag {
                 .tagPriority(tagPriority)
                 .build();
     }
+
+    public void updatePriority(Integer tagPriority) {
+        this.tagPriority = tagPriority;
+    }
 }
