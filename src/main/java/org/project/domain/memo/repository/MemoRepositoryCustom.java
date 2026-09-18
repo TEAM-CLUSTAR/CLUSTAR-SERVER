@@ -10,7 +10,7 @@ public interface MemoRepositoryCustom {
     List<Memo> findMemos(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             Pageable pageable
     );
@@ -18,7 +18,7 @@ public interface MemoRepositoryCustom {
     List<Memo> findAiMemos(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             Pageable pageable
     );

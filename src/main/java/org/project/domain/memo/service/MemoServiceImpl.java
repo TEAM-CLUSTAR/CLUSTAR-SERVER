@@ -446,7 +446,7 @@ public class MemoServiceImpl implements MemoService {
     public MemoListDashboardResponse getMemosWithMedia(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             int size
     ) {
@@ -463,7 +463,7 @@ public class MemoServiceImpl implements MemoService {
         List<Memo> memos = memoRepository.findMemos(
                 userId,
                 tagIds,
-                cursorCreatedAt,
+                cursorLastViewedAt,
                 cursorMemoId,
                 PageRequest.of(0, size)
         );
@@ -496,7 +496,7 @@ public class MemoServiceImpl implements MemoService {
     public MemoListDashboardResponse getAiMemosWithMedia(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             int size
     ) {
@@ -513,7 +513,7 @@ public class MemoServiceImpl implements MemoService {
         List<Memo> memos = memoRepository.findAiMemos(
                 userId,
                 tagIds,
-                cursorCreatedAt,
+                cursorLastViewedAt,
                 cursorMemoId,
                 PageRequest.of(0, size)
         );

@@ -41,9 +41,20 @@ public record MemoListDashboardResponse(
             Boolean isAiGenerated,
             Boolean isNew,
             LocalDateTime createdAt,
+            @Schema(nullable = true, description = "마지막 열람 시각. 다음 페이지 조회 시 cursorLastViewedAt에 전달합니다.")
+            LocalDateTime lastViewedAt,
 
             List<TagResponse> tagList
     ) {
+
+        public MemoDashboardResponse(
+                Long memoId, String title, String content, String representativeImageUrl,
+                int imageCount, int fileCount, Boolean isPinned, Boolean isAiGenerated,
+                Boolean isNew, LocalDateTime createdAt, List<TagResponse> tagList
+        ) {
+            this(memoId, title, content, representativeImageUrl, imageCount, fileCount,
+                    isPinned, isAiGenerated, isNew, createdAt, null, tagList);
+        }
 
         /**
          * 엔티티 → DTO 변환
@@ -67,6 +78,7 @@ public record MemoListDashboardResponse(
                     memo.getIsAiGenerated(),
                     memo.getIsNew(),
                     memo.getCreatedAt(),
+                    memo.getLastViewedAt(),
                     memo.getMemoTags().stream()
                             .map(MemoTag::getTag)
                             .map(TagResponse::from)
