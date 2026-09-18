@@ -133,4 +133,47 @@ class MemoRepositoryTest {
         assertThat(after.getIsNew()).isFalse();
         assertThat(after.getUpdatedAt()).isEqualTo(originalUpdatedAt); // 열람으로 오염되지 않음
     }
+
+    @Test
+    @DisplayName("전체 메모는 최근 열람순으로 조회되고 미열람 메모는 최하단에 노출된다")
+    void findAllByUserIdWithTagsAndNotDeleted_ordersByLastViewedAt_success() {
+        // given
+        User user = userRepository.save(
+                User.createSocialUser(
+                        "test" + UUID.randomUUID() + "@test.com",
+                        "테스트 유저",
+                        "profile.png",
+                        "google"
+                )
+        );
+        LocalDateTime viewedAt = LocalDateTime.of(2026, 9, 18, 10, 0, 0);
+
+        Memo notViewed = memoRepository.save(Memo.createMemo("미열람", "내용", user));
+        Memo olderViewed = memoRepository.save(Memo.builder()
+                .title("이전 열람").content("내용").user(user)
+                .lastViewedAt(viewedAt.minusMinutes(1))
+                .build());
+        Memo firstViewedAtSameTime = memoRepository.save(Memo.builder()
+                .title("동률 첫 번째").content("내용").user(user)
+                .lastViewedAt(viewedAt)
+                .build());
+        Memo secondViewedAtSameTime = memoRepository.save(Memo.builder()
+                .title("동률 두 번째").content("내용").user(user)
+                .lastViewedAt(viewedAt)
+                .build());
+
+        em.flush();
+        em.clear();
+
+        // when
+        var result = memoRepository.findAllByUserIdWithTagsAndNotDeleted(user.getId());
+
+        // then
+        assertThat(result).extracting(Memo::getId).containsExactly(
+                secondViewedAtSameTime.getId(),
+                firstViewedAtSameTime.getId(),
+                olderViewed.getId(),
+                notViewed.getId()
+        );
+    }
 }

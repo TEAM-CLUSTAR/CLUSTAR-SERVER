@@ -14,15 +14,19 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
 
     Optional<Tag> findByNameAndUserId(String name, Long userId);
 
-    List<Tag> findAllByUserId(Long userId);
+    List<Tag> findAllByUserIdOrderByCreatedAtAscIdAsc(Long userId);
 
     Optional<Tag> findByIdAndUserId(Long id, Long userId);
 
-    List<Tag> findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(Long userId);
+    long countByUserIdAndParentIsNull(Long userId);
+
+    List<Tag> findAllByUserIdAndParentIsNull(Long userId);
+
+    List<Tag> findTop10ByUserIdAndParentIsNullOrderByCreatedAtDescIdDesc(Long userId);
 
     Optional<Tag> findByIdAndUserIdAndParentIsNull(Long id, Long userId);
 
-    List<Tag> findByUserIdAndParentIdOrderByCreatedAtDesc(Long userId, Long parentId);
+    List<Tag> findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(Long userId, Long parentId);
 
-    List<Tag> findByUserIdAndParentParentIdOrderByCreatedAtDesc(Long userId, Long parentId);
+    List<Tag> findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(Long userId, Long parentId);
 }

@@ -40,7 +40,7 @@ class MemoRepositoryImplTest {
     TestEntityManager em;
 
     @Test
-    @DisplayName("태그 조건 없이 최신 메모부터 조회된다")
+    @DisplayName("태그 조건 없이 최근 열람 메모부터 조회되고 미열람 메모는 최하단에 노출된다")
     void findMemos_withoutTag_success() {
         // given
         User user = userRepository.save(
@@ -52,7 +52,10 @@ class MemoRepositoryImplTest {
                 )
         );
 
-        Memo memo1 = Memo.createMemo("memo1", "content1", user);
+        Memo memo1 = Memo.builder()
+                .title("memo1").content("content1").user(user)
+                .lastViewedAt(LocalDateTime.now())
+                .build();
         Memo memo2 = Memo.createMemo("memo2", "content2", user);
 
         em.persist(memo1);
@@ -71,8 +74,8 @@ class MemoRepositoryImplTest {
 
         // then
         assertThat(result).hasSize(2);
-        assertThat(result.get(0).getTitle()).isEqualTo("memo2");
-        assertThat(result.get(1).getTitle()).isEqualTo("memo1");
+        assertThat(result.get(0).getTitle()).isEqualTo("memo1");
+        assertThat(result.get(1).getTitle()).isEqualTo("memo2");
     }
 
     @Test
@@ -141,31 +144,31 @@ class MemoRepositoryImplTest {
         em.persist(newMemo);
         em.flush();
 
-        // createdAt 강제 수정
+        // lastViewedAt 강제 수정
         em.getEntityManager().createQuery("""
                     update Memo m
-                    set m.createdAt = :createdAt
+                    set m.lastViewedAt = :viewedAt
                     where m.id = :id
                 """)
-                .setParameter("createdAt", base.minusMinutes(2))
+                .setParameter("viewedAt", base.minusMinutes(2))
                 .setParameter("id", oldMemo.getId())
                 .executeUpdate();
 
         em.getEntityManager().createQuery("""
                     update Memo m
-                    set m.createdAt = :createdAt
+                    set m.lastViewedAt = :viewedAt
                     where m.id = :id
                 """)
-                .setParameter("createdAt", base.minusMinutes(1))
+                .setParameter("viewedAt", base.minusMinutes(1))
                 .setParameter("id", midMemo.getId())
                 .executeUpdate();
 
         em.getEntityManager().createQuery("""
                     update Memo m
-                    set m.createdAt = :createdAt
+                    set m.lastViewedAt = :viewedAt
                     where m.id = :id
                 """)
-                .setParameter("createdAt", base)
+                .setParameter("viewedAt", base)
                 .setParameter("id", newMemo.getId())
                 .executeUpdate();
 
@@ -178,7 +181,7 @@ class MemoRepositoryImplTest {
         List<Memo> result = memoRepository.findMemos(
                 user.getId(),
                 null,
-                cursor.getCreatedAt(),
+                cursor.getLastViewedAt(),
                 cursor.getId(),
                 PageRequest.of(0, 10)
         );

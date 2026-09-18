@@ -26,7 +26,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     public List<Memo> findMemos(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             Pageable pageable
     ) {
@@ -45,11 +45,11 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                         memo.user.id.eq(userId),
                         memo.isDeleted.eq(false),
                         tagIn(tagIds),
-                        cursorCondition(cursorCreatedAt, cursorMemoId)
+                        cursorCondition(cursorLastViewedAt, cursorMemoId)
                 )
                 .groupBy(memo.id)
                 .orderBy(
-                        memo.createdAt.desc(),
+                        memo.lastViewedAt.desc().nullsLast(),
                         memo.id.desc()
                 )
                 .limit(pageable.getPageSize())
@@ -67,7 +67,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .leftJoin(memoTag.tag, tag).fetchJoin()
                 .where(memo.id.in(memoIds))
                 .orderBy(
-                        memo.createdAt.desc(),
+                        memo.lastViewedAt.desc().nullsLast(),
                         memo.id.desc()
                 )
                 .fetch();
@@ -78,7 +78,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     public List<Memo> findAiMemos(
             Long userId,
             List<Long> tagIds,
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId,
             Pageable pageable
     ) {
@@ -98,11 +98,11 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                         memo.isDeleted.eq(false),
                         memo.isAiGenerated.eq(true),
                         tagIn(tagIds),
-                        cursorCondition(cursorCreatedAt, cursorMemoId)
+                        cursorCondition(cursorLastViewedAt, cursorMemoId)
                 )
                 .groupBy(memo.id)
                 .orderBy(
-                        memo.createdAt.desc(),
+                        memo.lastViewedAt.desc().nullsLast(),
                         memo.id.desc()
                 )
                 .limit(pageable.getPageSize())
@@ -120,7 +120,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .leftJoin(memoTag.tag, tag).fetchJoin()
                 .where(memo.id.in(memoIds))
                 .orderBy(
-                        memo.createdAt.desc(),
+                        memo.lastViewedAt.desc().nullsLast(),
                         memo.id.desc()
                 )
                 .fetch();
@@ -280,19 +280,25 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
      * 커서 조건
      */
     private BooleanExpression cursorCondition(
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
             Long cursorMemoId
     ) {
-        if (cursorCreatedAt == null || cursorMemoId == null) {
+        if (cursorMemoId == null) {
             return null;
         }
 
         QMemo memo = QMemo.memo;
 
-        return memo.createdAt.lt(cursorCreatedAt)
+        if (cursorLastViewedAt == null) {
+            return memo.lastViewedAt.isNull()
+                    .and(memo.id.lt(cursorMemoId));
+        }
+
+        return memo.lastViewedAt.lt(cursorLastViewedAt)
                 .or(
-                        memo.createdAt.eq(cursorCreatedAt)
+                        memo.lastViewedAt.eq(cursorLastViewedAt)
                                 .and(memo.id.lt(cursorMemoId))
-                );
+                )
+                .or(memo.lastViewedAt.isNull());
     }
 }
