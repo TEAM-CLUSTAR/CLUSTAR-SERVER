@@ -23,7 +23,7 @@ public record MemoListDashboardResponse(
     /**
      * 대시보드용 메모 응답
      */
-    @Schema(requiredProperties = {"memoId", "title", "content", "representativeImageUrl", "imageCount", "fileCount", "isPinned", "isAiGenerated", "isNew", "createdAt", "tagList"})
+    @Schema(requiredProperties = {"memoId", "title", "content", "representativeImageUrl", "imageCount", "fileCount", "isPinned", "isAiGenerated", "isNew", "createdAt", "updatedAt", "tagList"})
     public record MemoDashboardResponse(
             Long memoId,
             String title,
@@ -41,9 +41,20 @@ public record MemoListDashboardResponse(
             Boolean isAiGenerated,
             Boolean isNew,
             LocalDateTime createdAt,
+            @Schema(description = "메모 마지막 수정 시각")
+            LocalDateTime updatedAt,
 
             List<TagResponse> tagList
     ) {
+
+        public MemoDashboardResponse(
+                Long memoId, String title, String content, String representativeImageUrl,
+                int imageCount, int fileCount, Boolean isPinned, Boolean isAiGenerated,
+                Boolean isNew, LocalDateTime createdAt, List<TagResponse> tagList
+        ) {
+            this(memoId, title, content, representativeImageUrl, imageCount, fileCount,
+                    isPinned, isAiGenerated, isNew, createdAt, createdAt, tagList);
+        }
 
         /**
          * 엔티티 → DTO 변환
@@ -67,6 +78,7 @@ public record MemoListDashboardResponse(
                     memo.getIsAiGenerated(),
                     memo.getIsNew(),
                     memo.getCreatedAt(),
+                    memo.getUpdatedAt(),
                     memo.getMemoTags().stream()
                             .map(MemoTag::getTag)
                             .map(TagResponse::from)

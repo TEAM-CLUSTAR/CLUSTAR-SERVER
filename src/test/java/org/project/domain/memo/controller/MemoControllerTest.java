@@ -807,6 +807,8 @@ class MemoControllerTest {
         void getMemos_Default_Success() throws Exception {
             // given
             Long userId = 1L;
+            LocalDateTime createdAt = LocalDateTime.of(2026, 9, 1, 10, 0);
+            LocalDateTime updatedAt = LocalDateTime.of(2026, 9, 2, 11, 0);
 
             MemoListDashboardResponse.MemoDashboardResponse memo1 =
                     new MemoListDashboardResponse.MemoDashboardResponse(
@@ -819,7 +821,8 @@ class MemoControllerTest {
                             false,  // isPinned
                             false,  // isAiGenerated
                             true,
-                            LocalDateTime.now(),
+                            createdAt,
+                            updatedAt,
                             List.of(
                                     new MemoListDashboardResponse.TagResponse(1L, "SOPT", "light-blue"),
                                     new MemoListDashboardResponse.TagResponse(2L, "교양", "green")
@@ -865,6 +868,8 @@ class MemoControllerTest {
                     .andExpect(jsonPath("$.data.memos[0].imageCount").value(2))
                     .andExpect(jsonPath("$.data.memos[0].fileCount").value(1))
                     .andExpect(jsonPath("$.data.memos[0].isPinned").value(false))
+                    .andExpect(jsonPath("$.data.memos[0].createdAt").value("2026-09-01T10:00:00"))
+                    .andExpect(jsonPath("$.data.memos[0].updatedAt").value("2026-09-02T11:00:00"))
                     .andExpect(jsonPath("$.data.memos[0].tagList.length()").value(2))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].tagId").value(1L))
                     .andExpect(jsonPath("$.data.memos[0].tagList[0].name").value("SOPT"))

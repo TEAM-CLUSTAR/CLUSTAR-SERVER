@@ -401,6 +401,8 @@ class MemoServiceImplTest {
         @DisplayName("성공: 메모 + 이미지 + 파일을 함께 조회한다")
         void success() {
             // given
+            LocalDateTime updatedAt = LocalDateTime.of(2026, 9, 18, 12, 0);
+            ReflectionTestUtils.setField(memo1, "updatedAt", updatedAt);
             when(memoRepository.findMemos(
                     eq(user.getId()),
                     isNull(),
@@ -438,6 +440,7 @@ class MemoServiceImplTest {
             assertThat(memoResponse.title()).isEqualTo("메모1");
             assertThat(memoResponse.imageCount()).isEqualTo(1);
             assertThat(memoResponse.fileCount()).isEqualTo(1);
+            assertThat(memoResponse.updatedAt()).isEqualTo(updatedAt);
 
             // repository 호출 검증
             verify(memoRepository).findMemos(
