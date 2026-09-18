@@ -43,7 +43,9 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
             LEFT JOIN FETCH mt.tag
             WHERE m.user.id = :userId
               AND m.isDeleted = false
-            ORDER BY m.createdAt DESC, m.id DESC
+            ORDER BY CASE WHEN m.lastViewedAt IS NULL THEN 1 ELSE 0 END ASC,
+                     m.lastViewedAt DESC,
+                     m.id DESC
             """)
     List<Memo> findAllByUserIdWithTagsAndNotDeleted(@Param("userId") Long userId);
 

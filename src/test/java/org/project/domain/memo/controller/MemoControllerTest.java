@@ -847,7 +847,7 @@ class MemoControllerTest {
             when(memoService.getMemosWithMedia(
                     eq(userId),
                     eq(null),  // tagIds
-                    eq(null),  // cursorCreatedAt
+                    eq(null),  // cursorLastViewedAt
                     eq(null),  // cursorMemoId
                     eq(20)     // default size
             )).thenReturn(expectedResponse);
@@ -936,7 +936,7 @@ class MemoControllerTest {
         void getMemos_WithCursor_Success() throws Exception {
             // given
             Long userId = 1L;
-            LocalDateTime cursorCreatedAt = LocalDateTime.of(2026, 1, 15, 12, 0);
+            LocalDateTime cursorLastViewedAt = LocalDateTime.of(2026, 1, 15, 12, 0);
             Long cursorMemoId = 10L;
             int size = 10;
 
@@ -946,14 +946,14 @@ class MemoControllerTest {
             when(memoService.getMemosWithMedia(
                     eq(userId),
                     eq(null),
-                    eq(cursorCreatedAt),
+                    eq(cursorLastViewedAt),
                     eq(cursorMemoId),
                     eq(size)
             )).thenReturn(expectedResponse);
 
             // when & then
             mockMvc.perform(get("/api/v1/memo")
-                            .param("cursorCreatedAt", "2026-01-15T12:00:00")
+                            .param("cursorLastViewedAt", "2026-01-15T12:00:00")
                             .param("cursorMemoId", "10")
                             .param("size", "10")
                             .contentType(MediaType.APPLICATION_JSON))

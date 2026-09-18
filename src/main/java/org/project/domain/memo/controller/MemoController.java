@@ -132,9 +132,9 @@ public class MemoController {
     @Operation(
             summary = "메모 전체 조회(대시보드)",
             description = """
-                메모를 전체 조회합니다.
+                메모를 최근 열람순으로 전체 조회합니다. 미열람 메모는 최하단에 노출됩니다.
                 - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
-                - 커서 기반 페이지네이션을 지원합니다.
+                - 다음 페이지 조회 시 마지막 카드의 lastViewedAt과 memoId를 각각 cursorLastViewedAt, cursorMemoId로 전달합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
                   이미지/파일 개수 정보를 포함합니다.
                 """
@@ -148,7 +148,7 @@ public class MemoController {
             List<Long> tagIds,
 
             @RequestParam(required = false)
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
 
             @RequestParam(required = false)
             Long cursorMemoId,
@@ -161,7 +161,7 @@ public class MemoController {
                 memoService.getMemosWithMedia(
                         userDetails.getUserId(),
                         tagIds,
-                        cursorCreatedAt,
+                        cursorLastViewedAt,
                         cursorMemoId,
                         size
                 );
@@ -172,9 +172,9 @@ public class MemoController {
     @Operation(
             summary = "AI가 생성한 메모 전체 조회(대시보드)",
             description = """
-                AI가 생성한 메모를 전체 조회합니다.
+                AI가 생성한 메모를 최근 열람순으로 전체 조회합니다. 미열람 메모는 최하단에 노출됩니다.
                 - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
-                - 커서 기반 페이지네이션을 지원합니다.
+                - 다음 페이지 조회 시 마지막 카드의 lastViewedAt과 memoId를 각각 cursorLastViewedAt, cursorMemoId로 전달합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
                   이미지/파일 개수 정보를 포함합니다.
                 """
@@ -188,7 +188,7 @@ public class MemoController {
             List<Long> tagIds,
 
             @RequestParam(required = false)
-            LocalDateTime cursorCreatedAt,
+            LocalDateTime cursorLastViewedAt,
 
             @RequestParam(required = false)
             Long cursorMemoId,
@@ -201,7 +201,7 @@ public class MemoController {
                 memoService.getAiMemosWithMedia(
                         userDetails.getUserId(),
                         tagIds,
-                        cursorCreatedAt,
+                        cursorLastViewedAt,
                         cursorMemoId,
                         size
                 );
@@ -232,7 +232,11 @@ public class MemoController {
     }
 
     @GetMapping("/structure")
-    @Operation(summary = "구조화뷰 메모 전체 조회", description = "구조화뷰를 위한 전체 메모를 조회합니다.")
+    @Operation(
+            summary = "구조화뷰 메모 전체 조회",
+            description = "구조화뷰를 위한 전체 메모를 최근 열람순으로 조회합니다. "
+                    + "한 번도 열람하지 않은 메모는 목록 최하단에 노출됩니다."
+    )
     public ResponseEntity<ApiResponse<MemoStructureListResponse>> getStructureMemo(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ){
@@ -301,4 +305,3 @@ public class MemoController {
     }
 
 }
-

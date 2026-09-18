@@ -545,10 +545,10 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("성공: cursorCreatedAt + cursorMemoId 기준으로 다음 페이지를 조회한다")
+        @DisplayName("성공: cursorLastViewedAt + cursorMemoId 기준으로 다음 페이지를 조회한다")
         void success_cursorPagination() {
             // given
-            LocalDateTime cursorCreatedAt =
+            LocalDateTime cursorLastViewedAt =
                     LocalDateTime.of(2026, 1, 13, 11, 0);
             Long cursorMemoId = 2L;
 
@@ -568,7 +568,7 @@ class MemoServiceImplTest {
             when(memoRepository.findMemos(
                     eq(user.getId()),
                     isNull(),
-                    eq(cursorCreatedAt),
+                    eq(cursorLastViewedAt),
                     eq(cursorMemoId),
                     any(PageRequest.class)
             )).thenReturn(List.of(nextMemo));
@@ -586,7 +586,7 @@ class MemoServiceImplTest {
                     memoService.getMemosWithMedia(
                             user.getId(),
                             null,
-                            cursorCreatedAt,
+                            cursorLastViewedAt,
                             cursorMemoId,
                             10
                     );
@@ -604,7 +604,7 @@ class MemoServiceImplTest {
             verify(memoRepository).findMemos(
                     eq(user.getId()),
                     isNull(),
-                    eq(cursorCreatedAt),
+                    eq(cursorLastViewedAt),
                     eq(cursorMemoId),
                     any(PageRequest.class)
             );
