@@ -9,6 +9,7 @@ import org.project.domain.tag.dto.response.TagParentListResponse;
 import org.project.domain.tag.dto.response.TagSummaryResponse;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.tag.repository.TagRepository;
+import org.project.domain.tag.util.TagColorPalette;
 import org.project.domain.memo.repository.MemoTagRepository;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
@@ -24,24 +25,32 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Collections;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TagServiceImpl implements TagService{
 
+    private static final int MAX_PARENT_TAG_COUNT = 10;
+
     private final TagRepository tagRepository;
     private final MemoTagRepository memoTagRepository;
     private final UserRepository userRepository;
 
     public TagListResponse getAllTags(Long userId) {
-        List<Tag> tags = tagRepository.findAllByUserId(userId);
+        List<Tag> tags = tagRepository.findAllByUserIdOrderByCreatedAtAscIdAsc(userId);
         return TagListResponse.from(tags);
     }
 
     @Override
     public TagParentListResponse getParentTags(Long userId) {
-        List<Tag> tags = tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(userId);
+        List<Tag> tags = new ArrayList<>(
+                tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDescIdDesc(userId)
+        );
+        Collections.reverse(tags);
         return TagParentListResponse.from(tags);
     }
 
@@ -50,8 +59,8 @@ public class TagServiceImpl implements TagService{
         Tag parentTag = tagRepository.findByIdAndUserIdAndParentIsNull(parentTagId, userId)
                 .orElseThrow(() -> new TagException(TagErrorCode.PARENT_TAG_NOT_FOUND));
 
-        List<Tag> childTags = tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, parentTagId);
-        List<Tag> grandChildTags = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(userId, parentTagId);
+        List<Tag> childTags = tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(userId, parentTagId);
+        List<Tag> grandChildTags = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(userId, parentTagId);
 
         Map<Long, List<Tag>> grandChildTagsByParentId = grandChildTags.stream()
                 .collect(Collectors.groupingBy(tag -> tag.getParent().getId()));
@@ -76,10 +85,12 @@ public class TagServiceImpl implements TagService{
 
         ensureTagNameIsUnique(userId, request.name(), null);
 
-        User user = getUserOrThrow(userId);
+        User user = parentTag == null
+                ? getUserForParentTagCreation(userId)
+                : getUserOrThrow(userId);
 
         Tag tag = parentTag == null
-                ? Tag.create(request.name(), user)
+                ? createParentTag(request.name(), userId, user)
                 : Tag.create(request.name(), user, parentTag);
 
         Tag savedTag = tagRepository.save(tag);
@@ -101,8 +112,8 @@ public class TagServiceImpl implements TagService{
     public void deleteTag(Long userId, Long tagId) {
         Tag target = getTagOrThrow(userId, tagId);
 
-        List<Tag> childTags = tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(userId, tagId);
-        List<Tag> grandChildTags = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(userId, tagId);
+        List<Tag> childTags = tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(userId, tagId);
+        List<Tag> grandChildTags = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(userId, tagId);
 
         List<Long> tagIds = new ArrayList<>();
         grandChildTags.forEach(tag -> tagIds.add(tag.getId()));
@@ -142,6 +153,23 @@ public class TagServiceImpl implements TagService{
         if (parentTagId <= 0) {
             throw new TagException(TagErrorCode.INVALID_PARENT_TAG_ID);
         }
+    }
+
+    private Tag createParentTag(String name, Long userId, User user) {
+        if (tagRepository.countByUserIdAndParentIsNull(userId) >= MAX_PARENT_TAG_COUNT) {
+            throw new TagException(TagErrorCode.PARENT_TAG_LIMIT_EXCEEDED);
+        }
+
+        Set<String> usedColors = tagRepository.findAllByUserIdAndParentIsNull(userId).stream()
+                .map(Tag::getColor)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        return Tag.create(name, user, TagColorPalette.firstAvailableColor(usedColors));
+    }
+
+    private User getUserForParentTagCreation(Long userId) {
+        return userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.NOT_FOUND_USER));
     }
 
     private User getUserOrThrow(Long userId) {

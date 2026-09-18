@@ -114,7 +114,7 @@ public class TagController {
     @Operation(
             summary = "부모 태그 최대 10개 조회",
             description = """
-            사용자의 부모 태그 최대 10개를 생성일 내림차순으로 조회합니다.
+            사용자의 부모 태그 최대 10개를 생성일 오름차순으로 조회합니다.
             """
     )
     @GetMapping("/parents")
