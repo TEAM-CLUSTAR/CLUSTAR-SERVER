@@ -301,6 +301,46 @@ class MemoRepositoryImplTest {
         assertThat(result).hasSize(3);
     }
 
+    @Test
+    @DisplayName("구조화 메모 조회는 최근 열람순으로 정렬하고 미열람 메모를 최하단에 둔다")
+    void findAllByUserIdWithTagsOrderByLastViewedAt_success() {
+        // given
+        User user = userRepository.save(
+                User.createSocialUser("structure@test.com", "유저", "profile.png", "google")
+        );
+        Tag firstTag = tagRepository.save(Tag.create("첫 번째 태그", user));
+        Tag secondTag = tagRepository.save(Tag.create("두 번째 태그", user));
+        LocalDateTime base = LocalDateTime.now();
+
+        Memo oldViewedMemo = Memo.createMemo("old", "content", user);
+        Memo firstTieMemo = Memo.createMemo("first-tie", "content", user);
+        Memo secondTieMemo = Memo.createMemo("second-tie", "content", user);
+        Memo neverViewedMemo = Memo.createMemo("never", "content", user);
+        firstTieMemo.addTag(firstTag, 1);
+        firstTieMemo.addTag(secondTag, 2);
+
+        em.persist(oldViewedMemo);
+        em.persist(firstTieMemo);
+        em.persist(secondTieMemo);
+        em.persist(neverViewedMemo);
+        em.flush();
+
+        forceLastViewedAt(oldViewedMemo.getId(), base.minusMinutes(1));
+        forceLastViewedAt(firstTieMemo.getId(), base);
+        forceLastViewedAt(secondTieMemo.getId(), base);
+        em.clear();
+
+        // when
+        List<Memo> result = memoRepository.findAllByUserIdWithTagsOrderByLastViewedAt(user.getId());
+
+        // then
+        assertThat(result)
+                .extracting(Memo::getTitle)
+                .containsExactly("second-tie", "first-tie", "old", "never");
+        assertThat(result).hasSize(4);
+        assertThat(result.get(1).getMemoTags()).hasSize(2);
+    }
+
     private void forceCreatedAt(Long memoId, LocalDateTime createdAt) {
         em.getEntityManager().createQuery("""
                     update Memo m
@@ -308,6 +348,17 @@ class MemoRepositoryImplTest {
                     where m.id = :id
                 """)
                 .setParameter("createdAt", createdAt)
+                .setParameter("id", memoId)
+                .executeUpdate();
+    }
+
+    private void forceLastViewedAt(Long memoId, LocalDateTime lastViewedAt) {
+        em.getEntityManager().createQuery("""
+                    update Memo m
+                    set m.lastViewedAt = :lastViewedAt
+                    where m.id = :id
+                """)
+                .setParameter("lastViewedAt", lastViewedAt)
                 .setParameter("id", memoId)
                 .executeUpdate();
     }

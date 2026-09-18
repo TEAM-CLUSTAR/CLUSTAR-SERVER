@@ -37,19 +37,6 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     );
 
     @Query("""
-            SELECT DISTINCT m
-            FROM Memo m
-            LEFT JOIN FETCH m.memoTags mt
-            LEFT JOIN FETCH mt.tag
-            WHERE m.user.id = :userId
-              AND m.isDeleted = false
-            ORDER BY CASE WHEN m.lastViewedAt IS NULL THEN 1 ELSE 0 END ASC,
-                     m.lastViewedAt DESC,
-                     m.id DESC
-            """)
-    List<Memo> findAllByUserIdWithTagsAndNotDeleted(@Param("userId") Long userId);
-
-    @Query("""
         SELECT COUNT(DISTINCT m)
         FROM Memo m
         LEFT JOIN m.memoTags mt

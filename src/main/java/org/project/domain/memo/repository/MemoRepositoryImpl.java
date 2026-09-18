@@ -127,6 +127,28 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
     }
 
     @Override
+    public List<Memo> findAllByUserIdWithTagsOrderByLastViewedAt(Long userId) {
+        QMemo memo = QMemo.memo;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false)
+                )
+                .orderBy(
+                        memo.lastViewedAt.desc().nullsLast(),
+                        memo.id.desc()
+                )
+                .fetch();
+    }
+
+    @Override
     public List<Memo> searchByText(Long userId, String query) {
         QMemo memo = QMemo.memo;
         QMemoTag memoTag = QMemoTag.memoTag;
