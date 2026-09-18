@@ -136,7 +136,7 @@ class MemoRepositoryTest {
 
     @Test
     @DisplayName("전체 메모는 최근 열람순으로 조회되고 미열람 메모는 최하단에 노출된다")
-    void findAllByUserIdWithTagsAndNotDeleted_ordersByLastViewedAt_success() {
+    void findAllByUserIdWithTagsOrderByLastViewedAt_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
@@ -166,7 +166,7 @@ class MemoRepositoryTest {
         em.clear();
 
         // when
-        var result = memoRepository.findAllByUserIdWithTagsAndNotDeleted(user.getId());
+        var result = memoRepository.findAllByUserIdWithTagsOrderByLastViewedAt(user.getId());
 
         // then
         assertThat(result).extracting(Memo::getId).containsExactly(

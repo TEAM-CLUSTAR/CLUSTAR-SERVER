@@ -578,7 +578,7 @@ public class MemoServiceImpl implements MemoService {
     @Override
     public MemoStructureListResponse getStructureMemo(Long userId){
         // 메모 + 태그 한번에 조회
-        List<Memo> memos = memoRepository.findAllByUserIdWithTagsAndNotDeleted(userId);
+        List<Memo> memos = memoRepository.findAllByUserIdWithTagsOrderByLastViewedAt(userId);
 
         List<MemoStructureResponse> responses = memos.stream()
                 .map(memo -> MemoStructureResponse.from(memo, MarkdownUtil.strip(memo.getContent())))
