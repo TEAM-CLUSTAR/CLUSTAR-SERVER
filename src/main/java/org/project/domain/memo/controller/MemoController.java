@@ -136,7 +136,7 @@ public class MemoController {
                 - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
                 - 다음 페이지 조회 시 마지막 카드의 lastViewedAt과 memoId를 각각 cursorLastViewedAt, cursorMemoId로 전달합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
-                  이미지/파일 개수 정보를 포함합니다.
+                  이미지/파일 개수, 생성 시각(createdAt), 마지막 수정 시각(updatedAt)을 포함합니다.
                 """
     )
     @GetMapping
@@ -176,7 +176,7 @@ public class MemoController {
                 - tagIds가 있으면 해당 태그가 포함된 메모만 조회합니다.
                 - 다음 페이지 조회 시 마지막 카드의 lastViewedAt과 memoId를 각각 cursorLastViewedAt, cursorMemoId로 전달합니다.
                 - 각 메모는 대표 이미지 1개(presigned URL)와
-                  이미지/파일 개수 정보를 포함합니다.
+                  이미지/파일 개수, 생성 시각(createdAt), 마지막 수정 시각(updatedAt)을 포함합니다.
                 """
     )
     @GetMapping("/ai")

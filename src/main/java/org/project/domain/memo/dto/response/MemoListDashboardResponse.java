@@ -23,7 +23,7 @@ public record MemoListDashboardResponse(
     /**
      * 대시보드용 메모 응답
      */
-    @Schema(requiredProperties = {"memoId", "title", "content", "representativeImageUrl", "imageCount", "fileCount", "isPinned", "isAiGenerated", "isNew", "createdAt", "tagList"})
+    @Schema(requiredProperties = {"memoId", "title", "content", "representativeImageUrl", "imageCount", "fileCount", "isPinned", "isAiGenerated", "isNew", "createdAt", "updatedAt", "tagList"})
     public record MemoDashboardResponse(
             Long memoId,
             String title,
@@ -41,6 +41,8 @@ public record MemoListDashboardResponse(
             Boolean isAiGenerated,
             Boolean isNew,
             LocalDateTime createdAt,
+            @Schema(description = "메모 마지막 수정 시각")
+            LocalDateTime updatedAt,
             @Schema(nullable = true, description = "마지막 열람 시각. 다음 페이지 조회 시 cursorLastViewedAt에 전달합니다.")
             LocalDateTime lastViewedAt,
 
@@ -53,7 +55,17 @@ public record MemoListDashboardResponse(
                 Boolean isNew, LocalDateTime createdAt, List<TagResponse> tagList
         ) {
             this(memoId, title, content, representativeImageUrl, imageCount, fileCount,
-                    isPinned, isAiGenerated, isNew, createdAt, null, tagList);
+                    isPinned, isAiGenerated, isNew, createdAt, createdAt, null, tagList);
+        }
+
+        public MemoDashboardResponse(
+                Long memoId, String title, String content, String representativeImageUrl,
+                int imageCount, int fileCount, Boolean isPinned, Boolean isAiGenerated,
+                Boolean isNew, LocalDateTime createdAt, LocalDateTime lastViewedAt,
+                List<TagResponse> tagList
+        ) {
+            this(memoId, title, content, representativeImageUrl, imageCount, fileCount,
+                    isPinned, isAiGenerated, isNew, createdAt, createdAt, lastViewedAt, tagList);
         }
 
         /**
@@ -78,6 +90,7 @@ public record MemoListDashboardResponse(
                     memo.getIsAiGenerated(),
                     memo.getIsNew(),
                     memo.getCreatedAt(),
+                    memo.getUpdatedAt(),
                     memo.getLastViewedAt(),
                     memo.getMemoTags().stream()
                             .map(MemoTag::getTag)
