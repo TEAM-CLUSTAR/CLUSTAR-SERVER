@@ -56,6 +56,14 @@ public class Tag extends BaseEntity {
                 .build();
     }
 
+    public static Tag create(String name, User user, String color) {
+        return Tag.builder()
+                .name(name)
+                .color(color)
+                .user(user)
+                .build();
+    }
+
     public static Tag create(String name, User user, Tag parent) {
         return Tag.builder()
                 .name(name)
@@ -83,10 +91,10 @@ public class Tag extends BaseEntity {
      */
     public static List<Tag> createDefaultTags(User user) {
         return List.of(
-                create("졸업 프로젝트", user),
-                create("교양", user),
-                create("SOPT", user),
-                create("레퍼런스", user)
+                create("졸업 프로젝트", user, TagColorPalette.colors().get(0)),
+                create("교양", user, TagColorPalette.colors().get(1)),
+                create("SOPT", user, TagColorPalette.colors().get(2)),
+                create("레퍼런스", user, TagColorPalette.colors().get(3))
         );
     }
 }

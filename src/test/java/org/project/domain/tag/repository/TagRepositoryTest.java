@@ -35,8 +35,8 @@ class TagRepositoryTest {
     private TestEntityManager em;
 
     @Test
-    @DisplayName("부모 태그는 생성일 내림차순으로 최대 10개 조회된다")
-    void findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc_success() {
+    @DisplayName("부모 태그는 최신 10개를 생성일과 ID 내림차순으로 조회한다")
+    void findTop10ByUserIdAndParentIsNullOrderByCreatedAtDescIdDesc_success() {
         // given
         User user = userRepository.save(createUser());
 
@@ -54,7 +54,7 @@ class TagRepositoryTest {
         em.clear();
 
         // when
-        List<Tag> result = tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(user.getId());
+        List<Tag> result = tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDescIdDesc(user.getId());
 
         // then
         assertThat(result).hasSize(10);
@@ -96,14 +96,39 @@ class TagRepositoryTest {
         em.clear();
 
         // when
-        List<Tag> children = tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
-        List<Tag> grandChildren = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(user.getId(), parent.getId());
+        List<Tag> children = tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(user.getId(), parent.getId());
+        List<Tag> grandChildren = tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(user.getId(), parent.getId());
 
         // then
         assertThat(children).extracting(Tag::getName)
-                .containsExactly("child-2", "child-1");
+                .containsExactly("child-1", "child-2");
         assertThat(grandChildren).extracting(Tag::getName)
-                .containsExactly("grand-3", "grand-2", "grand-1");
+                .containsExactly("grand-1", "grand-2", "grand-3");
+    }
+
+    @Test
+    @DisplayName("동일한 생성일의 태그는 ID 오름차순으로 조회된다")
+    void findAllByUserIdOrderByCreatedAtAscIdAsc_sameCreatedAt_success() {
+        // given
+        User user = userRepository.save(createUser());
+        LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 0, 0);
+
+        Tag firstTag = Tag.create("first", user);
+        ReflectionTestUtils.setField(firstTag, "createdAt", createdAt);
+        tagRepository.save(firstTag);
+
+        Tag secondTag = Tag.create("second", user);
+        ReflectionTestUtils.setField(secondTag, "createdAt", createdAt);
+        tagRepository.save(secondTag);
+
+        em.flush();
+        em.clear();
+
+        // when
+        List<Tag> result = tagRepository.findAllByUserIdOrderByCreatedAtAscIdAsc(user.getId());
+
+        // then
+        assertThat(result).extracting(Tag::getName).containsExactly("first", "second");
     }
 
     private User createUser() {

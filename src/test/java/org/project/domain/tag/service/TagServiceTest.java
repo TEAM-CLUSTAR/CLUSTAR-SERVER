@@ -3,6 +3,7 @@ package org.project.domain.tag.service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,7 +60,7 @@ class TagServiceTest {
         Tag parent1 = Tag.create("parent-1", user);
         Tag parent2 = Tag.create("parent-2", user);
 
-        when(tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDesc(1L))
+        when(tagRepository.findTop10ByUserIdAndParentIsNullOrderByCreatedAtDescIdDesc(1L))
                 .thenReturn(List.of(parent2, parent1));
 
         // when
@@ -67,7 +68,7 @@ class TagServiceTest {
 
         // then
         assertThat(response.tags()).hasSize(2);
-        assertThat(response.tags().get(0).name()).isEqualTo("parent-2");
+        assertThat(response.tags().get(0).name()).isEqualTo("parent-1");
         assertThat(response.tags().get(0).color()).isIn(TagColorPalette.colors());
         assertThat(response.tags().get(0).parentId()).isNull();
     }
@@ -91,10 +92,10 @@ class TagServiceTest {
 
         when(tagRepository.findByIdAndUserIdAndParentIsNull(10L, 1L))
                 .thenReturn(Optional.of(parent));
-        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
-                .thenReturn(List.of(child2, child1));
-        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
-                .thenReturn(List.of(grand2, grand1));
+        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
+                .thenReturn(List.of(child1, child2));
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
+                .thenReturn(List.of(grand1, grand2));
 
         // when
         TagHierarchyResponse response = tagService.getChildAndGrandChildTags(1L, 10L);
@@ -104,16 +105,16 @@ class TagServiceTest {
         assertThat(response.parentTag().color()).isIn(TagColorPalette.colors());
         assertThat(response.parentTag().parentId()).isNull();
         assertThat(response.childTags()).hasSize(2);
-        assertThat(response.childTags().get(0).name()).isEqualTo("child-2");
+        assertThat(response.childTags().get(0).name()).isEqualTo("child-1");
         assertThat(response.childTags().get(0).color()).isEqualTo(response.parentTag().color());
         assertThat(response.childTags().get(0).parentId()).isEqualTo(10L);
         assertThat(response.childTags().get(0).childTags()).extracting(TagHierarchyResponse.TagTreeResponse::name)
-                .containsExactly("grand-2");
-        assertThat(response.childTags().get(0).childTags().get(0).parentId()).isEqualTo(12L);
+                .containsExactly("grand-1");
+        assertThat(response.childTags().get(0).childTags().get(0).parentId()).isEqualTo(11L);
         assertThat(response.childTags().get(0).childTags().get(0).color())
                 .isEqualTo(response.parentTag().color());
         assertThat(response.childTags().get(1).childTags()).extracting(TagHierarchyResponse.TagTreeResponse::name)
-                .containsExactly("grand-1");
+                .containsExactly("grand-2");
     }
 
     @Test
@@ -134,8 +135,10 @@ class TagServiceTest {
     void createTag_parent_success() {
         // given
         User user = createUser();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
         when(tagRepository.findByNameAndUserId("parent", 1L)).thenReturn(Optional.empty());
+        when(tagRepository.countByUserIdAndParentIsNull(1L)).thenReturn(0L);
+        when(tagRepository.findAllByUserIdAndParentIsNull(1L)).thenReturn(List.of());
         Tag saved = Tag.create("parent", user);
         ReflectionTestUtils.setField(saved, "id", 100L);
         when(tagRepository.save(any(Tag.class))).thenReturn(saved);
@@ -148,6 +151,46 @@ class TagServiceTest {
         assertThat(response.name()).isEqualTo("parent");
         assertThat(response.color()).isIn(TagColorPalette.colors());
         assertThat(response.parentId()).isNull();
+    }
+
+    @Test
+    @DisplayName("부모 태그는 사용 중인 부모 색상을 제외한 색상으로 생성한다")
+    void createTag_parent_assignsUnusedColor() {
+        // given
+        User user = createUser();
+        Tag existingParent = Tag.create("existing", user, TagColorPalette.colors().get(0));
+        Tag saved = Tag.create("parent", user, TagColorPalette.colors().get(1));
+        ReflectionTestUtils.setField(saved, "id", 100L);
+
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+        when(tagRepository.findByNameAndUserId("parent", 1L)).thenReturn(Optional.empty());
+        when(tagRepository.countByUserIdAndParentIsNull(1L)).thenReturn(1L);
+        when(tagRepository.findAllByUserIdAndParentIsNull(1L)).thenReturn(List.of(existingParent));
+        when(tagRepository.save(any(Tag.class))).thenReturn(saved);
+
+        // when
+        tagService.createTag(1L, new TagCreateRequest("parent", null));
+
+        // then
+        ArgumentCaptor<Tag> tagCaptor = ArgumentCaptor.forClass(Tag.class);
+        verify(tagRepository).save(tagCaptor.capture());
+        assertThat(tagCaptor.getValue().getColor()).isEqualTo(TagColorPalette.colors().get(1));
+    }
+
+    @Test
+    @DisplayName("부모 태그가 10개이면 추가 생성을 막는다")
+    void createTag_parentLimitExceeded_fail() {
+        // given
+        User user = createUser();
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+        when(tagRepository.findByNameAndUserId("parent", 1L)).thenReturn(Optional.empty());
+        when(tagRepository.countByUserIdAndParentIsNull(1L)).thenReturn(10L);
+
+        // when & then
+        assertThatThrownBy(() -> tagService.createTag(1L, new TagCreateRequest("parent", null)))
+                .isInstanceOf(TagException.class)
+                .hasMessageContaining(TagErrorCode.PARENT_TAG_LIMIT_EXCEEDED.getMsg());
+        verify(tagRepository, never()).save(any(Tag.class));
     }
 
     @Test
@@ -209,9 +252,9 @@ class TagServiceTest {
         ReflectionTestUtils.setField(child, "id", 11L);
 
         when(tagRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
-        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
+        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
                 .thenReturn(List.of(child));
-        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
                 .thenReturn(List.of());
 
         // when
@@ -237,16 +280,16 @@ class TagServiceTest {
         ReflectionTestUtils.setField(grandChild, "id", 12L);
 
         when(tagRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(parent));
-        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtDesc(1L, 10L))
+        when(tagRepository.findByUserIdAndParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
                 .thenReturn(List.of(child));
-        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L))
+        when(tagRepository.findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(1L, 10L))
                 .thenReturn(List.of(grandChild));
 
         // when
         tagService.deleteTag(1L, 10L);
 
         // then
-        verify(tagRepository).findByUserIdAndParentParentIdOrderByCreatedAtDesc(1L, 10L);
+        verify(tagRepository).findByUserIdAndParentParentIdOrderByCreatedAtAscIdAsc(1L, 10L);
         verify(memoTagRepository).deleteByTagIds(List.of(12L, 11L, 10L));
         verify(tagRepository).deleteAllInBatch(List.of(grandChild, child, parent));
     }
@@ -271,7 +314,7 @@ class TagServiceTest {
     @DisplayName("사용자가 없으면 사용자 예외를 던진다")
     void createTag_userNotFound_fail() {
         // given
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> tagService.createTag(1L, new TagCreateRequest("parent", null)))
