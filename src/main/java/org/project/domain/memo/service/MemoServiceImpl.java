@@ -40,6 +40,7 @@ import org.project.global.util.FileSizeUtil;
 import org.project.global.util.MarkdownUtil;
 import org.project.global.util.S3KeyUtil;
 import org.project.global.util.S3Util;
+import org.project.global.util.SearchQueryTokenizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
@@ -49,6 +50,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -621,68 +623,142 @@ public class MemoServiceImpl implements MemoService {
             throw new MemoException(MemoErrorCode.EMPTY_SEARCH_QUERY);
         }
 
-        // 키워드(텍스트) 기반 검색: 검색어가 제목/태그/본문에 포함된 모든 메모를
-        // 필드 우선순위(제목>태그>본문) + 온전한 키워드 매칭 여부 + 최신순으로 정렬해 반환한다.
-        List<Memo> textResults = memoRepository.searchByText(userId, query);
+        // 시간 단서("지난주에 쓴" 등)는 날짜 조건으로 바꾸고 남은 말로 검색
+        SearchTimeCueParser.ParsedQuery parsed = SearchTimeCueParser.parse(query, LocalDate.now());
+        String searchText = parsed.text();
+        LocalDateTime from = parsed.from() == null ? null : parsed.from().atStartOfDay();
+        LocalDateTime to = parsed.toExclusive() == null ? null : parsed.toExclusive().atStartOfDay();
+        int maxTotal = memoSearchProperties.getMaxTotalResults();
 
-        List<MemoSearchItemResponse> results = textResults.stream()
-                .map(memo -> MemoSearchItemResponse.from(memo, SearchType.TEXT))
-                .toList();
+        // 시간 단서만 있으면("어제 쓴 메모") 해당 기간의 메모를 작성일순으로 반환
+        if (parsed.hasCue() && !SearchQueryTokenizer.hasSearchableToken(searchText)) {
+            List<MemoSearchItemResponse> listed = memoRepository
+                    .findByCreatedAtRange(userId, from, to, parsed.order() == SearchTimeCueParser.DateOrder.EARLIEST, maxTotal)
+                    .stream()
+                    .map(memo -> MemoSearchItemResponse.from(memo, SearchType.TEXT))
+                    .toList();
+            return MemoSearchResponse.of(listed, listed.isEmpty() ? "검색 결과가 없어요." : null);
+        }
 
-        // [보존] 추후 이용될 수도 있으므로 의미 기반 검색 보존
-        /*
-         * // 텍스트 검색 (병렬) — 실패해도 의미 검색 결과라도 주도록 빈 리스트로 degrade
-         * CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
-         *         () -> {
-         *             try {
-         *                 return memoRepository.searchByText(userId, query); // (구: searchByText(userId, query, 3))
-         *             } catch (Exception e) {
-         *                 log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} errorType={}",
-         *                         userId, e.getClass().getSimpleName());
-         *                 return List.<Memo>of();
-         *             }
-         *         }, ioExecutor
-         * );
-         *
-         * // 의미 기반 벡터 검색 (병렬)
-         * CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
-         *         () -> memoSearchVectorRetriever.retrieve(userId, query), ioExecutor
-         * );
-         *
-         * CompletableFuture.allOf(textFuture, vectorFuture).join();
-         *
-         * List<Memo> textResults = textFuture.join();
-         * List<Memo> vectorResults = vectorFuture.join();
-         *
-         * // 텍스트 결과 먼저, 중복 memoId 제거하며 벡터 결과 추가
-         * Set<Long> seenIds = new LinkedHashSet<>();
-         * List<MemoSearchItemResponse> results = new ArrayList<>();
-         *
-         * textResults.forEach(memo -> {
-         *     if (seenIds.add(memo.getId())) {
-         *         results.add(MemoSearchItemResponse.from(memo, SearchType.TEXT));
-         *     }
-         * });
-         *
-         * // 벡터 결과는 텍스트와 중복 제거를 먼저 한 뒤 상위 maxMemoResults개만 가져가게
-         * int maxSemantic = memoSearchProperties.getMaxMemoResults();
-         * int semanticAdded = 0;
-         * for (Memo memo : vectorResults) {
-         *     if (semanticAdded >= maxSemantic) {
-         *         break;
-         *     }
-         *     if (seenIds.add(memo.getId())) {
-         *         results.add(MemoSearchItemResponse.from(memo, SearchType.SEMANTIC));
-         *         semanticAdded++;
-         *     }
-         * }
-         *
-         * String message = vectorResults.isEmpty() ? "의미상 유사한 메모를 찾지 못했어요." : null;
-         * return MemoSearchResponse.of(results, message);
-         */
+        // 텍스트 검색과 의미 검색을 병렬로 수행 (한쪽이 실패해도 다른 쪽 결과는 반환)
+        CompletableFuture<List<Memo>> textFuture = CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        return memoRepository.searchByText(userId, searchText, from, to);
+                    } catch (Exception e) {
+                        log.warn("[Search] 텍스트 검색 실패, 의미 검색 결과만 반환합니다. userId={} errorType={}",
+                                userId, e.getClass().getSimpleName());
+                        return List.<Memo>of();
+                    }
+                }, ioExecutor
+        );
+        CompletableFuture<List<Memo>> vectorFuture = CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        // 날짜 조건이 있으면 그 기간의 메모만 후보로 삼음
+                        List<Long> candidateIds = parsed.hasRange() ? memoRepository.findIdsByCreatedAtRange(userId, from, to) : null;
+                        return memoSearchVectorRetriever.retrieve(userId, searchText, candidateIds);
+                    } catch (Exception e) {
+                        log.warn("[Search] 의미 검색 실패, 텍스트 검색 결과만 반환합니다. userId={} errorType={}",
+                                userId, e.getClass().getSimpleName());
+                        return List.<Memo>of();
+                    }
+                }, ioExecutor
+        );
+
+        CompletableFuture.allOf(textFuture, vectorFuture).join();
+
+        List<Memo> textResults = textFuture.join();
+        List<Memo> vectorResults = vectorFuture.join();
+
+        // 텍스트 결과를 강한 일치와 약한 일치로 분리
+        List<String> tokens = SearchQueryTokenizer.tokenize(searchText);
+        double minCoverage = memoSearchProperties.getTextStrongTokenCoverage();
+        List<Memo> strongTextResults = new ArrayList<>();
+        List<Memo> weakTextResults = new ArrayList<>();
+        for (Memo memo : textResults) {
+            if (MemoTextMatcher.isStrongMatch(memo, tokens, minCoverage)) {
+                strongTextResults.add(memo);
+            } else {
+                weakTextResults.add(memo);
+            }
+        }
+
+        Set<Long> seenIds = new HashSet<>();
+        List<MemoSearchItemResponse> results = new ArrayList<>();
+        if (parsed.order() == SearchTimeCueParser.DateOrder.NONE) {
+            // 강한 텍스트 → 의미 → 약한 텍스트 순으로 채움 (구간별·전체 상한, 중복 제거)
+            appendResults(results, seenIds, strongTextResults, SearchType.TEXT,
+                    memoSearchProperties.getTextStrongMaxResults(), maxTotal);
+            appendResults(results, seenIds, vectorResults, SearchType.SEMANTIC,
+                    memoSearchProperties.getMaxMemoResults(), maxTotal);
+        } else {
+            // 처음/최근 요구는 구간별 상한으로 자르면 대상 메모가 빠질 수 있어, 합쳐서 날짜순 정렬 후 전체 상한만 적용
+            appendByCreatedAt(results, seenIds, strongTextResults, vectorResults,
+                    parsed.order() == SearchTimeCueParser.DateOrder.EARLIEST, maxTotal);
+        }
+
+        // 약한 일치는 앞 결과를 보충할 때만 붙임 (없는 걸 찾을 때 엉뚱한 메모가 나오는 것 방지)
+        // 날짜 조건이 있으면 이미 기간으로 좁혀진 후보라 허용
+        if (!results.isEmpty() || parsed.hasRange()) {
+            appendResults(results, seenIds, weakTextResults, SearchType.TEXT,
+                    memoSearchProperties.getTextWeakMaxResults(), maxTotal);
+        }
 
         String message = results.isEmpty() ? "검색 결과가 없어요." : null;
         return MemoSearchResponse.of(results, message);
+    }
+
+    private void appendByCreatedAt(
+            List<MemoSearchItemResponse> results,
+            Set<Long> seenIds,
+            List<Memo> textMemos,
+            List<Memo> semanticMemos,
+            boolean ascending,
+            int totalLimit
+    ) {
+        record Candidate(Memo memo, SearchType type) {
+        }
+
+        Set<Long> pooledIds = new HashSet<>();
+        List<Candidate> pool = new ArrayList<>();
+        textMemos.stream().filter(memo -> pooledIds.add(memo.getId()))
+                .forEach(memo -> pool.add(new Candidate(memo, SearchType.TEXT)));
+        semanticMemos.stream().filter(memo -> pooledIds.add(memo.getId()))
+                .forEach(memo -> pool.add(new Candidate(memo, SearchType.SEMANTIC)));
+
+        Comparator<Candidate> byCreatedAt = Comparator
+                .comparing((Candidate c) -> c.memo().getCreatedAt(), Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()))
+                .thenComparing(c -> c.memo().getId());
+        pool.sort(ascending ? byCreatedAt : byCreatedAt.reversed());
+
+        for (Candidate candidate : pool) {
+            if (results.size() >= totalLimit) {
+                break;
+            }
+            seenIds.add(candidate.memo().getId());
+            results.add(MemoSearchItemResponse.from(candidate.memo(), candidate.type()));
+        }
+    }
+
+    private void appendResults(
+            List<MemoSearchItemResponse> results,
+            Set<Long> seenIds,
+            List<Memo> memos,
+            SearchType searchType,
+            int sectionLimit,
+            int totalLimit
+    ) {
+        int added = 0;
+        for (Memo memo : memos) {
+            if (added >= sectionLimit || results.size() >= totalLimit) {
+                break;
+            }
+            if (seenIds.add(memo.getId())) {
+                results.add(MemoSearchItemResponse.from(memo, searchType));
+                added++;
+            }
+        }
     }
 
     @Override
