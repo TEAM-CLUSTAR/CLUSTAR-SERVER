@@ -111,7 +111,8 @@ app:
     same-site: None
     secure: true
   oauth:
-    frontend-callback-url: ${FRONTEND_OAUTH_CALLBACK_URL:http://localhost:5173/oauth/callback}
+    local-frontend-origin: http://localhost:5173
+    deployed-frontend-origin: https://www.clustar.cloud
 
 cloud:
   aws:
