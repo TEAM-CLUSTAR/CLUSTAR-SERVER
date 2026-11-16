@@ -617,6 +617,9 @@ public class MemoServiceImpl implements MemoService {
     }
 
 
+    // 병렬 검색을 join()으로 기다리는 동안 읽기 트랜잭션이 커넥션을 점유하지 않도록 트랜잭션에서 분리
+    // (조회 결과는 fetch join으로 태그까지 로드되므로 트랜잭션 밖에서 접근해도 안전)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
     public MemoSearchResponse searchMemos(Long userId, String query) {
         if (query == null || query.isBlank()) {
