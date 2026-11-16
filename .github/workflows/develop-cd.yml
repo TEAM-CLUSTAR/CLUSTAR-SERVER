@@ -1,71 +1,49 @@
 name: develop-cd
+
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [develop]
     paths:
       - 'src/**'
       - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'deploy/lightsail/**'
+      - '.github/workflows/develop-cd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clustar-lightsail-develop
+  cancel-in-progress: false
 
 jobs:
-  # 빌드 및 ECR 이미지 푸시
-  build-and-push:
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
-    # 이 Job에서 만든 값을 다른 Job에서 쓸 수 있도록 설정
-    outputs:
-      image-tag: ${{ steps.set-tag.outputs.tag }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: "temurin"
-
-      # ECR 로그인을 위한 자격증명 설정
-      - name: AWS Credentials 설정
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
-
-      - name: ECR 로그인
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: 이미지 태그 설정
-        id: set-tag
-        run: |
-          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "🔥 이미지 태그: ${{ github.sha }}"
-
-      - name: Jib로 빌드 및 ECR 푸시
-        run: |
-          ./gradlew jib \
-            -PjibToImage=${{ secrets.ECR_REPOSITORY }} \
-            -PjibTag=${{ steps.set-tag.outputs.tag }}
-          
-          echo "✅ 이미지 푸시 완료: ${{ secrets.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.tag }}"
-
   deploy:
-    needs: build-and-push
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - name: EC2에 접속 및 배포 명령 실행
-        uses: appleboy/ssh-action@v1.0.3
-        # Runner의 메모리에 깃 시크릿 값을 잠시 담아둠
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+
+      - name: Build versioned image archive
+        run: |
+          ./gradlew --no-daemon jibBuildTar -PjibToImage="clustar:$GITHUB_SHA" -PjibTag="$GITHUB_SHA"
+          gzip -1 build/jib-image.tar
+
+      - name: Upload and deploy to Lightsail
+        shell: bash
         env:
-          DEV_DB_URL: ${{ secrets.DEV_DB_URL }}
-          DEV_DB_USERNAME: ${{ secrets.DEV_DB_USERNAME }}
-          DEV_DB_PASSWORD: ${{ secrets.DEV_DB_PASSWORD }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
-          AWS_REGION: ap-northeast-2
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          LIGHTSAIL_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_KNOWN_HOSTS }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -73,110 +51,66 @@ jobs:
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
           SWAGGER_USERNAME: ${{ secrets.SWAGGER_USERNAME }}
           SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
-          FRONTEND_OAUTH_CALLBACK_URL: ${{ secrets.FRONTEND_OAUTH_CALLBACK_URL }}
-        with:
-          host: ${{ secrets.EC2_DEV_HOST }}
-          username: ${{ secrets.EC2_DEV_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          # GitHub의 시크릿 값들을 EC2 쉘 환경변수로 넘겨주기 (러너 메모리 -> EC2로 복사)
-          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,GOOGLE_AI_API_KEY,SWAGGER_USERNAME,SWAGGER_PASSWORD,FRONTEND_OAUTH_CALLBACK_URL
-          script: |
-            cd /home/ubuntu/clustar_infra
-            
-            aws ecr get-login-password --region ${AWS_REGION} | \
-            sudo docker login --username AWS --password-stdin ${ECR_REPOSITORY%%/*}
-            
-            echo "DEV_DB_URL=${DEV_DB_URL}" > .env
-            echo "DEV_DB_USERNAME=${DEV_DB_USERNAME}" >> .env
-            echo "DEV_DB_PASSWORD=${DEV_DB_PASSWORD}" >> .env
-            echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> .env
-            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
-            echo "JWT_SECRET_KEY=${JWT_SECRET_KEY}" >> .env
-            echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" >> .env
-            echo "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" >> .env
-            echo "GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" >> .env
-            echo "GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}" >> .env
-            echo "SWAGGER_USERNAME=${SWAGGER_USERNAME}" >> .env
-            echo "SWAGGER_PASSWORD=${SWAGGER_PASSWORD}" >> .env
-            echo "FRONTEND_OAUTH_CALLBACK_URL=${FRONTEND_OAUTH_CALLBACK_URL}" >> .env
+          AWS_ACCESS_KEY_ID: ${{ secrets.LIGHTSAIL_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LIGHTSAIL_S3_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          tmp=$(mktemp -d)
+          remote_dir=
+          cleanup() {
+            if [[ -n $remote_dir ]]; then
+              ssh "${ssh_options[@]}" "$target" \
+                "cd '$remote_dir' && rm -f -- compose.yaml deploy.sh jib-image.tar.gz runtime.env && cd .. && rmdir '$remote_dir'" || true
+            fi
+            rm -f -- "$tmp/key" "$tmp/known_hosts" "$tmp/runtime.env"
+            rmdir "$tmp"
+          }
+          trap cleanup EXIT
+          : "${LIGHTSAIL_HOST:?GitHub secret LIGHTSAIL_HOST is required}"
+          [[ $LIGHTSAIL_HOST =~ ^[a-zA-Z0-9.-]+$ ]]
+          : "${LIGHTSAIL_SSH_KEY:?GitHub secret LIGHTSAIL_SSH_KEY is required}"
+          : "${LIGHTSAIL_KNOWN_HOSTS:?GitHub secret LIGHTSAIL_KNOWN_HOSTS is required}"
+          printf '%s\n' "$LIGHTSAIL_SSH_KEY" > "$tmp/key"
+          printf '%s\n' "$LIGHTSAIL_KNOWN_HOSTS" > "$tmp/known_hosts"
+          ssh_options=(-i "$tmp/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$tmp/known_hosts")
+          target="ubuntu@$LIGHTSAIL_HOST"
 
-            # 배포 스크립트 실행권한 부여
-            sudo chmod +x deploy.sh
-            
-            # 현재 환경변수 유지하며 스크립트 실행
-            sudo -E ./deploy.sh
+          write_env() {
+            local key=$1 value=${!1}
+            if [[ -z $value || $value == *$'\n'* || $value == *$'\r'* ]]; then
+              echo "::error::$key must be a non-empty, single-line value"
+              exit 1
+            fi
+            printf '%s=%s\n' "$key" "$value" >> "$tmp/runtime.env"
+          }
+          for key in JWT_SECRET_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI \
+              GOOGLE_AI_API_KEY SWAGGER_USERNAME SWAGGER_PASSWORD; do
+            write_env "$key"
+          done
+          if [[ -n $AWS_ACCESS_KEY_ID || -n $AWS_SECRET_ACCESS_KEY ]]; then
+            write_env AWS_ACCESS_KEY_ID
+            write_env AWS_SECRET_ACCESS_KEY
+          fi
 
-      - name: 배포실패 시 이전 버전으로 롤백
-        if: failure()
+          upload_path=$(ssh "${ssh_options[@]}" "$target" 'mktemp -d /opt/clustar/incoming/deploy.XXXXXXXX')
+          [[ $upload_path =~ ^/opt/clustar/incoming/deploy\.[A-Za-z0-9]{8}$ ]]
+          remote_dir=$upload_path
+          scp "${ssh_options[@]}" deploy/lightsail/{compose.yaml,deploy.sh} \
+            build/jib-image.tar.gz "$tmp/runtime.env" "$target:$remote_dir/"
+          ssh "${ssh_options[@]}" "$target" \
+            "bash '$remote_dir/deploy.sh' release '$GITHUB_SHA' '$remote_dir/jib-image.tar.gz' '$remote_dir/runtime.env'"
 
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_DEV_HOST }}
-          username: ${{ secrets.EC2_DEV_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/clustar_infra
-            
-            echo "🔄 이전 버전으로 롤백 시작"
-            
-            sudo chmod +x rollback.sh
-            sudo ./rollback.sh
-            
-            echo "✅ 롤백 완료"
-
-  notify-discord:
-    needs: [build-and-push, deploy]
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-       - name: 배포 결과 디스코드 알림 전송
-         env:
-           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-           STATUS: ${{ needs.deploy.result }}
-           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-           AUTHOR: ${{ github.actor }}
-           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
-         run: |
-           if [ "$STATUS" = "success" ]; then
-             message="✅ 배포 성공"
-             color=3066993
-           else
-             message="❌ 배포 실패 (자동 롤백 완료)"
-             color=15158332
-           fi
-
-           payload=$(cat <<EOF
-           {
-             "embeds": [{
-               "title": "🚀 DEV 서버 배포 알림",
-               "description": "**커밋 메시지**: $COMMIT_MESSAGE\n**작성자**: $AUTHOR\n**결과**: ${message}",
-               "color": ${color},
-               "fields": [
-                 {
-                   "name": "🏷️ 이미지 태그",
-                   "value": "\`$IMAGE_TAG\`",
-                   "inline": true
-                 },
-                 {
-                   "name": "🌿 브랜치",
-                   "value": "develop",
-                   "inline": true
-                 },
-                 {
-                   "name": "🔗 커밋 링크",
-                   "value": "[확인하기](https://github.com/${{ github.repository }}/commit/$IMAGE_TAG)"
-                 }
-               ],
-               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-             }]
-           }
-           EOF
-           )
-
-           curl -H "Content-Type: application/json" \
-              -X POST \
-              -d "$payload" \
-              "$DISCORD_WEBHOOK"
-
-           echo "📢 디스코드 알림 전송 완료"
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -n "$DISCORD_WEBHOOK" ]]; then
+            jq -n --arg message "CLUSTAR DEV deployment: $STATUS ($RUN_URL)" '{content: $message}' |
+              curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' \
+                --data-binary @- "$DISCORD_WEBHOOK" || echo 'Discord notification failed' >&2
+          fi

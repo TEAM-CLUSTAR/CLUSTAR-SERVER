@@ -1,0 +1,82 @@
+x-app: &app
+  restart: unless-stopped
+  stop_grace_period: 65s
+  env_file:
+    - path: ${APP_ENV_FILE:-/dev/null}
+      format: raw
+  environment:
+    SPRING_PROFILES_ACTIVE: dev
+    DEV_DB_URL: jdbc:postgresql://postgres:5432/clustar
+    DEV_DB_USERNAME: clustar
+    DEV_DB_PASSWORD: ${DB_PASSWORD:?}
+    SPRING_REDIS_HOST: redis
+    MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+    MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db,redis
+    MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
+    MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
+    SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 60s
+    SERVER_SHUTDOWN: graceful
+    CLUSTAR_S3_CLEANUP_ENABLED: "false"
+    CLUSTAR_JWT_TEST_ENABLED: "false"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clustar
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d clustar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?}
+    ports:
+      - "${HTTP_BIND:-80}:80"
+      - "${HTTPS_BIND:-443}:443"
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  app-blue:
+    <<: *app
+    image: ${BLUE_IMAGE:-clustar:unconfigured}
+    profiles: [app]
+    ports:
+      - "127.0.0.1:${BLUE_PORT:-18081}:8080"
+
+  app-green:
+    <<: *app
+    image: ${GREEN_IMAGE:-clustar:unconfigured}
+    profiles: [app]
+    ports:
+      - "127.0.0.1:${GREEN_PORT:-18082}:8080"
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

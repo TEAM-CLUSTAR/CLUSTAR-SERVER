@@ -6,11 +6,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.user.service.JWTService;
 import org.project.global.response.ApiResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@ConditionalOnProperty(name = "clustar.jwt.test.enabled", matchIfMissing = true)
 @RequiredArgsConstructor
 @Tag(name = "토큰 관련 API")
 public class JWTController {
