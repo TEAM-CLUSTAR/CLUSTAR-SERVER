@@ -39,6 +39,7 @@ ssh -i "$existing_key" "ubuntu@$lightsail_ip" 'cut -d " " -f 1,2 /etc/ssh/ssh_ho
 
 ## 장애 대응과 백업
 
+- `/opt/clustar/caddy-recovery-required`가 있으면 배포가 차단됩니다. 서버에서 `flock /opt/clustar/deploy.lock bash`로 잠금을 잡고, `cat /opt/clustar/caddy/route.caddy`에서 선택된 슬롯을 확인합니다. 해당 슬롯의 컨테이너가 실행 중이고 readiness가 정상인지 확인한 후 `sudo docker compose --project-directory /opt/clustar --env-file /opt/clustar/infra.env exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`로 경로 파일을 적용합니다. HTTPS `/actuator/health/readiness`의 `X-Clustar-Slot` 헤더가 파일의 슬롯과 일치하는지 확인한 뒤에만 `rm /opt/clustar/caddy-recovery-required`를 실행하고 잠금 셸에서 나옵니다. 첫 배포 전 `none` 경로라면 HTTPS가 503을 반환하는지 확인합니다. 확인에 실패하면 표식을 유지하고 장애를 해결합니다.
 - Actions의 [develop-cd] 워크플로에서 `develop`을 선택해 재실행할 수 있습니다. 배포 전 readiness가 실패하면 기존 앱을 유지합니다. 전환 후 확인이 실패하면 기존 Caddy 경로를 복원합니다.
 - 이전 슬롯 컨테이너가 보존되어 있으면 서버에서 `bash /opt/clustar/deploy.sh rollback`으로 되돌릴 수 있습니다. 실패 후보가 이전 슬롯을 이미 교체했다면 필요한 커밋의 이미지로 다시 배포합니다.
 - 서버에는 커밋 SHA 태그로 앱 이미지를 보관합니다. 디스크 정리 시 현재 및 직전 슬롯이 참조하는 이미지를 확인한 후 나머지 태그를 선별해 제거합니다.

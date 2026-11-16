@@ -13,6 +13,10 @@ mkdir -p "$root/caddy" "$root/postgres-init" "$root/incoming"
 chmod 0755 "$root/caddy" "$root/postgres-init"
 exec 9>"$root/deploy.lock"
 flock -n 9
+if [[ -e $root/caddy-recovery-required ]]; then
+  echo 'Caddy route requires recovery. Follow the Lightsail recovery instructions before bootstrapping.' >&2
+  exit 1
+fi
 
 if [[ ! -e $root/infra.env ]]; then
   [[ $site =~ ^[a-zA-Z0-9.-]+$ ]] || exit 2

@@ -15,6 +15,11 @@ fi
 
 exec 9>"$root/deploy.lock"
 flock -n 9 || { echo 'Another deployment is running' >&2; exit 1; }
+recovery_marker="$root/caddy-recovery-required"
+if [[ -e $recovery_marker ]]; then
+  echo 'Caddy route requires recovery. Follow the Lightsail recovery instructions before deploying.' >&2
+  exit 1
+fi
 
 dc() {
   sudo -n env BLUE_IMAGE="${BLUE_IMAGE:-}" GREEN_IMAGE="${GREEN_IMAGE:-}" APP_ENV_FILE="${APP_ENV_FILE:-}" \
@@ -23,6 +28,21 @@ dc() {
 
 reload_proxy() {
   dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
+route_matches() {
+  local slot=$1 headers status
+  headers=$(mktemp "$root/.route-check.XXXXXXXX") || return 1
+  status=$(curl -sS --max-time 5 "${edge_options[@]}" -D "$headers" -o /dev/null \
+    -w '%{http_code}' "$edge_url") || { rm -f -- "$headers"; return 1; }
+  if [[ $slot == none ]]; then
+    [[ $status == 503 ]] && ! tr -d '\r' < "$headers" | grep -qi '^X-Clustar-Slot:'
+  else
+    [[ $status == 200 ]] && tr -d '\r' < "$headers" | grep -Fix "X-Clustar-Slot: $slot"
+  fi
+  local result=$?
+  rm -f -- "$headers"
+  return "$result"
 }
 
 stop_slot() {
@@ -52,10 +72,19 @@ finish() {
   trap - EXIT
   if (( status != 0 && verified == 0 )); then
     if (( route_changed )); then
-      if mv -f -- "$previous_route" "$route" && reload_proxy; then
-        echo "Restored Caddy route to $active" >&2
+      if mv -f -- "$previous_route" "$route" && reload_proxy && route_matches "$active"; then
+        if rm -f -- "$recovery_marker"; then
+          echo "Restored Caddy route to $active" >&2
+        else
+          echo 'Caddy was restored but the recovery marker could not be removed.' >&2
+          started=0
+        fi
       else
         echo 'Caddy rollback failed. Both slots were left available for recovery.' >&2
+        if [[ -f $previous_route ]]; then
+          echo "Previous route saved at $previous_route" >&2
+          previous_route=''
+        fi
         started=0
       fi
     fi
@@ -63,7 +92,8 @@ finish() {
       stop_slot "$next" || true
     fi
   fi
-  rm -f -- "$previous_route" "$candidate_route"
+  [[ -z $previous_route ]] || rm -f -- "$previous_route"
+  rm -f -- "$candidate_route"
   exit "$status"
 }
 trap finish EXIT
@@ -105,6 +135,7 @@ done
 
 printf '# active: %s\nheader /actuator/health/readiness X-Clustar-Slot %s\nreverse_proxy %s:8080 {\n    stream_close_delay 30s\n}\n' \
   "$next" "$next" "$next" > "$candidate_route"
+printf 'Caddy route transition requires verification.\n' > "$recovery_marker"
 route_changed=1
 mv -f -- "$candidate_route" "$route"
 reload_proxy
@@ -118,6 +149,7 @@ for ((attempt=1; attempt<=5; attempt++)); do
   sleep 1
 done
 (( verified )) || { echo 'Caddy readiness check failed' >&2; exit 1; }
+rm -f -- "$recovery_marker"
 
 if [[ $active != none ]]; then
   sleep 30
