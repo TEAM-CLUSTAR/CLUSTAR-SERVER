@@ -150,6 +150,11 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
 
     @Override
     public List<Memo> searchByText(Long userId, String query) {
+        return searchByText(userId, query, null, null);
+    }
+
+    @Override
+    public List<Memo> searchByText(Long userId, String query, LocalDateTime from, LocalDateTime to) {
         QMemo memo = QMemo.memo;
         QMemoTag memoTag = QMemoTag.memoTag;
         QTag tag = QTag.tag;
@@ -176,6 +181,7 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .where(
                         memo.user.id.eq(userId),
                         memo.isDeleted.eq(false),
+                        createdAtInRange(memo, from, to),
                         tokenMatch
                 )
                 .fetch();
@@ -191,6 +197,69 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
         );
 
         return ranked;
+    }
+
+    @Override
+    public List<Long> findIdsByCreatedAtRange(Long userId, LocalDateTime from, LocalDateTime to) {
+        QMemo memo = QMemo.memo;
+
+        return queryFactory
+                .select(memo.id)
+                .from(memo)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
+                        createdAtInRange(memo, from, to)
+                )
+                .fetch();
+    }
+
+    @Override
+    public List<Memo> findByCreatedAtRange(Long userId, LocalDateTime from, LocalDateTime to, boolean ascending, int limit) {
+        QMemo memo = QMemo.memo;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
+
+        // id 먼저 조회 후 페치조인 (findRecentCreated와 동일)
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(false),
+                        createdAtInRange(memo, from, to)
+                )
+                .orderBy(ascending ? memo.createdAt.asc() : memo.createdAt.desc(),
+                        ascending ? memo.id.asc() : memo.id.desc())
+                .limit(limit)
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(ascending ? memo.createdAt.asc() : memo.createdAt.desc(),
+                        ascending ? memo.id.asc() : memo.id.desc())
+                .fetch();
+    }
+
+    // 작성일 [from, to) 조건, 둘 다 null이면 조건 없음
+    private BooleanExpression createdAtInRange(QMemo memo, LocalDateTime from, LocalDateTime to) {
+        BooleanExpression condition = null;
+        if (from != null) {
+            condition = memo.createdAt.goe(from);
+        }
+        if (to != null) {
+            BooleanExpression before = memo.createdAt.lt(to);
+            condition = condition == null ? before : condition.and(before);
+        }
+        return condition;
     }
 
     // 필드 우선순위(제목>태그>본문) + 필드 내 "온전 키워드 우선"을 하나의 순위값으로 환산. 높을수록 상위.

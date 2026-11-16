@@ -251,9 +251,10 @@ public class MemoController {
 
     @GetMapping("/search")
     @Operation(summary = "메모 검색", description = """
-            키워드가 제목/태그/본문에 포함된 모든 메모를 반환합니다.
-            정렬: 필드 우선순위(제목 > 태그 > 본문) + 필드 내 온전한 키워드 매칭 우선, 동점은 최신순.
-            (의미 기반 검색은 기획 결정으로 비활성화되었습니다.)
+            키워드(텍스트) 검색과 자연어(의미) 검색을 함께 수행합니다.
+            1) 텍스트: 키워드가 제목/태그/본문에 포함된 모든 메모 (searchType=TEXT).
+               정렬: 필드 우선순위(제목 > 태그 > 본문) + 필드 내 온전한 키워드 매칭 우선, 동점은 최신순.
+            2) 의미: 텍스트 결과와 중복되지 않는 의미상 유사 메모를 유사도 순으로 최대 N개 뒤에 덧붙임 (searchType=SEMANTIC).
             """)
     public ResponseEntity<ApiResponse<MemoSearchResponse>> searchMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,

@@ -11,12 +11,11 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,9 +28,17 @@ public class MemoSearchVectorRetriever {
     private final MemoRepository memoRepository;
     private final MemoSearchProperties memoSearchProperties;
 
-    public List<Memo> retrieve(Long userId, String query) {
+    // memoIdFilter: null이면 전체 메모가 대상, 아니면 해당 id의 메모만 대상 (비어 있으면 검색 없이 빈 결과)
+    public List<Memo> retrieve(Long userId, String query, Collection<Long> memoIdFilter) {
+        if (memoIdFilter != null && memoIdFilter.isEmpty()) {
+            return List.of();
+        }
+
         try {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
+            var filter = memoIdFilter == null
+                    ? b.eq("userId", userId)
+                    : b.and(b.eq("userId", userId), b.in("memoId", memoIdFilter.toArray()));
 
             // threshold는 여기서 걸지 않고 topK 후보를 전부 받아서 애플리케이션 레벨에서 거른다.
             // (SearchRequest에 similarityThreshold를 걸면 컷된 후보는 아예 안 돌아와서, 로그로도 못 남기고
@@ -40,13 +47,13 @@ public class MemoSearchVectorRetriever {
                     .query(query)
                     .topK(memoSearchProperties.getVectorTopK())
                     .similarityThresholdAll()
-                    .filterExpression(b.eq("userId", userId).build())
+                    .filterExpression(filter.build())
                     .build();
 
             double threshold = memoSearchProperties.getSemanticSimilarityThreshold();
 
-            // memoId 기준 중복 제거 (LinkedHashSet으로 유사도 순서 유지)
-            Set<Long> seenMemoIds = new LinkedHashSet<>();
+            // memoId별로 가장 높은 유사도만 사용
+            Map<Long, Double> similarityByMemoId = new LinkedHashMap<>();
 
             vectorStore.similaritySearch(searchRequest).forEach(doc -> {
                 Object memoIdObj = doc.getMetadata().get("memoId");
@@ -59,14 +66,21 @@ public class MemoSearchVectorRetriever {
                         userId, query, memoIdObj, similarity, threshold, passed);
 
                 if (passed && memoIdObj instanceof Number memoId) {
-                    seenMemoIds.add(memoId.longValue());
+                    similarityByMemoId.putIfAbsent(memoId.longValue(), similarity);
                 }
             });
+
+            // 1위 유사도에서 relativeGap 넘게 낮은 후보는 제외
+            double topSimilarity = similarityByMemoId.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
+            double relativeFloor = topSimilarity - memoSearchProperties.getSemanticRelativeGap();
 
             // threshold를 통과한 후보를 유사도 순으로 "모두" 반환한다.
             // 상위 N개로 자르는 것은 텍스트 검색 결과와 중복 제거한 뒤 서비스 계층에서 처리한다.
             // (여기서 미리 자르면, 상위 후보가 텍스트 결과와 겹칠 때 의미 검색 결과가 통째로 사라진다.)
-            List<Long> passedMemoIds = new ArrayList<>(seenMemoIds);
+            List<Long> passedMemoIds = similarityByMemoId.entrySet().stream()
+                    .filter(entry -> entry.getValue() >= relativeFloor)
+                    .map(Map.Entry::getKey)
+                    .toList();
 
             if (passedMemoIds.isEmpty()) {
                 return List.of();

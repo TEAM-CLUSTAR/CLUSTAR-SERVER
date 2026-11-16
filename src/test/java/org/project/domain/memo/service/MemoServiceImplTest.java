@@ -51,6 +51,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -928,6 +929,22 @@ class MemoServiceImplTest {
     @DisplayName("메모 검색 테스트")
     class SearchMemos {
 
+        @BeforeEach
+        void setUp() {
+            // 텍스트/의미 검색을 병렬로 돌리는 ioExecutor를 테스트에서는 호출 스레드에서 즉시 실행시킨다.
+            ReflectionTestUtils.setField(memoService, "ioExecutor", (Executor) Runnable::run);
+            lenient().when(memoSearchProperties.getMaxMemoResults()).thenReturn(2);
+            lenient().when(memoSearchProperties.getTextStrongTokenCoverage()).thenReturn(0.66);
+            lenient().when(memoSearchProperties.getTextStrongMaxResults()).thenReturn(5);
+            lenient().when(memoSearchProperties.getTextWeakMaxResults()).thenReturn(3);
+            lenient().when(memoSearchProperties.getMaxTotalResults()).thenReturn(10);
+        }
+
+        private Memo memo(Long id, String title) {
+            User user = User.builder().id(userId).build();
+            return Memo.builder().id(id).title(title).content("내용").user(user).isDeleted(false).build();
+        }
+
         @Test
         @DisplayName("빈 검색어이면 EMPTY_SEARCH_QUERY 예외가 발생한다")
         void searchMemos_emptyQuery_throwsException() {
@@ -937,30 +954,240 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("키워드 검색 결과를 모두 TEXT 타입으로 반환한다 (의미 검색 비활성화)")
-        void searchMemos_returnsTextResultsOnly() {
-            // given
-            User user = User.builder().id(userId).build();
-            Memo m1 = Memo.builder().id(1L).title("스프링 정리").content("내용").user(user).isDeleted(false).build();
-            Memo m2 = Memo.builder().id(2L).title("스프링 부트").content("내용").user(user).isDeleted(false).build();
+        @DisplayName("텍스트 결과 뒤에 의미 검색 결과를 SEMANTIC 타입으로 덧붙인다")
+        void searchMemos_textThenSemantic() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), isNull(), isNull()))
+                    .willReturn(List.of(memo(1L, "스프링 정리"), memo(2L, "스프링 부트")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링"), isNull()))
+                    .willReturn(List.of(memo(3L, "자바 프레임워크")));
 
-            given(memoRepository.searchByText(eq(userId), eq("스프링")))
-                    .willReturn(List.of(m1, m2));
-
-            // when
             MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
 
-            // then: 리포지토리가 정렬해준 순서 그대로, 전부 TEXT 타입
-            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L, 3L);
             assertThat(response.results()).extracting("searchType")
-                    .containsOnly(SearchType.TEXT);
+                    .containsExactly(SearchType.TEXT, SearchType.TEXT, SearchType.SEMANTIC);
+            assertThat(response.message()).isNull();
+        }
+
+        @Test
+        @DisplayName("텍스트 결과와 중복된 의미 검색 결과는 제외하고, 중복 제외 후 상위 maxMemoResults개만 추가한다")
+        void searchMemos_dedupAndLimitSemantic() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), isNull(), isNull()))
+                    .willReturn(List.of(memo(1L, "스프링 정리")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링"), isNull()))
+                    .willReturn(List.of(memo(1L, "스프링 정리"), memo(3L, "A"), memo(4L, "B"), memo(5L, "C")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 3L, 4L);
+            assertThat(response.results()).extracting("searchType")
+                    .containsExactly(SearchType.TEXT, SearchType.SEMANTIC, SearchType.SEMANTIC);
+        }
+
+        @Test
+        @DisplayName("검색어 단어 일부만 일치한 약한 텍스트 결과는 의미 검색 결과 뒤에 둔다")
+        void searchMemos_weakTextComesAfterSemantic() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링 부트 입문"), isNull(), isNull()))
+                    .willReturn(List.of(memo(2L, "스프링 노트"), memo(1L, "스프링 부트 입문")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링 부트 입문"), isNull()))
+                    .willReturn(List.of(memo(3L, "자바 프레임워크")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링 부트 입문");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 3L, 2L);
+            assertThat(response.results()).extracting("searchType")
+                    .containsExactly(SearchType.TEXT, SearchType.SEMANTIC, SearchType.TEXT);
+        }
+
+        @Test
+        @DisplayName("약한 텍스트 결과가 의미 검색 결과에도 있으면 한 번만, SEMANTIC으로 담는다")
+        void searchMemos_weakTextDuplicatedBySemantic() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링 부트 입문"), isNull(), isNull()))
+                    .willReturn(List.of(memo(2L, "스프링 노트")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링 부트 입문"), isNull()))
+                    .willReturn(List.of(memo(2L, "스프링 노트")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링 부트 입문");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(2L);
+            assertThat(response.results()).extracting("searchType").containsExactly(SearchType.SEMANTIC);
+        }
+
+        @Test
+        @DisplayName("검색어 전체 구문이 본문에 들어 있으면 일부 단어만 맞아도 강한 일치로 앞에 둔다")
+        void searchMemos_phraseInContentIsStrong() {
+            Memo phraseInContent = Memo.builder().id(1L).title("무제").content("오늘 스프링 부트 입문 강의를 들었다")
+                    .user(User.builder().id(userId).build()).isDeleted(false).build();
+            given(memoRepository.searchByText(eq(userId), eq("스프링 부트 입문"), isNull(), isNull()))
+                    .willReturn(List.of(phraseInContent));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링 부트 입문"), isNull()))
+                    .willReturn(List.of(memo(3L, "자바 프레임워크")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링 부트 입문");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 3L);
+        }
+
+        @Test
+        @DisplayName("구간별 상한과 전체 상한을 넘지 않는다")
+        void searchMemos_respectsLimits() {
+            given(memoSearchProperties.getMaxTotalResults()).willReturn(4);
+            given(memoSearchProperties.getTextStrongMaxResults()).willReturn(2);
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), isNull(), isNull()))
+                    .willReturn(List.of(memo(1L, "스프링 1"), memo(2L, "스프링 2"), memo(3L, "스프링 3")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링"), isNull()))
+                    .willReturn(List.of(memo(4L, "A"), memo(5L, "B"), memo(6L, "C")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            // 강한 일치 2개(1, 2) + 의미 검색 2개(4, 5) = 전체 상한 4. 강한 일치 3번째(3)는 구간 상한 때문에 빠진다.
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L, 4L, 5L);
+        }
+
+        @Test
+        @DisplayName("강한 일치도 의미 검색 결과도 없으면 약한 텍스트 일치만으로는 결과를 만들지 않는다")
+        void searchMemos_onlyWeakText_returnsEmpty() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링 부트 입문"), isNull(), isNull()))
+                    .willReturn(List.of(memo(2L, "스프링 노트"), memo(4L, "부트 캠프")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링 부트 입문"), isNull()))
+                    .willReturn(List.of());
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링 부트 입문");
+
+            assertThat(response.results()).isEmpty();
+            assertThat(response.message()).isEqualTo("검색 결과가 없어요.");
+        }
+
+        @Test
+        @DisplayName("약한 텍스트 상한이 0이면 약한 일치는 반환하지 않는다")
+        void searchMemos_weakTextDisabled() {
+            given(memoSearchProperties.getTextWeakMaxResults()).willReturn(0);
+            given(memoRepository.searchByText(eq(userId), eq("스프링 부트 입문"), isNull(), isNull()))
+                    .willReturn(List.of(memo(2L, "스프링 노트")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링 부트 입문"), isNull()))
+                    .willReturn(List.of(memo(3L, "자바 프레임워크")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링 부트 입문");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(3L);
+        }
+
+        private Memo memoCreatedAt(Long id, String title, LocalDateTime createdAt) {
+            Memo m = memo(id, title);
+            ReflectionTestUtils.setField(m, "createdAt", createdAt);
+            return m;
+        }
+
+        @Test
+        @DisplayName("어제 쓴 같은 시간 단서는 단서를 뺀 검색어로, 해당 날짜 범위 안에서 텍스트·의미 검색한다")
+        void searchMemos_dateCue_filtersByRange() {
+            LocalDate today = LocalDate.now();
+            LocalDateTime from = today.minusDays(1).atStartOfDay();
+            LocalDateTime to = today.atStartOfDay();
+            given(memoRepository.searchByText(eq(userId), eq("산책 얘기"), eq(from), eq(to)))
+                    .willReturn(List.of(memo(1L, "산책 얘기")));
+            given(memoRepository.findIdsByCreatedAtRange(eq(userId), eq(from), eq(to)))
+                    .willReturn(List.of(1L, 2L));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("산책 얘기"), eq(List.of(1L, 2L))))
+                    .willReturn(List.of(memo(2L, "퇴근길")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "어제 쓴 산책 얘기");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+        }
+
+        @Test
+        @DisplayName("날짜 조건이 있으면 강한 일치도 의미 검색 결과도 없어도 약한 텍스트 일치를 보여 준다")
+        void searchMemos_dateCue_showsWeakTextWithoutOthers() {
+            given(memoRepository.searchByText(eq(userId), eq("가격 고민"), any(), any()))
+                    .willReturn(List.of(memo(1L, "고민 일기")));
+            given(memoRepository.findIdsByCreatedAtRange(eq(userId), any(), any())).willReturn(List.of(1L));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("가격 고민"), any())).willReturn(List.of());
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "8월에 쓴 가격 고민");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L);
+        }
+
+        @Test
+        @DisplayName("시간 단서만 있고 찾을 말이 없으면 날짜 범위의 메모를 작성일순으로 보여 준다")
+        void searchMemos_cueOnly_listsByRange() {
+            given(memoRepository.findByCreatedAtRange(eq(userId), any(), any(), eq(false), eq(10)))
+                    .willReturn(List.of(memo(5L, "A"), memo(4L, "B")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "어제 쓴 메모");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(5L, 4L);
+            assertThat(response.results()).extracting("searchType").containsOnly(SearchType.TEXT);
+            verify(memoRepository, never()).searchByText(anyLong(), anyString(), any(), any());
+        }
+
+        @Test
+        @DisplayName("제일 처음 쓴이면 구간별 상한과 상관없이 일치하는 메모를 오래된 순으로 정렬한다")
+        void searchMemos_earliest_sortsByCreatedAt() {
+            given(memoRepository.searchByText(eq(userId), eq("러닝"), isNull(), isNull()))
+                    .willReturn(List.of(
+                            memoCreatedAt(1L, "러닝 최신", LocalDateTime.of(2026, 10, 5, 10, 0)),
+                            memoCreatedAt(2L, "러닝 기록", LocalDateTime.of(2026, 8, 1, 10, 0))));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("러닝"), isNull()))
+                    .willReturn(List.of(memoCreatedAt(3L, "달리기", LocalDateTime.of(2026, 6, 1, 10, 0))));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "제일 처음 쓴 러닝");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(3L, 2L, 1L);
+            assertThat(response.results()).extracting("searchType")
+                    .containsExactly(SearchType.SEMANTIC, SearchType.TEXT, SearchType.TEXT);
+        }
+
+        @Test
+        @DisplayName("가장 최근에 쓴이면 최신 순으로 정렬한다")
+        void searchMemos_latest_sortsByCreatedAtDescending() {
+            given(memoRepository.searchByText(eq(userId), eq("러닝"), isNull(), isNull()))
+                    .willReturn(List.of(
+                            memoCreatedAt(1L, "러닝 최신", LocalDateTime.of(2026, 10, 5, 10, 0)),
+                            memoCreatedAt(2L, "러닝 기록", LocalDateTime.of(2026, 8, 1, 10, 0))));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("러닝"), isNull())).willReturn(List.of());
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "가장 최근에 쓴 러닝");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L, 2L);
+        }
+
+        @Test
+        @DisplayName("텍스트 검색이 실패해도 의미 검색 결과는 반환한다")
+        void searchMemos_textFails_returnsSemanticOnly() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), isNull(), isNull()))
+                    .willThrow(new RuntimeException("db error"));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링"), isNull()))
+                    .willReturn(List.of(memo(3L, "자바 프레임워크")));
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(3L);
+            assertThat(response.results()).extracting("searchType").containsOnly(SearchType.SEMANTIC);
+        }
+
+        @Test
+        @DisplayName("의미 검색 결과가 없으면 텍스트 결과만 반환한다")
+        void searchMemos_noSemantic_returnsTextOnly() {
+            given(memoRepository.searchByText(eq(userId), eq("스프링"), isNull(), isNull()))
+                    .willReturn(List.of(memo(1L, "스프링 정리")));
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("스프링"), isNull()))
+                    .willReturn(List.of());
+
+            MemoSearchResponse response = memoService.searchMemos(userId, "스프링");
+
+            assertThat(response.results()).extracting("memoId").containsExactly(1L);
+            assertThat(response.results()).extracting("searchType").containsOnly(SearchType.TEXT);
         }
 
         @Test
         @DisplayName("검색 결과가 없으면 빈 리스트와 안내 메시지를 반환한다")
         void searchMemos_noResults_returnsEmptyWithMessage() {
             // given
-            given(memoRepository.searchByText(eq(userId), eq("없는내용")))
+            given(memoRepository.searchByText(eq(userId), eq("없는내용"), isNull(), isNull()))
+                    .willReturn(List.of());
+            given(memoSearchVectorRetriever.retrieve(eq(userId), eq("없는내용"), isNull()))
                     .willReturn(List.of());
 
             // when
