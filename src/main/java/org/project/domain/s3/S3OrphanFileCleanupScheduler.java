@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.project.domain.memo.repository.MemoFileRepository;
 import org.project.domain.memo.repository.MemoImageRepository;
 import org.project.global.util.S3Util;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ import java.util.Set;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "clustar.s3.cleanup.enabled", matchIfMissing = true)
 @RequiredArgsConstructor
 public class S3OrphanFileCleanupScheduler {
 
