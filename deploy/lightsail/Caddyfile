@@ -1,3 +1,7 @@
 {$SITE_ADDRESS} {
+    @metrics path /actuator/prometheus /actuator/prometheus/
+    respond @metrics 403
     import /etc/caddy/route.caddy
 }
+
+import /etc/caddy/grafana/*.caddy
