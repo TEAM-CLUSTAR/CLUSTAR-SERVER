@@ -1,0 +1,126 @@
+package org.project.domain.review.controller;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.FindingResponse;
+import org.project.domain.review.dto.response.ReviewMessageResponse;
+import org.project.domain.review.dto.response.ReviewResponse;
+import org.project.domain.review.entity.FindingCategory;
+import org.project.domain.review.entity.FindingStatus;
+import org.project.domain.review.entity.ReviewMessageRole;
+import org.project.domain.review.service.ReviewService;
+import org.project.domain.user.dto.CustomUserDetails;
+import org.project.domain.user.entity.User;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.security.filter.JWTFilter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.support.WithSecurityContext;
+import org.springframework.security.test.context.support.WithSecurityContextFactory;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(ReviewController.class)
+@AutoConfigureMockMvc(addFilters = false)
+@DisplayName("ReviewController 테스트")
+class ReviewControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @MockBean
+    private ReviewService reviewService;
+    @MockBean
+    private JWTFilter jwtFilter;
+
+    @Test
+    @DisplayName("진행 중 검토가 없으면 review 필드를 null로 내려준다")
+    @WithMockCustomUser
+    void getActiveReview_noReview() throws Exception {
+        when(reviewService.getActiveReview(1L, 3L)).thenReturn(new ActiveReviewResponse(3L, 1, null));
+
+        mockMvc.perform(get("/api/v1/ai/reviews/active").param("memoId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memoId").value(3))
+                .andExpect(jsonPath("$.data.currentVersion").value(1))
+                .andExpect(jsonPath("$.data.review").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("진행 중 검토가 있으면 카드와 대화를 함께 내려준다")
+    @WithMockCustomUser
+    void getActiveReview_withReview() throws Exception {
+        FindingResponse finding = new FindingResponse(
+                101L, 1, FindingCategory.CRITERIA, "2. 타깃",
+                "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.",
+                "타깃 학년을 고른 기준이 없어요", "짚은 곳", "근거",
+                "여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
+                FindingStatus.ANSWERING,
+                List.of(new ReviewMessageResponse(501L, ReviewMessageRole.USER, "음 1~2학년이 많이 사서", LocalDateTime.now())),
+                null
+        );
+        when(reviewService.getActiveReview(1L, 3L)).thenReturn(
+                new ActiveReviewResponse(3L, 2, new ReviewResponse(12L, 2, List.of(finding))));
+
+        mockMvc.perform(get("/api/v1/ai/reviews/active").param("memoId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentVersion").value(2))
+                .andExpect(jsonPath("$.data.review.reviewId").value(12))
+                .andExpect(jsonPath("$.data.review.version").value(2))
+                .andExpect(jsonPath("$.data.review.findings[0].category").value("CRITERIA"))
+                .andExpect(jsonPath("$.data.review.findings[0].status").value("ANSWERING"))
+                .andExpect(jsonPath("$.data.review.findings[0].messages[0].role").value("USER"))
+                .andExpect(jsonPath("$.data.review.findings[0].appliedText").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("메모가 없으면 404")
+    @WithMockCustomUser
+    void getActiveReview_memoNotFound() throws Exception {
+        when(reviewService.getActiveReview(1L, 3L)).thenThrow(new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/ai/reviews/active").param("memoId", "3"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @WithSecurityContext(factory = WithMockCustomUserSecurityContextFactory.class)
+    @interface WithMockCustomUser {
+        long userId() default 1L;
+    }
+
+    static class WithMockCustomUserSecurityContextFactory
+            implements WithSecurityContextFactory<WithMockCustomUser> {
+        @Override
+        public SecurityContext createSecurityContext(WithMockCustomUser annotation) {
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            User user = User.builder()
+                    .id(annotation.userId())
+                    .email("test@example.com")
+                    .name("테스트유저")
+                    .providerName("google")
+                    .build();
+            CustomUserDetails userDetails = new CustomUserDetails(user);
+            context.setAuthentication(new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities()));
+            return context;
+        }
+    }
+}
