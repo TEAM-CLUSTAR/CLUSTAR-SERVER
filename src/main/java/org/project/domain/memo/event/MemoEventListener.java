@@ -15,17 +15,19 @@ public class MemoEventListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleMemoDeleted(MemoDeletedEvent event) {
-        log.info("메모 삭제 완료 - S3 파일 삭제 시작: memoId={}", event.getMemoId());
+    public void handleMemoPurged(MemoPurgedEvent event) {
+        log.info("메모 영구 삭제 완료 - S3 파일 삭제 시작: memoIds={}", event.memoIds());
 
-        event.getImageKeys().forEach(key ->
-                s3DeletionHandler.deleteOrRecord(key, event.getMemoId(), "image")
-        );
-        event.getFileKeys().forEach(key ->
-                s3DeletionHandler.deleteOrRecord(key, event.getMemoId(), "file")
-        );
+        for (MemoPurgedEvent.PurgedMemo memo : event.memos()) {
+            memo.imageKeys().forEach(key ->
+                    s3DeletionHandler.deleteOrRecord(key, memo.memoId(), "image")
+            );
+            memo.fileKeys().forEach(key ->
+                    s3DeletionHandler.deleteOrRecord(key, memo.memoId(), "file")
+            );
+        }
 
-        log.info("S3 파일 삭제 완료: memoId={}", event.getMemoId());
+        log.info("S3 파일 삭제 완료: memoIds={}", event.memoIds());
     }
 
     @Async

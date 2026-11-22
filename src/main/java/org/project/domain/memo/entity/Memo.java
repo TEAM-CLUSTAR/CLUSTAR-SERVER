@@ -2,6 +2,7 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.project.domain.memo.entity.converter.SourceMemoSnapshotsConverter;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.user.entity.User;
 import org.project.global.entity.BaseEntity;
@@ -45,6 +46,12 @@ public class Memo extends BaseEntity {
     @Column(name = "source")
     private String source;
 
+    // AI 메모가 참고한 원본의 ID·제목 스냅샷 (생성 시점). 원본이 영구 삭제돼도 '사용한 메모'에 제목을 보여주기 위해 저장한다.
+    @Convert(converter = SourceMemoSnapshotsConverter.class)
+    @Column(name = "source_snapshots", columnDefinition = "TEXT")
+    @Builder.Default
+    private List<SourceMemoSnapshot> sourceSnapshots = new ArrayList<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -57,6 +64,10 @@ public class Memo extends BaseEntity {
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
+
+    // 휴지통으로 옮긴 시각. 보존 기간이 지나면 영구 삭제 대상이 된다.
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     // 마지막으로 열람(상세조회)한 시각. 한 번도 열지 않은 메모는 null.
     // 검색 모달의 "최근 열람한 메모" 목록 정렬/카드 날짜 표기에 사용된다.
@@ -87,15 +98,16 @@ public class Memo extends BaseEntity {
         return memo;
     }
 
-    // RAG/AI로 생성된 메모 생성
-    public static Memo createAiMemo(String title, String content, User user, List<Long> sourceMemoIds) {
+    // RAG/AI로 생성된 메모 생성. sources = 참고한 원본(요청 순서)의 ID·제목
+    public static Memo createAiMemo(String title, String content, User user, List<SourceMemoSnapshot> sources) {
         Memo memo = Memo.builder()
                 .title(title)
                 .content(content)
                 .user(user)
                 .isAiGenerated(true)
                 .isNew(true)
-                .source(formatSource(sourceMemoIds))
+                .source(formatSource(sources.stream().map(SourceMemoSnapshot::memoId).toList()))
+                .sourceSnapshots(new ArrayList<>(sources))
                 .build();
 
         user.getMemos().add(memo);
@@ -131,10 +143,6 @@ public class Memo extends BaseEntity {
     public void update(String title, String content) {
         this.title = title;
         this.content = content;
-    }
-
-    public void delete() {
-        this.isDeleted = true;
     }
 
 }

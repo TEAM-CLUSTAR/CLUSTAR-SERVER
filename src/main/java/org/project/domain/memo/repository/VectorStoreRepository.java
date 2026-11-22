@@ -35,6 +35,9 @@ public class VectorStoreRepository {
                            MIN(vs.embedding <=> avg_vec.vec) AS min_distance
                     FROM vector_store vs
                     JOIN avg_vec ON TRUE
+                    -- 휴지통 메모는 벡터가 남아 있으므로 후보에서 제외 (LIMIT 전에 걸러야 추천 개수가 줄지 않음)
+                    JOIN memo m ON m.memo_id = CAST(vs.metadata->>'memoId' AS BIGINT)
+                               AND m.is_deleted = false
                     WHERE CAST(vs.metadata->>'userId' AS BIGINT) = :userId
                       AND CAST(vs.metadata->>'memoId' AS BIGINT) NOT IN (:memoIds)
                     GROUP BY CAST(vs.metadata->>'memoId' AS BIGINT)
@@ -149,10 +152,15 @@ public class VectorStoreRepository {
         return jdbcTemplate.query(sql, params, (rs, rowNum) -> (UUID) rs.getObject("id"));
     }
 
-    // 메모의 모든 벡터(text/image/file)를 memoId 기준으로 삭제. 메모 삭제 시 유령 벡터를 남기지 않기 위해 사용한다.
-    public void deleteByMemoId(Long memoId) {
-        String sql = "DELETE FROM vector_store WHERE CAST(metadata->>'memoId' AS BIGINT) = :memoId";
-        MapSqlParameterSource params = new MapSqlParameterSource().addValue("memoId", memoId);
+    // 메모들의 모든 벡터(text/image/file)를 memoId 기준으로 삭제. 영구 삭제 시 유령 벡터를 남기지 않기 위해 사용한다.
+    // (휴지통 이동 시에는 복원에 대비해 벡터를 유지한다)
+    public void deleteByMemoIds(List<Long> memoIds) {
+        if (memoIds == null || memoIds.isEmpty()) {
+            return;
+        }
+
+        String sql = "DELETE FROM vector_store WHERE CAST(metadata->>'memoId' AS BIGINT) IN (:memoIds)";
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("memoIds", memoIds);
         jdbcTemplate.update(sql, params);
     }
 

@@ -6,6 +6,7 @@ import org.project.domain.tag.entity.Tag;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.config.MemoSearchProperties;
+import org.project.domain.memo.config.MemoTrashProperties;
 import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
@@ -15,10 +16,11 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
 import org.project.domain.memo.entity.MemoTag;
+import org.project.domain.memo.entity.SourceMemoSnapshot;
 import org.project.domain.memo.event.MemoAttachmentsRemovedEvent;
-import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.event.MemoFileCreatedEvent;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
+import org.project.domain.memo.event.MemoPurgedEvent;
 import org.project.domain.memo.event.MemoTextCreatedEvent;
 import org.project.domain.memo.event.MemoTextUpdatedEvent;
 import org.project.domain.memo.repository.MemoFileRepository;
@@ -84,6 +86,7 @@ public class MemoServiceImpl implements MemoService {
     private final VectorStoreRepository vectorStoreRepository;
     private final MemoRecommendationProperties memoRecommendationProperties;
     private final MemoSearchProperties memoSearchProperties;
+    private final MemoTrashProperties memoTrashProperties;
 
     @Autowired
     @Qualifier("ioExecutor")
@@ -420,13 +423,20 @@ public class MemoServiceImpl implements MemoService {
         List<Memo> sourceMemos =
                 memoRepository.findByIdInWithTagsAndNotDeleted(userId, sourceMemoIds);
 
-        validateSourceMemos(sourceMemoIds, sourceMemos);
+        validateSourceMemos(userId, sourceMemoIds, sourceMemos);
+
+        // 원본이 나중에 영구 삭제돼도 제목을 보여줄 수 있도록 요청 순서대로 ID·제목을 함께 저장
+        Map<Long, String> titleById = sourceMemos.stream()
+                .collect(Collectors.toMap(Memo::getId, Memo::getTitle));
+        List<SourceMemoSnapshot> sources = sourceMemoIds.stream()
+                .map(id -> new SourceMemoSnapshot(id, titleById.get(id)))
+                .toList();
 
         Memo memo = Memo.createAiMemo(
                 request.title(),
                 request.content(),
                 user,
-                sourceMemoIds
+                sources
         );
 
         syncTags(memo, resolveCommonTagNames(sourceMemos), user);
@@ -552,29 +562,62 @@ public class MemoServiceImpl implements MemoService {
         // 본인 메모가 아니면 예외
         checkMyMemo(memo, userId);
 
-        // 이미지, 파일정보 매핑
-        List<MemoDetailResponse.ImageInfo> images = mapToImageInfos(memo.getMemoImages());
-        List<MemoDetailResponse.FileInfo> files = mapToFileInfos(memo.getMemoFiles());
-
-        List<Memo> sourceMemos = Collections.emptyList();
-
-        if (Boolean.TRUE.equals(memo.getIsAiGenerated())
-                && memo.getSource() != null
-                && !memo.getSource().isBlank()) {
-
-            List<Long> sourceIds = parseSourceIds(memo.getSource());
-            sourceMemos = memoRepository.findAllById(sourceIds);
-        }
+        MemoDetailResponse response = toDetailResponse(memo);
 
         // 열람 기록은 전용 UPDATE로 (dirty checking 회피 → updatedAt이 열람으로 오염되지 않음)
         memoRepository.touchViewed(memoId, LocalDateTime.now());
+
+        return response;
+    }
+
+    // 상세 응답 조립 (이미지/파일 presigned URL + AI 메모의 원본 목록). 일반 상세와 휴지통 상세가 공용으로 쓴다.
+    private MemoDetailResponse toDetailResponse(Memo memo) {
+        List<MemoDetailResponse.ImageInfo> images = mapToImageInfos(memo.getMemoImages());
+        List<MemoDetailResponse.FileInfo> files = mapToFileInfos(memo.getMemoFiles());
 
         return MemoDetailResponse.from(
                 memo,
                 images,
                 files,
-                sourceMemos
+                resolveSourceMemos(memo)
         );
+    }
+
+    // AI 메모의 원본마다 현재 상태를 판별한다 (생성 시 순서 유지).
+    // 정상·휴지통이면 지금 제목, 영구 삭제(행 없음)면 생성 시점에 저장해 둔 제목을 쓴다.
+    private List<MemoDetailResponse.SourceMemoInfo> resolveSourceMemos(Memo memo) {
+        if (!Boolean.TRUE.equals(memo.getIsAiGenerated())) {
+            return List.of();
+        }
+
+        // 스냅샷이 없는 예전 AI 메모는 source의 ID만으로 판별한다(영구 삭제된 원본은 제목 없음)
+        List<SourceMemoSnapshot> sources = !memo.getSourceSnapshots().isEmpty()
+                ? memo.getSourceSnapshots()
+                : parseSourceIds(memo.getSource()).stream()
+                        .map(id -> new SourceMemoSnapshot(id, null))
+                        .toList();
+        if (sources.isEmpty()) {
+            return List.of();
+        }
+
+        // 휴지통 메모도 함께 조회해야 하므로 삭제 여부와 무관하게 조회
+        Map<Long, Memo> currentById = memoRepository.findAllById(
+                        sources.stream().map(SourceMemoSnapshot::memoId).toList()).stream()
+                .collect(Collectors.toMap(Memo::getId, Function.identity()));
+
+        return sources.stream()
+                .map(source -> {
+                    Memo current = currentById.get(source.memoId());
+                    if (current == null) {
+                        return new MemoDetailResponse.SourceMemoInfo(
+                                source.memoId(), source.title(), MemoDetailResponse.SourceMemoStatus.DELETED);
+                    }
+                    MemoDetailResponse.SourceMemoStatus status = Boolean.TRUE.equals(current.getIsDeleted())
+                            ? MemoDetailResponse.SourceMemoStatus.TRASHED
+                            : MemoDetailResponse.SourceMemoStatus.ACTIVE;
+                    return new MemoDetailResponse.SourceMemoInfo(current.getId(), current.getTitle(), status);
+                })
+                .toList();
     }
 
     @Override
@@ -598,22 +641,8 @@ public class MemoServiceImpl implements MemoService {
         // 본인 메모가 아니면 예외
         checkMyMemo(memo, userId);
 
-        // 삭제할 S3 키 수집
-        List<String> imageKeys = memo.getMemoImages().stream()
-                .map(MemoImage::getImageS3Key)
-                .toList();
-        List<String> fileKeys = memo.getMemoFiles().stream()
-                .map(MemoFile::getFileS3Key)
-                .toList();
-
-        // DB 삭제 hard/soft delete
-        memoImageRepository.deleteByMemo(memo);
-        memoFileRepository.deleteByMemo(memo);
-        memoTagRepository.deleteByMemo(memo);
-        memo.delete();
-
-        // 이벤트 발행(트랜잭션 커밋 후 실행됨)
-        eventPublisher.publishEvent(new MemoDeletedEvent(memoId, imageKeys, fileKeys));
+        // 휴지통으로 옮기기만 한다. 태그/첨부/S3/벡터는 복원에 대비해 그대로 두고 영구 삭제 때 정리한다.
+        memoRepository.moveToTrash(memoId, LocalDateTime.now());
     }
 
 
@@ -790,7 +819,7 @@ public class MemoServiceImpl implements MemoService {
         List<Long> selectedMemoIds = request.memoIds();
         long ownedCount = memoRepository.countByIdInAndUserIdAndNotDeleted(userId, selectedMemoIds);
         if (ownedCount != selectedMemoIds.stream().distinct().count()) {
-            throw new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+            throw unusableSelectedMemoException(userId, selectedMemoIds);
         }
 
         // Gate 1: 선택된 메모들 자체가 서로 응집돼 있지 않으면(평균 벡터가 대표성이 없으면) 후보 검색 없이 바로 종료
@@ -824,6 +853,150 @@ public class MemoServiceImpl implements MemoService {
                 .toList();
 
         return MemoRecommendationResponse.of(items);
+    }
+
+    // == 휴지통 == //
+
+    @Override
+    public MemoTrashListResponse getTrashMemos(Long userId, LocalDateTime cursorDeletedAt, Long cursorMemoId, int size) {
+        long totalCount = memoRepository.countTrashedMemos(userId);
+
+        List<Memo> memos = memoRepository.findTrashedMemos(userId, cursorDeletedAt, cursorMemoId, size);
+        if (memos.isEmpty()) {
+            return MemoTrashListResponse.from(totalCount, List.of());
+        }
+
+        // 대표 이미지 s3Key + 개수만 프로젝션으로 조회 (대시보드와 동일)
+        List<Long> memoIds = memos.stream().map(Memo::getId).toList();
+        Map<Long, String> representativeImageS3KeyMap = memoImageRepository.findRepresentativeImageS3Keys(memoIds);
+        Map<Long, Long> imageCountMap = memoImageRepository.countImagesByMemoId(memoIds);
+        Map<Long, Long> fileCountMap = memoFileRepository.countFilesByMemoId(memoIds);
+
+        List<MemoTrashListResponse.TrashMemoResponse> responses = memos.stream()
+                .map(memo -> {
+                    String s3Key = representativeImageS3KeyMap.get(memo.getId());
+                    return MemoTrashListResponse.TrashMemoResponse.of(
+                            memo,
+                            MarkdownUtil.strip(memo.getContent()),
+                            s3Key != null ? s3Util.generatePresignedUrl(s3Key) : null,
+                            imageCountMap.getOrDefault(memo.getId(), 0L).intValue(),
+                            fileCountMap.getOrDefault(memo.getId(), 0L).intValue()
+                    );
+                })
+                .toList();
+
+        return MemoTrashListResponse.from(totalCount, responses);
+    }
+
+    @Override
+    public MemoDetailResponse getTrashMemoDetail(Long userId, Long memoId) {
+        // 휴지통 미리보기는 열람 기록(lastViewedAt)을 남기지 않는다
+        return toDetailResponse(getMyTrashedMemoOrThrow(memoId, userId));
+    }
+
+    @Override
+    @Transactional
+    public MemoResponse restoreMemo(Long userId, Long memoId) {
+        Memo memo = getMyTrashedMemoOrThrow(memoId, userId);
+
+        // 0이면 그 사이 다른 요청이 복원했거나 영구 삭제한 것
+        if (memoRepository.restoreFromTrash(memoId) == 0) {
+            throw new MemoException(MemoErrorCode.TRASH_MEMO_NOT_FOUND);
+        }
+
+        return MemoResponse.from(memo);
+    }
+
+    @Override
+    @Transactional
+    public void deleteTrashMemoPermanently(Long userId, Long memoId) {
+        getMyTrashedMemoOrThrow(memoId, userId);
+
+        if (purgeTrashedMemos(List.of(memoId)) == 0) {
+            throw new MemoException(MemoErrorCode.TRASH_MEMO_NOT_FOUND);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void emptyTrash(Long userId) {
+        List<Long> memoIds = memoRepository.findTrashedIdsByUserId(userId);
+
+        // IN 절이 너무 길어지지 않도록 배치 크기만큼 나눠서 지운다 (한 트랜잭션이라 중간 실패 시 전체 롤백)
+        int chunkSize = memoTrashProperties.getPurgeBatchSize();
+        for (int from = 0; from < memoIds.size(); from += chunkSize) {
+            purgeTrashedMemos(memoIds.subList(from, Math.min(from + chunkSize, memoIds.size())));
+        }
+    }
+
+    // 배치마다 트랜잭션을 따로 커밋해, 한 배치가 실패해도 앞서 지운 배치는 유지되게 한다
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public int purgeExpiredTrash(LocalDateTime cutoff, int batchSize) {
+        int totalPurged = 0;
+
+        while (true) {
+            List<Long> memoIds = memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, batchSize));
+            if (memoIds.isEmpty()) {
+                break;
+            }
+
+            Integer purged = transactionTemplate.execute(status -> purgeTrashedMemos(memoIds));
+            totalPurged += purged == null ? 0 : purged;
+
+            // 마지막 배치이거나, 조회된 메모가 그 사이 복원돼 하나도 못 지웠으면 종료 (무한 반복 방지)
+            if (memoIds.size() < batchSize || purged == null || purged == 0) {
+                break;
+            }
+        }
+
+        return totalPurged;
+    }
+
+    // 휴지통 메모 영구 삭제. 호출하는 쪽 트랜잭션 안에서 실행돼야 한다.
+    // 대상 행 잠금 → S3 키 수집 → 태그/첨부/메모 행 삭제 → 커밋 후 S3·벡터 정리(이벤트)
+    // 반환값 = 실제로 삭제한 메모 수
+    private int purgeTrashedMemos(List<Long> memoIds) {
+        if (memoIds.isEmpty()) {
+            return 0;
+        }
+
+        // 복원과 동시에 실행돼도 휴지통에 남아 있는 메모만 지우도록 잠금으로 대상을 확정한다
+        List<Long> targetIds = memoRepository.lockTrashedIds(memoIds);
+        if (targetIds.isEmpty()) {
+            return 0;
+        }
+
+        Map<Long, List<String>> imageKeysByMemoId = memoImageRepository.findByMemoIdIn(targetIds).stream()
+                .collect(Collectors.groupingBy(image -> image.getMemo().getId(),
+                        Collectors.mapping(MemoImage::getImageS3Key, Collectors.toList())));
+        Map<Long, List<String>> fileKeysByMemoId = memoFileRepository.findByMemoIdIn(targetIds).stream()
+                .collect(Collectors.groupingBy(file -> file.getMemo().getId(),
+                        Collectors.mapping(MemoFile::getFileS3Key, Collectors.toList())));
+
+        // FK 순서대로 자식 → 메모
+        memoTagRepository.deleteByMemoIdIn(targetIds);
+        memoImageRepository.deleteByMemoIdIn(targetIds);
+        memoFileRepository.deleteByMemoIdIn(targetIds);
+        int deleted = memoRepository.deleteTrashedByIdIn(targetIds);
+
+        List<MemoPurgedEvent.PurgedMemo> purgedMemos = targetIds.stream()
+                .map(id -> new MemoPurgedEvent.PurgedMemo(
+                        id,
+                        imageKeysByMemoId.getOrDefault(id, List.of()),
+                        fileKeysByMemoId.getOrDefault(id, List.of())
+                ))
+                .toList();
+        eventPublisher.publishEvent(new MemoPurgedEvent(purgedMemos));
+
+        return deleted;
+    }
+
+    private Memo getMyTrashedMemoOrThrow(Long memoId, Long userId) {
+        Memo memo = memoRepository.findTrashedById(memoId)
+                .orElseThrow(() -> new MemoException(MemoErrorCode.TRASH_MEMO_NOT_FOUND));
+        checkMyMemo(memo, userId);
+        return memo;
     }
 
     // == 내부 헬퍼 메서드들== //
@@ -918,14 +1091,21 @@ public class MemoServiceImpl implements MemoService {
         return tagsByName;
     }
 
-    private void validateSourceMemos(List<Long> sourceMemoIds, List<Memo> sourceMemos) {
+    // 선택한 메모 중 쓸 수 없는 게 있을 때, 휴지통 메모가 섞였으면 409로 따로 알린다(없거나 남의 메모면 404)
+    private MemoException unusableSelectedMemoException(Long userId, List<Long> memoIds) {
+        return memoRepository.countTrashedByIdInAndUserId(userId, memoIds) > 0
+                ? new MemoException(MemoErrorCode.SOURCE_MEMO_IN_TRASH)
+                : new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+    }
+
+    private void validateSourceMemos(Long userId, List<Long> sourceMemoIds, List<Memo> sourceMemos) {
         Set<Long> requestedIds = Set.copyOf(sourceMemoIds);
         Set<Long> foundIds = sourceMemos.stream()
                 .map(Memo::getId)
                 .collect(Collectors.toSet());
 
         if (requestedIds.size() != foundIds.size()) {
-            throw new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+            throw unusableSelectedMemoException(userId, sourceMemoIds);
         }
     }
 

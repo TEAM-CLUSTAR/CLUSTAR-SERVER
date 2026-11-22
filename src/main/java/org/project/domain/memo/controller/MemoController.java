@@ -292,7 +292,11 @@ public class MemoController {
     }
 
     @DeleteMapping("/{memoId}")
-    @Operation(summary = "메모 삭제", description = "특정 메모를 삭제합니다.")
+    @Operation(summary = "메모 삭제(휴지통으로 이동)", description = """
+            메모를 휴지통으로 옮깁니다. 태그와 첨부는 그대로 보관되며 복원할 수 있습니다.
+            휴지통에서 30일이 지나면 영구 삭제됩니다.
+            삭제 직후 '실행 취소'는 복원 API(PATCH /trash/{memoId}/restore)를 사용합니다.
+            """)
     @BusinessExceptionDescription(SwaggerResponseDescription.DELETE_MEMO)
     public ResponseEntity<ApiResponse<Void>> deleteMemo(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -301,6 +305,87 @@ public class MemoController {
         Long userId = userDetails.getUserId();
 
         memoService.deleteMemo(userId, memoId);
+
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    // == 휴지통 == //
+
+    @GetMapping("/trash")
+    @Operation(summary = "휴지통 목록 조회", description = """
+            휴지통에 있는 메모를 휴지통으로 옮긴 최신순으로 조회합니다.
+            - totalCount는 휴지통 전체 메모 수입니다(사이드바 개수 표시용).
+            - 다음 페이지 조회 시 마지막 카드의 deletedAt과 memoId를 각각 cursorDeletedAt, cursorMemoId로 전달합니다.
+            """)
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_MEMOS)
+    public ResponseEntity<ApiResponse<MemoTrashListResponse>> getTrashMemos(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+
+            @RequestParam(required = false)
+            LocalDateTime cursorDeletedAt,
+
+            @RequestParam(required = false)
+            Long cursorMemoId,
+
+            @RequestParam(defaultValue = "20")
+            int size
+    ) {
+        MemoTrashListResponse response = memoService.getTrashMemos(
+                userDetails.getUserId(), cursorDeletedAt, cursorMemoId, size);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping("/trash/{memoId}")
+    @Operation(summary = "휴지통 메모 상세 조회", description = """
+            휴지통에 있는 메모를 미리보기용으로 상세 조회합니다. 응답 형식은 메모 상세 조회와 같습니다.
+            열람 기록(최근 열람)은 남기지 않습니다.
+            """)
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_TRASH_MEMO)
+    public ResponseEntity<ApiResponse<MemoDetailResponse>> getTrashMemoDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId
+    ) {
+        MemoDetailResponse response = memoService.getTrashMemoDetail(userDetails.getUserId(), memoId);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PatchMapping("/trash/{memoId}/restore")
+    @Operation(summary = "메모 복원", description = """
+            휴지통에 있는 메모를 복원합니다. 태그와 첨부도 함께 복원됩니다.
+            메모 삭제 직후의 '실행 취소'도 이 API를 사용합니다.
+            """)
+    @BusinessExceptionDescription(SwaggerResponseDescription.TRASH_MEMO_ACTION)
+    public ResponseEntity<ApiResponse<MemoResponse>> restoreMemo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId
+    ) {
+        MemoResponse response = memoService.restoreMemo(userDetails.getUserId(), memoId);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @DeleteMapping("/trash/{memoId}")
+    @Operation(summary = "메모 영구 삭제", description = """
+            휴지통에 있는 메모를 영구 삭제합니다. 태그·첨부·S3 파일까지 지워지며 되돌릴 수 없습니다.
+            """)
+    @BusinessExceptionDescription(SwaggerResponseDescription.TRASH_MEMO_ACTION)
+    public ResponseEntity<ApiResponse<Void>> deleteTrashMemoPermanently(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long memoId
+    ) {
+        memoService.deleteTrashMemoPermanently(userDetails.getUserId(), memoId);
+
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @DeleteMapping("/trash")
+    @Operation(summary = "휴지통 비우기", description = "휴지통에 있는 내 메모를 모두 영구 삭제합니다. 되돌릴 수 없습니다.")
+    public ResponseEntity<ApiResponse<Void>> emptyTrash(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        memoService.emptyTrash(userDetails.getUserId());
 
         return ResponseEntity.ok(ApiResponse.ok(null));
     }

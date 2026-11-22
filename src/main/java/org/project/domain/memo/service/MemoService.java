@@ -50,4 +50,19 @@ public interface MemoService {
     MemoRecentViewedResponse getRecentViewedMemos(Long userId);
 
     MemoRecommendationResponse recommendMemos(Long userId, MemoRecommendationRequest request);
+
+    // == 휴지통 == //
+
+    MemoTrashListResponse getTrashMemos(Long userId, LocalDateTime cursorDeletedAt, Long cursorMemoId, int size);
+
+    MemoDetailResponse getTrashMemoDetail(Long userId, Long memoId);
+
+    MemoResponse restoreMemo(Long userId, Long memoId);
+
+    void deleteTrashMemoPermanently(Long userId, Long memoId);
+
+    void emptyTrash(Long userId);
+
+    // cutoff 이전에 휴지통으로 옮긴 메모를 batchSize씩 영구 삭제. 반환값 = 삭제한 메모 수
+    int purgeExpiredTrash(LocalDateTime cutoff, int batchSize);
 }
