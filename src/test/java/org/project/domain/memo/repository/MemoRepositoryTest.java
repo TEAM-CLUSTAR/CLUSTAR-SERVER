@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -76,7 +77,7 @@ class MemoRepositoryTest {
         Memo memo = Memo.createMemo("제목", "내용", user);
         memoRepository.save(memo);
 
-        memo.delete(); // isDeleted = true
+        ReflectionTestUtils.setField(memo, "isDeleted", true);
         em.flush();
         em.clear();
 

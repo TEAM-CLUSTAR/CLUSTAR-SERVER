@@ -1,5 +1,6 @@
 package org.project.domain.ai.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +14,10 @@ import org.project.domain.ai.dto.response.AiEvaluationResult;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
+import org.project.domain.memo.repository.MemoRepository;
 import org.project.global.exception.InsufficientRagContextException;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 
 import java.util.List;
 
@@ -42,6 +46,16 @@ class MemoAiServiceImplTest {
 
     @Mock
     private AiEvaluationService aiEvaluationService;
+
+    @Mock
+    private MemoRepository memoRepository;
+
+    // 기본값: 선택한 메모가 모두 본인 소유이며 휴지통에 없다
+    @BeforeEach
+    void allSelectedMemosAreAlive() {
+        lenient().when(memoRepository.countByIdInAndUserIdAndNotDeleted(any(), any()))
+                .thenAnswer(inv -> ((List<?>) inv.getArgument(1)).stream().distinct().count());
+    }
 
     @Test
     @DisplayName("AI 응답이 생성되면 사용자 프롬프트와 AI 응답을 저장한다")
@@ -179,5 +193,47 @@ class MemoAiServiceImplTest {
         assertThat(response.aiResponse().content()).isEqualTo("메모 내용이 부족합니다");
         assertThat(response.aiResponse().title()).isEqualTo("AI 응답을 생성할 수 없습니다");
         verify(aiEvaluationService, never()).evaluate(any(), any());
+    }
+
+    @Test
+    @DisplayName("담은 메모 중 휴지통 메모가 있으면 AI를 호출하지 않고 409 SOURCE_MEMO_IN_TRASH")
+    void generate_trashedMemo_throwsInTrash() {
+        MemoAiRequest request = MemoAiRequest.of("정리해줘", MemoAiOptions.MERGE, List.of(11L, 12L));
+        when(memoRepository.countByIdInAndUserIdAndNotDeleted(1L, List.of(11L, 12L))).thenReturn(1L);
+        when(memoRepository.countTrashedByIdInAndUserId(1L, List.of(11L, 12L))).thenReturn(1L);
+
+        assertThatThrownBy(() -> memoAiService.generate(1L, 7L, request))
+                .isInstanceOf(MemoException.class)
+                .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_IN_TRASH);
+        verify(ragPipeline, never()).run(any(), any(), any());
+        verify(chatMessageService, never()).saveTurn(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("담은 메모 중 없거나 남의 메모가 있으면 404 SOURCE_MEMO_NOT_FOUND")
+    void generate_missingMemo_throwsNotFound() {
+        MemoAiRequest request = MemoAiRequest.of("정리해줘", MemoAiOptions.MERGE, List.of(11L, 12L));
+        when(memoRepository.countByIdInAndUserIdAndNotDeleted(1L, List.of(11L, 12L))).thenReturn(1L);
+        when(memoRepository.countTrashedByIdInAndUserId(1L, List.of(11L, 12L))).thenReturn(0L);
+
+        assertThatThrownBy(() -> memoAiService.generate(1L, 7L, request))
+                .isInstanceOf(MemoException.class)
+                .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+        verify(ragPipeline, never()).run(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("[기획용] 담은 메모 중 휴지통 메모가 있으면 AI를 호출하지 않는다")
+    void generateForPlan_trashedMemo_throws() {
+        MemoAiRequestForPlan request = new MemoAiRequestForPlan(
+                "정리해줘", MemoAiOptions.MERGE, List.of(11L),
+                "system prompt", "gemini-2.5-flash", 0.7);
+        when(memoRepository.countByIdInAndUserIdAndNotDeleted(1L, List.of(11L))).thenReturn(0L);
+        when(memoRepository.countTrashedByIdInAndUserId(1L, List.of(11L))).thenReturn(1L);
+
+        assertThatThrownBy(() -> memoAiService.generateForPlan(1L, 7L, request))
+                .isInstanceOf(MemoException.class)
+                .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_IN_TRASH);
+        verify(ragPipeline, never()).runForPlan(any(), any(), any(), any(), any(), any());
     }
 }

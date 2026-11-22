@@ -8,8 +8,13 @@ import org.project.domain.ai.dto.response.AiEvaluationResult;
 import org.project.domain.ai.dto.response.MemoAiResponse;
 import org.project.domain.ai.dto.response.MemoAiResponseForPlan;
 import org.project.domain.ai.rag.pipeline.RagPipeline;
+import org.project.domain.memo.repository.MemoRepository;
 import org.project.global.exception.InsufficientRagContextException;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -21,6 +26,7 @@ public class MemoAiServiceImpl implements MemoAiService {
     private final ChatMessageService chatMessageService;
 
     private final AiEvaluationService aiEvaluationService;
+    private final MemoRepository memoRepository;
 
     @Override
     public MemoAiResponse generate(
@@ -31,6 +37,7 @@ public class MemoAiServiceImpl implements MemoAiService {
 
         // 접근 검증
         chatRoomService.validateAccess(userId, chatRoomId);
+        validateSelectedMemos(userId, request.memoIds());
 
         MemoAiResponse response;
 
@@ -66,6 +73,19 @@ public class MemoAiServiceImpl implements MemoAiService {
         return response;
     }
 
+    // 선택한 메모가 모두 본인 소유이며 휴지통에 없는지 검증.
+    // 휴지통 메모도 벡터가 남아 있어서, 검증 없이 넘기면 그 내용이 AI 컨텍스트로 쓰인다.
+    // 휴지통 메모가 섞였으면 409(SOURCE_MEMO_IN_TRASH), 없거나 남의 메모면 404로 구분한다.
+    private void validateSelectedMemos(Long userId, List<Long> memoIds) {
+        long distinctCount = memoIds.stream().distinct().count();
+        if (memoRepository.countByIdInAndUserIdAndNotDeleted(userId, memoIds) == distinctCount) {
+            return;
+        }
+        throw memoRepository.countTrashedByIdInAndUserId(userId, memoIds) > 0
+                ? new MemoException(MemoErrorCode.SOURCE_MEMO_IN_TRASH)
+                : new MemoException(MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+    }
+
     private void saveFailedTurnQuietly(Long chatRoomId, MemoAiRequest request) {
         try {
             chatMessageService.saveFailedTurn(chatRoomId, request);
@@ -87,6 +107,7 @@ public class MemoAiServiceImpl implements MemoAiService {
 
         // 채팅방 접근 검증
         chatRoomService.validateAccess(userId, chatRoomId);
+        validateSelectedMemos(userId, request.memoIds());
 
         // 내부 공통 AI 요청 DTO로 변환
         MemoAiRequest memoRequest = MemoAiRequest.of(

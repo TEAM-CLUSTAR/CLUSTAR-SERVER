@@ -357,6 +357,50 @@ public class MemoRepositoryImpl implements MemoRepositoryCustom {
                 .fetch();
     }
 
+    @Override
+    public List<Memo> findTrashedMemos(Long userId, LocalDateTime cursorDeletedAt, Long cursorMemoId, int limit) {
+        QMemo memo = QMemo.memo;
+        QMemoTag memoTag = QMemoTag.memoTag;
+        QTag tag = QTag.tag;
+
+        // id 먼저 조회 후 페치조인 (컬렉션 fetchJoin + limit의 인메모리 페이징 방지)
+        List<Long> memoIds = queryFactory
+                .select(memo.id)
+                .from(memo)
+                .where(
+                        memo.user.id.eq(userId),
+                        memo.isDeleted.eq(true),
+                        trashCursorCondition(cursorDeletedAt, cursorMemoId)
+                )
+                .orderBy(memo.deletedAt.desc(), memo.id.desc())
+                .limit(limit)
+                .fetch();
+
+        if (memoIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectDistinct(memo)
+                .from(memo)
+                .leftJoin(memo.memoTags, memoTag).fetchJoin()
+                .leftJoin(memoTag.tag, tag).fetchJoin()
+                .where(memo.id.in(memoIds))
+                .orderBy(memo.deletedAt.desc(), memo.id.desc())
+                .fetch();
+    }
+
+    // (deletedAt, id) 내림차순 커서. 커서가 없으면 첫 페이지
+    private BooleanExpression trashCursorCondition(LocalDateTime cursorDeletedAt, Long cursorMemoId) {
+        if (cursorDeletedAt == null || cursorMemoId == null) {
+            return null;
+        }
+
+        QMemo memo = QMemo.memo;
+        return memo.deletedAt.lt(cursorDeletedAt)
+                .or(memo.deletedAt.eq(cursorDeletedAt).and(memo.id.lt(cursorMemoId)));
+    }
+
     /**
      * tagIds가 있을 때
      */

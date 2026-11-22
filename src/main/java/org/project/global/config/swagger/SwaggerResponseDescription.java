@@ -78,8 +78,23 @@ public enum SwaggerResponseDescription {
 
     DELETE_MEMO(new LinkedHashSet<>(Set.of(
             MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO
+    ))),
+
+    GET_TRASH_MEMOS(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.INVALID_PAGE_SIZE,
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+    ))),
+
+    GET_TRASH_MEMO(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.TRASH_MEMO_NOT_FOUND,
             MemoErrorCode.FORBIDDEN_MEMO,
-            S3ErrorCode.FILE_DELETE_FAILED
+            S3ErrorCode.PRESIGNED_URL_GENERATION_FAILED
+    ))),
+
+    TRASH_MEMO_ACTION(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.TRASH_MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO
     ))),
 
     CREATE_AI_MEMO(new LinkedHashSet<>(Set.of(

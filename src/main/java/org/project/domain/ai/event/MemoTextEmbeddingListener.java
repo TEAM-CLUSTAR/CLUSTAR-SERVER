@@ -35,7 +35,7 @@ public class MemoTextEmbeddingListener {
     public void handle(MemoTextCreatedEvent event) {
         try {
             // 1️⃣ Extract
-            Memo memo = memoRepository.findByIdWithUserAndNotDeleted(event.memoId())
+            Memo memo = memoRepository.findByIdWithUser(event.memoId())
                     .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
             List<Document> extractedDocuments =

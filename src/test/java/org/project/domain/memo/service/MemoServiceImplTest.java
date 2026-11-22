@@ -5,7 +5,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,6 +16,8 @@ import org.project.domain.ai.rag.E.retrieve.search.MemoSearchVectorRetriever;
 import org.project.domain.tag.repository.TagRepository;
 import org.project.domain.memo.config.MemoRecommendationProperties;
 import org.project.domain.memo.config.MemoSearchProperties;
+import org.project.domain.memo.config.MemoTrashProperties;
+import org.project.domain.memo.dto.request.MemoAiCreateRequest;
 import org.project.domain.memo.dto.request.MemoCreateRequest;
 import org.project.domain.memo.dto.request.MemoPresignedUrlRequest;
 import org.project.domain.memo.dto.request.MemoRecommendationRequest;
@@ -25,13 +30,15 @@ import org.project.domain.memo.dto.response.RecentViewedSource;
 import org.project.domain.memo.dto.response.MemoRecommendationResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
 import org.project.domain.memo.dto.response.MemoSearchResponse;
+import org.project.domain.memo.dto.response.MemoTrashListResponse;
 import org.project.domain.memo.dto.response.SearchType;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoFile;
 import org.project.domain.memo.entity.MemoImage;
+import org.project.domain.memo.entity.SourceMemoSnapshot;
 import org.project.domain.memo.event.MemoAttachmentsRemovedEvent;
-import org.project.domain.memo.event.MemoDeletedEvent;
 import org.project.domain.memo.event.MemoImageCreatedEvent;
+import org.project.domain.memo.event.MemoPurgedEvent;
 import org.project.domain.memo.event.MemoTextUpdatedEvent;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.memo.repository.MemoFileRepository;
@@ -62,6 +69,9 @@ import java.util.concurrent.Executor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -89,6 +99,7 @@ class MemoServiceImplTest {
     @Mock private VectorStoreRepository vectorStoreRepository;
     @Mock private MemoRecommendationProperties memoRecommendationProperties;
     @Mock private MemoSearchProperties memoSearchProperties;
+    @Mock private MemoTrashProperties memoTrashProperties;
 
     // 공통 테스트 데이터 상수
     private final Long userId = 1L;
@@ -669,85 +680,319 @@ class MemoServiceImplTest {
     }
 
     @Nested
-    @DisplayName("메모 삭제 테스트")
+    @DisplayName("메모 삭제(휴지통 이동) 테스트")
     class deleteMemo {
 
-        @DisplayName("메모 삭제 시 DB 데이터가 삭제되고 삭제 이벤트가 발행되어야 한다.")
+        @DisplayName("메모 삭제 시 휴지통으로만 옮기고 태그/첨부 행·S3·벡터는 건드리지 않는다.")
         @Test
-        void deleteMemo_Success() {
-            // given 준비
+        void deleteMemo_movesToTrashOnly() {
+            // given
             User user = User.builder().id(userId).build();
             Memo memo = Memo.createMemo("삭제할 메모", "내용", user);
-            // 삭제 하기 전 조회가 되어야 하므로
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
-            // when 실행
-            memoService.deleteMemo(userId, memoId);
-
-            // then 검증
-            verify(memoImageRepository).deleteByMemo(memo);
-            verify(memoFileRepository).deleteByMemo(memo);
-            verify(memoTagRepository).deleteByMemo(memo);
-
-            verify(eventPublisher).publishEvent(any(MemoDeletedEvent.class));
-        }
-
-        @DisplayName("본인의 메모가 아닌 경우 FORBIDDEN_MEMO 예외가 발생하며 삭제되지 않는다.")
-        @Test
-        void deleteMemo_Forbidden_Exception() {
-            // given 준비
-            Long intruderId = 999L;
-            User owner = User.builder().id(userId).build();
-            Memo memo = Memo.createMemo("주인의 메모", "내용", owner);
-            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
-
-            // when & then 실행 및 검증
-            assertThatThrownBy(() -> memoService.deleteMemo(intruderId, memoId))
-                    .isInstanceOf(MemoException.class) // MemoException이 발생해야 하고
-                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
-            // 실제 삭제 로직 실행되지 않았음을 검증
-            verify(memoImageRepository, never()).deleteByMemo(any());
-            verify(eventPublisher, never()).publishEvent(any());
-        }
-
-        @DisplayName("메모 삭제 시 포함된 이미지와 S3 키들이 수집되어 이벤트에 담겨야 한다.")
-        @Test
-        void deleteMemo_With_Media_Keys() {
-            // given: 이미지와 파일이 포함된 메모 준비
-            User user = User.builder().id(userId).build();
-            Memo memo = Memo.createMemo("제목", "내용", user);
-            String imageKey1 = "memo/images/key-001.jpg";
-            String imageKey2 = "memo/images/key-002.png";
-            memo.getMemoImages().add(MemoImage.builder()
-                    .memo(memo)
-                    .imageS3Key(imageKey1)
-                    .imageBytes(1024L)
-                    .imageExtension("jpg")
-                    .imagePriority(1)
-                    .build());
-            memo.getMemoImages().add(MemoImage.builder()
-                    .memo(memo)
-                    .imageS3Key(imageKey2)
-                    .imageBytes(2048L)
-                    .imageExtension("png")
-                    .imagePriority(2)
-                    .build());
             given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
             // when
             memoService.deleteMemo(userId, memoId);
 
-            // then: 이벤트가 발행될 때 전달된 데이터를 캡처해서 검사
-            ArgumentCaptor<MemoDeletedEvent> eventCaptor = ArgumentCaptor.forClass(MemoDeletedEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            // then: 휴지통 이동 UPDATE만 실행되고 정리 작업(행 삭제/이벤트)은 없다
+            verify(memoRepository).moveToTrash(eq(memoId), any(LocalDateTime.class));
+            verify(memoTagRepository, never()).deleteByMemoIdIn(any());
+            verify(memoImageRepository, never()).deleteByMemoIdIn(any());
+            verify(memoFileRepository, never()).deleteByMemoIdIn(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
 
-            MemoDeletedEvent capturedEvent = eventCaptor.getValue();
-            assertThat(capturedEvent.getMemoId()).isEqualTo(memoId);
-            assertThat(capturedEvent.getImageKeys())
-                    .hasSize(2) // 개수가 2개여야 함
-                    .containsExactlyInAnyOrder(imageKey1, imageKey2);
+        @DisplayName("본인의 메모가 아닌 경우 FORBIDDEN_MEMO 예외가 발생하며 휴지통으로 옮겨지지 않는다.")
+        @Test
+        void deleteMemo_Forbidden_Exception() {
+            // given
+            Long intruderId = 999L;
+            User owner = User.builder().id(userId).build();
+            Memo memo = Memo.createMemo("주인의 메모", "내용", owner);
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
 
-            assertThat(memo.getIsDeleted()).isTrue();
+            // when & then
+            assertThatThrownBy(() -> memoService.deleteMemo(intruderId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
+            verify(memoRepository, never()).moveToTrash(any(), any());
+        }
+
+        @DisplayName("이미 휴지통에 있거나 없는 메모면 MEMO_NOT_FOUND 예외가 발생한다.")
+        @Test
+        void deleteMemo_NotFound_Exception() {
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> memoService.deleteMemo(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.MEMO_NOT_FOUND);
+            verify(memoRepository, never()).moveToTrash(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("휴지통 테스트")
+    class Trash {
+
+        private Memo trashedMemo(Long id, Long ownerId) {
+            User owner = User.builder().id(ownerId).build();
+            Memo memo = Memo.createMemo("휴지통 메모", "**굵은** 내용", owner);
+            ReflectionTestUtils.setField(memo, "id", id);
+            ReflectionTestUtils.setField(memo, "isDeleted", true);
+            ReflectionTestUtils.setField(memo, "deletedAt", LocalDateTime.of(2026, 11, 20, 10, 0));
+            return memo;
+        }
+
+        @BeforeEach
+        void maxPageSize() {
+            lenient().when(memoTrashProperties.getMaxPageSize()).thenReturn(100);
+        }
+
+        @ParameterizedTest(name = "size={0}")
+        @ValueSource(ints = {0, -1, 101})
+        @DisplayName("휴지통 목록 size가 1~100을 벗어나면 조회 전에 INVALID_PAGE_SIZE")
+        void getTrashMemos_invalidSize_throws(int size) {
+            assertThatThrownBy(() -> memoService.getTrashMemos(userId, null, null, size))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_PAGE_SIZE);
+            verify(memoRepository, never()).findTrashedMemos(any(), any(), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("휴지통 목록은 총 개수·대표 이미지·첨부 개수·deletedAt을 담아 반환한다")
+        void getTrashMemos_returnsCardInfo() {
+            Memo memo = trashedMemo(memoId, userId);
+            given(memoRepository.countTrashedMemos(userId)).willReturn(1L);
+            given(memoRepository.findTrashedMemos(userId, null, null, 20)).willReturn(List.of(memo));
+            given(memoImageRepository.findRepresentativeImageS3Keys(List.of(memoId)))
+                    .willReturn(Map.of(memoId, "memo-image/1/a.png"));
+            given(memoImageRepository.countImagesByMemoId(List.of(memoId))).willReturn(Map.of(memoId, 2L));
+            given(memoFileRepository.countFilesByMemoId(List.of(memoId))).willReturn(Map.of(memoId, 1L));
+            given(s3Util.generatePresignedUrl("memo-image/1/a.png")).willReturn("https://presigned");
+
+            MemoTrashListResponse response = memoService.getTrashMemos(userId, null, null, 20);
+
+            assertThat(response.totalCount()).isEqualTo(1L);
+            assertThat(response.memos()).hasSize(1);
+            MemoTrashListResponse.TrashMemoResponse item = response.memos().get(0);
+            assertThat(item.memoId()).isEqualTo(memoId);
+            assertThat(item.content()).isEqualTo("굵은 내용");
+            assertThat(item.representativeImageUrl()).isEqualTo("https://presigned");
+            assertThat(item.imageCount()).isEqualTo(2);
+            assertThat(item.fileCount()).isEqualTo(1);
+            assertThat(item.deletedAt()).isEqualTo(LocalDateTime.of(2026, 11, 20, 10, 0));
+        }
+
+        @Test
+        @DisplayName("휴지통이 비어 있으면 첨부 조회 없이 빈 목록을 반환한다")
+        void getTrashMemos_empty() {
+            given(memoRepository.countTrashedMemos(userId)).willReturn(0L);
+            given(memoRepository.findTrashedMemos(userId, null, null, 20)).willReturn(List.of());
+
+            MemoTrashListResponse response = memoService.getTrashMemos(userId, null, null, 20);
+
+            assertThat(response.totalCount()).isZero();
+            assertThat(response.memos()).isEmpty();
+            verifyNoInteractions(memoImageRepository, memoFileRepository);
+        }
+
+        @Test
+        @DisplayName("휴지통 상세는 열람 기록을 남기지 않는다")
+        void getTrashMemoDetail_doesNotTouchViewed() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, userId)));
+
+            MemoDetailResponse response = memoService.getTrashMemoDetail(userId, memoId);
+
+            assertThat(response.memoId()).isEqualTo(memoId);
+            verify(memoRepository, never()).touchViewed(any(), any());
+        }
+
+        @Test
+        @DisplayName("휴지통에 없는 메모를 상세 조회하면 TRASH_MEMO_NOT_FOUND")
+        void getTrashMemoDetail_notInTrash_throws() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> memoService.getTrashMemoDetail(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TRASH_MEMO_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("다른 사람의 휴지통 메모는 상세 조회할 수 없다")
+        void getTrashMemoDetail_forbidden() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, 999L)));
+
+            assertThatThrownBy(() -> memoService.getTrashMemoDetail(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
+        }
+
+        @Test
+        @DisplayName("복원하면 휴지통 상태만 되돌리고 메모 정보를 반환한다")
+        void restoreMemo_success() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, userId)));
+            given(memoRepository.restoreFromTrash(memoId)).willReturn(1);
+
+            MemoResponse response = memoService.restoreMemo(userId, memoId);
+
+            assertThat(response.memoId()).isEqualTo(memoId);
+            verify(memoRepository).restoreFromTrash(memoId);
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("그 사이 다른 요청이 복원/영구 삭제해 반영된 행이 없으면 TRASH_MEMO_NOT_FOUND")
+        void restoreMemo_alreadyHandled_throws() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, userId)));
+            given(memoRepository.restoreFromTrash(memoId)).willReturn(0);
+
+            assertThatThrownBy(() -> memoService.restoreMemo(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TRASH_MEMO_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("다른 사람의 휴지통 메모는 복원할 수 없다")
+        void restoreMemo_forbidden() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, 999L)));
+
+            assertThatThrownBy(() -> memoService.restoreMemo(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
+            verify(memoRepository, never()).restoreFromTrash(any());
+        }
+
+        @Test
+        @DisplayName("영구 삭제는 태그→이미지→파일→메모 순으로 지우고, S3 키를 담은 영구 삭제 이벤트를 발행한다")
+        void deleteTrashMemoPermanently_success() {
+            Memo memo = trashedMemo(memoId, userId);
+            MemoImage image = MemoImage.builder().memo(memo).imageS3Key("memo-image/1/a.png").imagePriority(0).build();
+            MemoFile file = MemoFile.builder().memo(memo).fileS3Key("memo-file/1/b.pdf").filePriority(0).build();
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(memo));
+            given(memoRepository.lockTrashedIds(List.of(memoId))).willReturn(List.of(memoId));
+            given(memoImageRepository.findByMemoIdIn(List.of(memoId))).willReturn(List.of(image));
+            given(memoFileRepository.findByMemoIdIn(List.of(memoId))).willReturn(List.of(file));
+            given(memoRepository.deleteTrashedByIdIn(List.of(memoId))).willReturn(1);
+
+            memoService.deleteTrashMemoPermanently(userId, memoId);
+
+            InOrder order = inOrder(memoTagRepository, memoImageRepository, memoFileRepository,
+                    vectorStoreRepository, memoRepository);
+            order.verify(memoTagRepository).deleteByMemoIdIn(List.of(memoId));
+            order.verify(memoImageRepository).deleteByMemoIdIn(List.of(memoId));
+            order.verify(memoFileRepository).deleteByMemoIdIn(List.of(memoId));
+            // 벡터는 커밋 후 비동기가 아니라 같은 트랜잭션에서 지운다
+            order.verify(vectorStoreRepository).deleteByMemoIds(List.of(memoId));
+            order.verify(memoRepository).deleteTrashedByIdIn(List.of(memoId));
+
+            ArgumentCaptor<MemoPurgedEvent> captor = ArgumentCaptor.forClass(MemoPurgedEvent.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            MemoPurgedEvent.PurgedMemo purged = captor.getValue().memos().get(0);
+            assertThat(purged.memoId()).isEqualTo(memoId);
+            assertThat(purged.imageKeys()).containsExactly("memo-image/1/a.png");
+            assertThat(purged.fileKeys()).containsExactly("memo-file/1/b.pdf");
+        }
+
+        @Test
+        @DisplayName("잠금 시점에 이미 복원돼 휴지통에 없으면 아무것도 지우지 않고 TRASH_MEMO_NOT_FOUND")
+        void deleteTrashMemoPermanently_restoredConcurrently_throws() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, userId)));
+            given(memoRepository.lockTrashedIds(List.of(memoId))).willReturn(List.of());
+
+            assertThatThrownBy(() -> memoService.deleteTrashMemoPermanently(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TRASH_MEMO_NOT_FOUND);
+            verify(memoTagRepository, never()).deleteByMemoIdIn(any());
+            verify(vectorStoreRepository, never()).deleteByMemoIds(any());
+            verify(memoRepository, never()).deleteTrashedByIdIn(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("다른 사람의 휴지통 메모는 영구 삭제할 수 없다")
+        void deleteTrashMemoPermanently_forbidden() {
+            given(memoRepository.findTrashedById(memoId)).willReturn(Optional.of(trashedMemo(memoId, 999L)));
+
+            assertThatThrownBy(() -> memoService.deleteTrashMemoPermanently(userId, memoId))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.FORBIDDEN_MEMO);
+            verify(memoRepository, never()).lockTrashedIds(any());
+        }
+
+        @Test
+        @DisplayName("휴지통 비우기는 내 휴지통 메모 전체를 영구 삭제한다")
+        void emptyTrash_purgesAll() {
+            given(memoTrashProperties.getPurgeBatchSize()).willReturn(100);
+            given(memoRepository.findTrashedIdsByUserId(userId)).willReturn(List.of(1L, 2L));
+            given(memoRepository.lockTrashedIds(List.of(1L, 2L))).willReturn(List.of(1L, 2L));
+            given(memoRepository.deleteTrashedByIdIn(List.of(1L, 2L))).willReturn(2);
+
+            memoService.emptyTrash(userId);
+
+            ArgumentCaptor<MemoPurgedEvent> captor = ArgumentCaptor.forClass(MemoPurgedEvent.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertThat(captor.getValue().memoIds()).containsExactly(1L, 2L);
+        }
+
+        @Test
+        @DisplayName("휴지통 비우기는 배치 크기만큼 나눠서 지운다")
+        void emptyTrash_chunksByBatchSize() {
+            given(memoTrashProperties.getPurgeBatchSize()).willReturn(2);
+            given(memoRepository.findTrashedIdsByUserId(userId)).willReturn(List.of(1L, 2L, 3L));
+            given(memoRepository.lockTrashedIds(anyList())).willAnswer(inv -> inv.getArgument(0));
+            given(memoRepository.deleteTrashedByIdIn(anyList()))
+                    .willAnswer(inv -> ((List<?>) inv.getArgument(0)).size());
+
+            memoService.emptyTrash(userId);
+
+            verify(memoRepository).lockTrashedIds(List.of(1L, 2L));
+            verify(memoRepository).lockTrashedIds(List.of(3L));
+            verify(eventPublisher, times(2)).publishEvent(any(MemoPurgedEvent.class));
+        }
+
+        @Test
+        @DisplayName("휴지통이 비어 있으면 비우기는 아무것도 하지 않는다")
+        void emptyTrash_nothingToPurge() {
+            given(memoRepository.findTrashedIdsByUserId(userId)).willReturn(List.of());
+
+            memoService.emptyTrash(userId);
+
+            verify(memoRepository, never()).lockTrashedIds(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("만료 정리는 ID 커서로 배치를 넘기며, 배치 크기보다 적게 조회될 때까지 영구 삭제한다")
+        void purgeExpiredTrash_loopsByIdCursor() {
+            LocalDateTime cutoff = LocalDateTime.of(2026, 10, 22, 0, 0);
+            given(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 2))).willReturn(List.of(1L, 2L));
+            given(memoRepository.findExpiredTrashedIds(cutoff, 2L, PageRequest.of(0, 2))).willReturn(List.of(3L));
+            given(memoRepository.lockExpiredTrashedIds(anyList(), eq(cutoff))).willAnswer(inv -> inv.getArgument(0));
+            given(memoRepository.deleteTrashedByIdIn(anyList()))
+                    .willAnswer(inv -> ((List<?>) inv.getArgument(0)).size());
+
+            int purged = memoService.purgeExpiredTrash(cutoff, 2);
+
+            assertThat(purged).isEqualTo(3);
+            verify(eventPublisher, times(2)).publishEvent(any(MemoPurgedEvent.class));
+            // 자동 삭제는 보존 기간 조건이 있는 잠금만 쓴다
+            verify(memoRepository, never()).lockTrashedIds(any());
+        }
+
+        @Test
+        @DisplayName("한 배치가 그 사이 모두 복원돼 0건이어도 멈추지 않고 뒤의 만료 메모를 계속 처리한다")
+        void purgeExpiredTrash_continuesPastFullyRestoredBatch() {
+            LocalDateTime cutoff = LocalDateTime.of(2026, 10, 22, 0, 0);
+            given(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 2))).willReturn(List.of(1L, 2L));
+            given(memoRepository.findExpiredTrashedIds(cutoff, 2L, PageRequest.of(0, 2))).willReturn(List.of(3L));
+            given(memoRepository.lockExpiredTrashedIds(List.of(1L, 2L), cutoff)).willReturn(List.of());
+            given(memoRepository.lockExpiredTrashedIds(List.of(3L), cutoff)).willReturn(List.of(3L));
+            given(memoRepository.deleteTrashedByIdIn(List.of(3L))).willReturn(1);
+
+            int purged = memoService.purgeExpiredTrash(cutoff, 2);
+
+            assertThat(purged).isEqualTo(1);
+            verify(memoRepository).deleteTrashedByIdIn(List.of(3L));
         }
     }
 
@@ -1402,6 +1647,142 @@ class MemoServiceImplTest {
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
 
             verify(vectorStoreRepository, never()).computeSelectionCohesion(any(), any());
+        }
+
+        @Test
+        @DisplayName("선택한 메모 중 휴지통 메모가 있으면 409 SOURCE_MEMO_IN_TRASH 예외가 발생한다")
+        void recommendMemos_trashedMemo_throwsInTrash() {
+            MemoRecommendationRequest request = new MemoRecommendationRequest(List.of(1L, 2L));
+            given(memoRepository.countByIdInAndUserIdAndNotDeleted(eq(userId), eq(List.of(1L, 2L))))
+                    .willReturn(1L);
+            given(memoRepository.countTrashedByIdInAndUserId(userId, List.of(1L, 2L))).willReturn(1L);
+
+            assertThatThrownBy(() -> memoService.recommendMemos(userId, request))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_IN_TRASH);
+            verify(vectorStoreRepository, never()).computeSelectionCohesion(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("AI 메모의 사용한 메모(원본) 표시")
+    class SourceMemos {
+
+        private Memo memoWithId(Long id, String title, User user) {
+            Memo memo = Memo.createMemo(title, "내용", user);
+            ReflectionTestUtils.setField(memo, "id", id);
+            return memo;
+        }
+
+        @Test
+        @DisplayName("AI 메모 저장 시 원본의 ID·제목을 요청 순서대로 함께 저장한다")
+        void createAiMemo_savesSourceSnapshotsInRequestOrder() {
+            User user = User.builder().id(userId).build();
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(memoRepository.findByIdInWithTagsAndNotDeleted(userId, List.of(2L, 1L)))
+                    .willReturn(List.of(memoWithId(1L, "원본1", user), memoWithId(2L, "원본2", user)));
+            given(memoRepository.save(any(Memo.class))).willAnswer(inv -> inv.getArgument(0));
+
+            memoService.createAiMemo(userId, new MemoAiCreateRequest("AI 메모", "본문", List.of(2L, 1L, 2L)));
+
+            ArgumentCaptor<Memo> captor = ArgumentCaptor.forClass(Memo.class);
+            verify(memoRepository).save(captor.capture());
+            assertThat(captor.getValue().getSourceSnapshots()).containsExactly(
+                    new SourceMemoSnapshot(2L, "원본2"), new SourceMemoSnapshot(1L, "원본1"));
+            assertThat(captor.getValue().getSource()).isEqualTo("[2, 1]");
+        }
+
+        @Test
+        @DisplayName("원본 상태를 정상·휴지통·영구 삭제로 구분하고, 영구 삭제는 저장해 둔 제목을 쓴다")
+        void detail_resolvesSourceStatuses() {
+            User user = User.builder().id(userId).build();
+            Memo aiMemo = Memo.createAiMemo("AI 메모", "본문", user, List.of(
+                    new SourceMemoSnapshot(1L, "원본1 (생성 당시)"),
+                    new SourceMemoSnapshot(2L, "원본2"),
+                    new SourceMemoSnapshot(3L, "원본3 (영구 삭제됨)")));
+            ReflectionTestUtils.setField(aiMemo, "id", memoId);
+
+            Memo active = memoWithId(1L, "원본1 (제목 수정)", user);
+            Memo trashed = memoWithId(2L, "원본2", user);
+            ReflectionTestUtils.setField(trashed, "isDeleted", true);
+
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(aiMemo));
+            given(memoRepository.findAllById(List.of(1L, 2L, 3L))).willReturn(List.of(trashed, active));
+
+            MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+            assertThat(response.sourceMemos()).containsExactly(
+                    new MemoDetailResponse.SourceMemoInfo(1L, "원본1 (제목 수정)", MemoDetailResponse.SourceMemoStatus.ACTIVE),
+                    new MemoDetailResponse.SourceMemoInfo(2L, "원본2", MemoDetailResponse.SourceMemoStatus.TRASHED),
+                    new MemoDetailResponse.SourceMemoInfo(3L, "원본3 (영구 삭제됨)", MemoDetailResponse.SourceMemoStatus.DELETED));
+            // 기존 필드는 남아 있는(정상·휴지통) 원본 제목만
+            assertThat(response.sourceMemoTitleList()).containsExactly("원본1 (제목 수정)", "원본2");
+        }
+
+        @Test
+        @DisplayName("스냅샷이 없는 예전 AI 메모는 source의 ID로 판별하고, 영구 삭제된 원본은 제목 없이 DELETED")
+        void detail_legacyAiMemoWithoutSnapshots() {
+            User user = User.builder().id(userId).build();
+            Memo aiMemo = memoWithId(memoId, "예전 AI 메모", user);
+            ReflectionTestUtils.setField(aiMemo, "isAiGenerated", true);
+            ReflectionTestUtils.setField(aiMemo, "source", "[5, 6]");
+
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(aiMemo));
+            given(memoRepository.findAllById(List.of(5L, 6L))).willReturn(List.of(memoWithId(5L, "원본5", user)));
+
+            MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+            assertThat(response.sourceMemos()).containsExactly(
+                    new MemoDetailResponse.SourceMemoInfo(5L, "원본5", MemoDetailResponse.SourceMemoStatus.ACTIVE),
+                    new MemoDetailResponse.SourceMemoInfo(6L, null, MemoDetailResponse.SourceMemoStatus.DELETED));
+        }
+
+        @Test
+        @DisplayName("일반 메모는 원본 목록이 비어 있고 원본 조회도 하지 않는다")
+        void detail_normalMemo_hasNoSources() {
+            Memo memo = memoWithId(memoId, "일반 메모", User.builder().id(userId).build());
+            given(memoRepository.findByIdAndNotDeleted(memoId)).willReturn(Optional.of(memo));
+
+            MemoDetailResponse response = memoService.getOneMemoDetail(userId, memoId);
+
+            assertThat(response.sourceMemos()).isEmpty();
+            verify(memoRepository, never()).findAllById(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("AI 메모 저장 원본 검증")
+    class CreateAiMemoSourceValidation {
+
+        @Test
+        @DisplayName("원본 메모 중 휴지통 메모가 있으면 409 SOURCE_MEMO_IN_TRASH, 저장하지 않는다")
+        void createAiMemo_trashedSource_throwsInTrash() {
+            User user = User.builder().id(userId).build();
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(memoRepository.findByIdInWithTagsAndNotDeleted(userId, List.of(1L, 2L)))
+                    .willReturn(List.of(Memo.createMemo("원본1", "내용", user)));
+            given(memoRepository.countTrashedByIdInAndUserId(userId, List.of(1L, 2L))).willReturn(1L);
+
+            assertThatThrownBy(() -> memoService.createAiMemo(userId,
+                    new MemoAiCreateRequest("AI 메모", "본문", List.of(1L, 2L))))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_IN_TRASH);
+            verify(memoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("원본 메모 중 없거나 남의 메모가 있으면 404 SOURCE_MEMO_NOT_FOUND")
+        void createAiMemo_missingSource_throwsNotFound() {
+            User user = User.builder().id(userId).build();
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(memoRepository.findByIdInWithTagsAndNotDeleted(userId, List.of(1L, 2L))).willReturn(List.of());
+            given(memoRepository.countTrashedByIdInAndUserId(userId, List.of(1L, 2L))).willReturn(0L);
+
+            assertThatThrownBy(() -> memoService.createAiMemo(userId,
+                    new MemoAiCreateRequest("AI 메모", "본문", List.of(1L, 2L))))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.SOURCE_MEMO_NOT_FOUND);
+            verify(memoRepository, never()).save(any());
         }
     }
 

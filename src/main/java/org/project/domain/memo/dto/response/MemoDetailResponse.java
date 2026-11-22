@@ -5,10 +5,9 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.entity.MemoTag;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 
-@Schema(requiredProperties = {"memoId", "title", "content", "images", "files", "tagList", "createdAt", "updatedAt", "isAiGenerated", "sourceMemoTitleList"})
+@Schema(requiredProperties = {"memoId", "title", "content", "images", "files", "tagList", "createdAt", "updatedAt", "isAiGenerated", "sourceMemoTitleList", "sourceMemos"})
 public record MemoDetailResponse(
 
         @Schema(description = "메모 ID", example = "1")
@@ -39,11 +38,36 @@ public record MemoDetailResponse(
         Boolean isAiGenerated,
 
         @Schema(
-                description = "AI 생성 시 참고한 메모 제목 목록",
+                description = "AI 생성 시 참고한 메모 제목 목록 (영구 삭제된 원본은 제외). 칩 표시는 sourceMemos 사용 권장",
                 example = "[\"UX 리서치 정리\", \"시험 대비 요약\"]"
         )
-        List<String> sourceMemoTitleList
+        List<String> sourceMemoTitleList,
+
+        @Schema(description = """
+                AI 생성 시 참고한 메모 목록 (생성 시 선택한 순서). AI 메모가 아니면 빈 리스트.
+                - ACTIVE: 정상 메모 → 클릭 시 메모 상세로 이동
+                - TRASHED: 휴지통에 있음 → 흐리게 표시, 클릭 시 휴지통 메모 상세(GET /trash/{memoId})로 이동
+                - DELETED: 영구 삭제됨 → 흐리게 표시, 클릭해도 이동 없음 (title은 AI 메모 생성 시점의 제목)
+                """)
+        List<SourceMemoInfo> sourceMemos
 ) {
+
+    public enum SourceMemoStatus {
+        ACTIVE, TRASHED, DELETED
+    }
+
+    @Schema(description = "AI 생성 시 참고한 메모", requiredProperties = {"memoId", "title", "status"})
+    public record SourceMemoInfo(
+
+            @Schema(description = "원본 메모 ID", example = "12")
+            Long memoId,
+
+            @Schema(description = "원본 메모 제목 (정상·휴지통은 현재 제목, 영구 삭제는 AI 메모 생성 시점 제목)", example = "6차 세미나")
+            String title,
+
+            @Schema(description = "원본 메모 상태", example = "ACTIVE")
+            SourceMemoStatus status
+    ) {}
 
     @Schema(description = "이미지 정보", requiredProperties = {"imageId", "imageUrl", "imageName", "imageExtension", "imageSize"})
     public record ImageInfo(
@@ -83,12 +107,12 @@ public record MemoDetailResponse(
             String fileSize
     ) {}
 
-    // 정적 팩터리 메서드
+    // 정적 팩터리 메서드. sourceMemos는 Service에서 원본 상태를 판별해 넘긴다(AI 메모가 아니면 빈 리스트).
     public static MemoDetailResponse from(
             Memo memo,
             List<ImageInfo> images,
             List<FileInfo> files,
-            List<Memo> sourceMemos
+            List<SourceMemoInfo> sourceMemos
     ) {
 
         return new MemoDetailResponse(
@@ -104,19 +128,12 @@ public record MemoDetailResponse(
                 memo.getCreatedAt(),
                 memo.getUpdatedAt(),
                 memo.getIsAiGenerated(),
-                memo.getIsAiGenerated()
-                        ? extractSourceTitles(sourceMemos)
-                        : Collections.emptyList()
+                // 기존 필드는 그대로 '지금 남아 있는(정상·휴지통) 원본 제목'만 담는다
+                sourceMemos.stream()
+                        .filter(source -> source.status() != SourceMemoStatus.DELETED)
+                        .map(SourceMemoInfo::title)
+                        .toList(),
+                sourceMemos
         );
-    }
-
-    private static List<String> extractSourceTitles(List<Memo> sourceMemos) {
-        if (sourceMemos == null || sourceMemos.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return sourceMemos.stream()
-                .map(Memo::getTitle)
-                .toList();
     }
 }

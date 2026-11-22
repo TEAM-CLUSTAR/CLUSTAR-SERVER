@@ -46,7 +46,7 @@ public class MemoTextUpdateEmbeddingListener {
                     .findDocumentIdsByMemoIdAndType(event.memoId(), RagDocumentType.MEMO_TEXT.name());
 
             // 1️⃣ Extract
-            Memo memo = memoRepository.findByIdWithUserAndNotDeleted(event.memoId())
+            Memo memo = memoRepository.findByIdWithUser(event.memoId())
                     .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
             List<Document> extractedDocuments = memoDocumentReader.readText(memo);

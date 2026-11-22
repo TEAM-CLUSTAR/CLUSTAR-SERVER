@@ -62,7 +62,7 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
     @Async
     @Override
     public void reEmbedAll() {
-        List<Long> memoIds = memoRepository.findAllNotDeletedMemoIds();
+        List<Long> memoIds = memoRepository.findAllMemoIds();
         log.info("[ReEmbedding] 배치 시작 - 대상 메모 수: {}", memoIds.size());
 
         for (Long memoId : memoIds) {
@@ -81,7 +81,7 @@ public class ReEmbeddingServiceImpl implements ReEmbeddingService {
 
     @Override
     public ReEmbeddingResultResponse reEmbedOne(Long memoId) {
-        Memo memo = memoRepository.findByIdWithUserAndNotDeleted(memoId)
+        Memo memo = memoRepository.findByIdWithUser(memoId)
                 .orElseThrow(() -> new MemoException(MemoErrorCode.MEMO_NOT_FOUND));
 
         // 텍스트는 항상 시도 대상. 이미지/파일은 하나가 실패해도 나머지 타입은 계속 시도한다(서로 독립).

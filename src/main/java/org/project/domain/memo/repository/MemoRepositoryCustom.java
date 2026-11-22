@@ -39,4 +39,7 @@ public interface MemoRepositoryCustom {
     List<Memo> findRecentViewed(Long userId, int limit);
 
     List<Memo> findRecentCreated(Long userId, int limit);
+
+    // 휴지통 메모를 휴지통 이동 최신순으로 조회 (커서: 마지막 카드의 deletedAt + memoId)
+    List<Memo> findTrashedMemos(Long userId, LocalDateTime cursorDeletedAt, Long cursorMemoId, int limit);
 }

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 public enum MemoErrorCode implements ErrorCode {
     MEMO_NOT_FOUND(HttpStatus.NOT_FOUND,404,"해당 메모를 찾을 수 없습니다."),
     SOURCE_MEMO_NOT_FOUND(HttpStatus.NOT_FOUND,404,"참고한 메모 ID 중 일부를 찾을 수 없습니다."),
+    SOURCE_MEMO_IN_TRASH(HttpStatus.CONFLICT, 409, "선택한 메모 중 휴지통에 있는 메모가 있어요. 휴지통 메모를 빼고 다시 시도해 주세요."),
     FORBIDDEN_MEMO(HttpStatus.FORBIDDEN, 403, "해당 메모에 접근할 권한이 없습니다."),
     INVALID_S3_KEY_FORMAT(HttpStatus.BAD_REQUEST, 400, "S3 키 형식이 올바르지 않습니다."),
     S3_KEY_USER_MISMATCH(HttpStatus.FORBIDDEN, 403, "요청한 사용자와 S3 리소스 소유자가 일치하지 않습니다."),
@@ -20,7 +21,9 @@ public enum MemoErrorCode implements ErrorCode {
     MISSING_ATTACHMENT_METADATA(HttpStatus.BAD_REQUEST, 400, "새로 추가하는 첨부는 파일명(imageName/fileName)을 함께 보내주세요."),
     UNSUPPORTED_EXTENSION(HttpStatus.BAD_REQUEST, 400, "지원하지 않는 확장자입니다."),
     EMPTY_SEARCH_QUERY(HttpStatus.BAD_REQUEST, 400, "검색어를 입력해주세요."),
-    EMPTY_MEMO_IDS(HttpStatus.BAD_REQUEST, 400, "선택된 메모가 없습니다.");
+    EMPTY_MEMO_IDS(HttpStatus.BAD_REQUEST, 400, "선택된 메모가 없습니다."),
+    TRASH_MEMO_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "휴지통에서 해당 메모를 찾을 수 없습니다."),
+    INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, 400, "한 번에 조회할 개수(size)는 1 이상 100 이하로 요청해 주세요.");
 
     private final HttpStatus status;
     private final int code;
