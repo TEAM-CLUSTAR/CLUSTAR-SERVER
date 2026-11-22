@@ -108,6 +108,12 @@ public enum SwaggerResponseDescription {
             MemoErrorCode.TOO_MANY_FILES,
             MemoErrorCode.IMAGE_TOO_LARGE,
             MemoErrorCode.FILE_TOO_LARGE
+    ))),
+
+    // == AI 검토 == //
+    GET_ACTIVE_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO
     )));
 
     private final Set<ErrorCode> errorCodeList;
