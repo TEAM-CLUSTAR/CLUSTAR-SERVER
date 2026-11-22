@@ -104,6 +104,12 @@ public class ReviewFinding extends BaseEntity {
         this.status = FindingStatus.ANSWERING;
     }
 
+    // 본문에 넣은 문장을 기억해 둔다(검토 중 반영 블록 표시, 다시 검토 시 제외 기준)
+    public void apply(String appliedText) {
+        this.status = FindingStatus.APPLIED;
+        this.appliedText = appliedText;
+    }
+
     public boolean isApplied() {
         return this.status == FindingStatus.APPLIED;
     }

@@ -2,7 +2,9 @@ package org.project.domain.review.controller;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.project.domain.review.dto.request.ApplyType;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.RefineResponse;
@@ -277,6 +279,50 @@ class ReviewControllerTest {
         mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/refine"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value(503));
+    }
+
+    @Test
+    @DisplayName("반영하면 바뀐 본문 전체와 반영된 카드 정보를 내려준다")
+    @WithMockCustomUser
+    void apply_ok() throws Exception {
+        when(findingService.apply(1L, 12L, 101L, ApplyType.REFINED, "선정 기준: 많이 사기 때문이다.")).thenReturn(new ApplyResponse(
+                3L, "2. 타깃\n짚은 문장\n선정 기준: 많이 사기 때문이다.", LocalDateTime.of(2026, 11, 22, 15, 0),
+                new ApplyResponse.AppliedFinding(101L, FindingStatus.APPLIED, "선정 기준: 많이 사기 때문이다.")));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/apply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\": \"REFINED\", \"text\": \"선정 기준: 많이 사기 때문이다.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memoId").value(3))
+                .andExpect(jsonPath("$.data.content").value("2. 타깃\n짚은 문장\n선정 기준: 많이 사기 때문이다."))
+                .andExpect(jsonPath("$.data.updatedAt").exists())
+                .andExpect(jsonPath("$.data.finding.status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.finding.appliedText").value("선정 기준: 많이 사기 때문이다."));
+    }
+
+    @Test
+    @DisplayName("반영 방식(type)이 없으면 400이고 서비스를 부르지 않는다")
+    @WithMockCustomUser
+    void apply_missingType() throws Exception {
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/apply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"문장\"}"))
+                .andExpect(status().isBadRequest());
+        verify(findingService, never()).apply(anyLong(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("본문에서 짚은 문장을 못 찾으면 409")
+    @WithMockCustomUser
+    void apply_anchorNotFound() throws Exception {
+        when(findingService.apply(1L, 12L, 101L, ApplyType.REFINED, "문장"))
+                .thenThrow(new ReviewException(ReviewErrorCode.ANCHOR_NOT_FOUND));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/apply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\": \"REFINED\", \"text\": \"문장\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
     }
 
     @Test

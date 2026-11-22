@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.review.ai.ReviewAiClient;
 import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.dto.request.ApplyType;
+import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.dto.response.RefineResponse;
+import org.project.global.exception.errorcode.ReviewErrorCode;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
@@ -46,6 +49,20 @@ public class ReviewFindingServiceImpl implements ReviewFindingService {
         RefineInput input = reviewWriter.prepareRefine(userId, reviewId, findingId);
         String refinedText = reviewAiClient.refine(input);
         return new RefineResponse(findingId, refinedText, input.rawText());
+    }
+
+    // REFINED는 미리보기에서 고친 문장을 받고(모두 지웠으면 400), RAW는 서버가 저장된 답으로 만든다
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ApplyResponse apply(Long userId, Long reviewId, Long findingId, ApplyType type, String text) {
+        String appliedText = null;
+        if (type == ApplyType.REFINED) {
+            if (text == null || text.isBlank()) {
+                throw new ReviewException(ReviewErrorCode.APPLY_TEXT_REQUIRED);
+            }
+            appliedText = text.strip();
+        }
+        return reviewWriter.apply(userId, reviewId, findingId, type, appliedText);
     }
 
     private ReviewMessageResponse createFollowUp(Long findingId, SavedAnswer saved) {

@@ -12,6 +12,8 @@ import org.project.domain.review.ai.ReviewAiClient;
 import org.project.domain.review.ai.dto.FollowUpInput;
 import org.project.domain.review.ai.dto.QuestionAnswers;
 import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.dto.request.ApplyType;
+import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.dto.response.RefineResponse;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.AnswerResponse;
@@ -148,6 +150,41 @@ class ReviewFindingServiceImplTest {
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
+        }
+    }
+
+    @Nested
+    @DisplayName("문서에 반영")
+    class Apply {
+
+        @Test
+        @DisplayName("다듬은 문장은 앞뒤 공백을 다듬어 저장 쪽에 넘긴다")
+        void refined_trimsAndDelegates() {
+            ApplyResponse saved = new ApplyResponse(3L, "본문", null, null);
+            when(reviewWriter.apply(USER_ID, REVIEW_ID, FINDING_ID, ApplyType.REFINED, "선정 기준: 많이 사기 때문이다."))
+                    .thenReturn(saved);
+
+            assertThat(findingService.apply(USER_ID, REVIEW_ID, FINDING_ID, ApplyType.REFINED, "  선정 기준: 많이 사기 때문이다.\n"))
+                    .isSameAs(saved);
+        }
+
+        @Test
+        @DisplayName("다듬은 문장을 모두 지우고 보내면 APPLY_TEXT_REQUIRED이고 저장하지 않는다")
+        void refinedBlank_throws() {
+            assertThatThrownBy(() -> findingService.apply(USER_ID, REVIEW_ID, FINDING_ID, ApplyType.REFINED, "  "))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.APPLY_TEXT_REQUIRED);
+            verify(reviewWriter, never()).apply(anyLong(), anyLong(), anyLong(), any(), any());
+        }
+
+        @Test
+        @DisplayName("원문 그대로 넣기는 text 없이도 저장 쪽에 넘긴다")
+        void raw_withoutText() {
+            ApplyResponse saved = new ApplyResponse(3L, "본문", null, null);
+            when(reviewWriter.apply(USER_ID, REVIEW_ID, FINDING_ID, ApplyType.RAW, null)).thenReturn(saved);
+
+            assertThat(findingService.apply(USER_ID, REVIEW_ID, FINDING_ID, ApplyType.RAW, null)).isSameAs(saved);
         }
     }
 

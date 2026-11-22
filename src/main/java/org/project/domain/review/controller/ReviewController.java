@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.review.dto.request.ReviewAnswerRequest;
+import org.project.domain.review.dto.request.ReviewApplyRequest;
+import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.dto.request.ReviewStartRequest;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
@@ -115,6 +117,30 @@ public class ReviewController {
             @PathVariable Long findingId
     ) {
         RefineResponse response = findingService.refine(userDetails.getUserId(), reviewId, findingId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "문서에 반영",
+            description = """
+                    미리보기의 [문서에 반영](type=REFINED) / [원문 그대로 넣기](type=RAW) 버튼.
+                    짚은 문장이 있는 줄 바로 다음 줄에 문장을 넣고 카드를 APPLIED로 바꿉니다.
+                    - REFINED: `text`에 미리보기에서 고친 최종 문장을 보냅니다(비어 있으면 400)
+                    - RAW: `text` 없이 보내면 서버가 저장된 내 답을 그대로 넣습니다(다듬기가 실패했어도 가능)
+                    - 응답의 `content`(반영 후 본문 전체)로 **편집기 내용을 반드시 바꿔 주세요.** 자동 저장이 옛 본문으로 덮어쓰면 반영 문장이 사라집니다
+                    - 본문이 바뀌어 짚은 문장을 못 찾으면 409, 이미 반영한 카드면 409
+                    """
+    )
+    @PostMapping("/{reviewId}/findings/{findingId}/apply")
+    @BusinessExceptionDescription(SwaggerResponseDescription.APPLY_FINDING)
+    public ResponseEntity<ApiResponse<ApplyResponse>> apply(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId,
+            @PathVariable Long findingId,
+            @Valid @RequestBody ReviewApplyRequest request
+    ) {
+        ApplyResponse response = findingService.apply(
+                userDetails.getUserId(), reviewId, findingId, request.type(), request.text());
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

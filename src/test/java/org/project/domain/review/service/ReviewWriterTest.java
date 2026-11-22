@@ -5,7 +5,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.memo.event.MemoTextUpdatedEvent;
 import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.dto.request.ApplyType;
+import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.ai.dto.RefineInput;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
@@ -28,6 +31,8 @@ import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.ReviewErrorCode;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
+@RecordApplicationEvents
 @ActiveProfiles("test")
 @Import({QuerydslTestConfig.class, ReviewWriter.class})
 @DisplayName("ReviewWriter 테스트")
@@ -268,6 +274,96 @@ class ReviewWriterTest {
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.ANSWER_REQUIRED);
+        }
+    }
+
+    @Nested
+    @DisplayName("문서에 반영")
+    class Apply {
+
+        private static final String ANCHOR = "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.";
+        private static final String CONTENT = "2. 타깃\n" + ANCHOR + "\n판매자는 졸업 예정자와 3~4학년이다.";
+
+        @Autowired
+        private ReviewMessageRepository messageRepository;
+        @Autowired
+        private ApplicationEvents events;
+
+        @Test
+        @DisplayName("다듬은 문장을 짚은 문장 다음 줄에 넣고, 카드를 반영됨으로 바꾸고, 재임베딩 이벤트를 낸다")
+        void refined_insertsIntoMemoAndMarksApplied() {
+            ReviewFinding finding = saveFindingInMemo(CONTENT);
+
+            ApplyResponse response = reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(),
+                    ApplyType.REFINED, "선정 기준: 1~2학년이 많이 사기 때문이다.");
+
+            String expected = "2. 타깃\n" + ANCHOR + "\n선정 기준: 1~2학년이 많이 사기 때문이다.\n판매자는 졸업 예정자와 3~4학년이다.";
+            assertThat(response.content()).isEqualTo(expected);
+            assertThat(memoRepository.findById(response.memoId()).orElseThrow().getContent()).isEqualTo(expected);
+            assertThat(response.finding().status()).isEqualTo(FindingStatus.APPLIED);
+            assertThat(response.finding().appliedText()).isEqualTo("선정 기준: 1~2학년이 많이 사기 때문이다.");
+            assertThat(findingRepository.findById(finding.getId()).orElseThrow().isApplied()).isTrue();
+            assertThat(events.stream(MemoTextUpdatedEvent.class))
+                    .containsExactly(new MemoTextUpdatedEvent(response.memoId(), userIdOf(finding)));
+        }
+
+        @Test
+        @DisplayName("원문 그대로 넣기는 보낸 text와 상관없이 저장된 내 답을 순서대로 이어 넣는다")
+        void raw_insertsStoredAnswers() {
+            ReviewFinding finding = saveFindingInMemo(CONTENT);
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "음 1~2학년이 많이 사서"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.AI, "후속 질문?"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "홍보는 저학년 위주"));
+
+            ApplyResponse response = reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(),
+                    ApplyType.RAW, "무시되는 문장");
+
+            assertThat(response.finding().appliedText()).isEqualTo("음 1~2학년이 많이 사서\n홍보는 저학년 위주");
+            assertThat(response.content()).contains(ANCHOR + "\n음 1~2학년이 많이 사서\n홍보는 저학년 위주\n");
+        }
+
+        @Test
+        @DisplayName("원문 그대로 넣기인데 답이 없으면 ANSWER_REQUIRED")
+        void rawWithoutAnswers_throws() {
+            ReviewFinding finding = saveFindingInMemo(CONTENT);
+
+            assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.RAW, null))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.ANSWER_REQUIRED);
+        }
+
+        @Test
+        @DisplayName("본문이 바뀌어 짚은 문장을 못 찾으면 ANCHOR_NOT_FOUND이고 반영하지 않는다")
+        void anchorMissing_throws() {
+            ReviewFinding finding = saveFindingInMemo("2. 타깃\n누군가 고쳐 쓴 문장.");
+
+            assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.ANCHOR_NOT_FOUND);
+            assertThat(finding.isApplied()).isFalse();
+            assertThat(events.stream(MemoTextUpdatedEvent.class)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("이미 반영한 카드면 FINDING_ALREADY_APPLIED(두 번 눌러도 한 번만 들어감)")
+        void appliedTwice_throws() {
+            ReviewFinding finding = saveFindingInMemo(CONTENT);
+            reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장");
+
+            assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.FINDING_ALREADY_APPLIED);
+        }
+
+        private ReviewFinding saveFindingInMemo(String content) {
+            User user = userRepository.save(User.createSocialUser("test@test.com", "테스터", null, "google"));
+            Memo memo = memoRepository.save(Memo.createMemo("전공책 중고거래 기획서", content, user));
+            Review review = reviewRepository.save(Review.start(memo, 2, content));
+            return findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, "2. 타깃",
+                    ANCHOR, "제목", "짚은 곳", "근거", "질문"));
         }
     }
 
