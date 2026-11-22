@@ -72,6 +72,13 @@ spring:
               model: gemini-embedding-001
               dimensions: 768
 
+review:
+  min-content-length: 300     # 검토 가능한 최소 본문 길이(제목 제외, 공백 포함)
+  max-findings: 10            # 한 번 검토할 때 최대 빈틈 카드 수
+  ai:
+    model: gemini-2.5-flash-lite
+    analysis-temperature: 0.2 # 같은 글에 비슷한 결과가 나오도록 낮게
+
 memo:
   recommendation:
     cohesion-threshold: 0.62

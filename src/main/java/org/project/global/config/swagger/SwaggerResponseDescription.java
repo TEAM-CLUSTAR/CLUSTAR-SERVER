@@ -114,6 +114,13 @@ public enum SwaggerResponseDescription {
     GET_ACTIVE_REVIEW(new LinkedHashSet<>(Set.of(
             MemoErrorCode.MEMO_NOT_FOUND,
             MemoErrorCode.FORBIDDEN_MEMO
+    ))),
+    START_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.CONTENT_TOO_SHORT,
+            ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
+            ReviewErrorCode.REVIEW_AI_FAILED
     )));
 
     private final Set<ErrorCode> errorCodeList;
