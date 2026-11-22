@@ -3,6 +3,8 @@ package org.project.domain.review.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.review.ai.ReviewAiClient;
+import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.dto.response.RefineResponse;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
@@ -35,6 +37,15 @@ public class ReviewFindingServiceImpl implements ReviewFindingService {
                 : createFollowUp(findingId, saved);
 
         return new AnswerResponse(findingId, saved.status(), saved.answer(), aiMessage);
+    }
+
+    // 재료 준비(읽기 트랜잭션) → AI 다듬기(트랜잭션 밖). 미리보기는 저장하지 않는다(취소는 화면만 닫으면 끝)
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public RefineResponse refine(Long userId, Long reviewId, Long findingId) {
+        RefineInput input = reviewWriter.prepareRefine(userId, reviewId, findingId);
+        String refinedText = reviewAiClient.refine(input);
+        return new RefineResponse(findingId, refinedText, input.rawText());
     }
 
     private ReviewMessageResponse createFollowUp(Long findingId, SavedAnswer saved) {

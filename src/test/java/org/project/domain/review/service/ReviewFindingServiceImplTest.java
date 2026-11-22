@@ -10,6 +10,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.review.ai.ReviewAiClient;
 import org.project.domain.review.ai.dto.FollowUpInput;
+import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.dto.response.RefineResponse;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
@@ -20,6 +23,7 @@ import org.project.global.exception.domainException.ReviewLengthException;
 import org.project.global.exception.errorcode.ReviewErrorCode;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -110,6 +114,40 @@ class ReviewFindingServiceImplTest {
                         assertThat(e.getMessage()).isEqualTo("답변이 너무 길어요. 1000자 이하로 줄여 주세요.");
                     });
             verify(reviewWriter, never()).saveAnswer(anyLong(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.eq("가".repeat(1001)));
+        }
+    }
+
+    @Nested
+    @DisplayName("문장 다듬기")
+    class Refine {
+
+        @Test
+        @DisplayName("저장된 답으로 다듬은 문장과 내 답 원문을 돌려준다")
+        void returnsRefinedAndRawText() {
+            RefineInput input = new RefineInput(3L, "2. 타깃", "짚은 문장", List.of(
+                    new QuestionAnswers("첫 질문", List.of("음 1~2학년이 많이 사서"))));
+            when(reviewWriter.prepareRefine(USER_ID, REVIEW_ID, FINDING_ID)).thenReturn(input);
+            when(reviewAiClient.refine(input)).thenReturn("선정 기준: 1~2학년이 많이 사기 때문이다.");
+
+            RefineResponse response = findingService.refine(USER_ID, REVIEW_ID, FINDING_ID);
+
+            assertThat(response.findingId()).isEqualTo(FINDING_ID);
+            assertThat(response.refinedText()).isEqualTo("선정 기준: 1~2학년이 많이 사기 때문이다.");
+            assertThat(response.rawText()).isEqualTo("음 1~2학년이 많이 사서");
+        }
+
+        @Test
+        @DisplayName("AI가 실패하면 REVIEW_AI_FAILED를 그대로 던진다(프론트가 다시 시도 표시)")
+        void aiFails_throws() {
+            RefineInput input = new RefineInput(3L, "2. 타깃", "짚은 문장", List.of(
+                    new QuestionAnswers("첫 질문", List.of("답"))));
+            when(reviewWriter.prepareRefine(USER_ID, REVIEW_ID, FINDING_ID)).thenReturn(input);
+            when(reviewAiClient.refine(input)).thenThrow(new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED));
+
+            assertThatThrownBy(() -> findingService.refine(USER_ID, REVIEW_ID, FINDING_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
         }
     }
 

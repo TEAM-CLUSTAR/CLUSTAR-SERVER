@@ -51,5 +51,10 @@ public class ReviewProperties {
         @DecimalMin("0.0")
         @DecimalMax("2.0")
         private double questionTemperature;
+
+        // 다듬기는 답에 없는 내용을 보태지 않도록 가장 낮게
+        @DecimalMin("0.0")
+        @DecimalMax("2.0")
+        private double refineTemperature;
     }
 }

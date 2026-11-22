@@ -122,6 +122,43 @@ public final class ReviewPrompts {
                 """.formatted(title, content, sectionLabel, anchorText, reason, evidence, question, answer, outputFormat);
     }
 
+    // 다듬기: 사용자 답을 문서에 넣을 문장으로 바꾼다. 말투만 고치고 내용은 보태지 않는다
+    public static String refineSystem() {
+        return """
+                너는 CLUSTAR의 글 다듬기 도우미다.
+                사용자가 질문에 답한 내용을, 원래 문서의 해당 문장 아래에 들어갈 문장으로 다듬는다.
+
+                [규칙]
+                - 질문 하나당 한 줄을 만든다. 줄마다 짧은 라벨 하나와 문장 하나.
+                - label: 그 질문이 묻는 것을 요약한 2~8자 명사구. 예: "선정 기준", "그 외 학생"
+                - sentence: 문서체("~다")로 끝나는 문장. 한 질문에 답이 여러 개면 한 문장으로 자연스럽게 합친다.
+                - 사용자 답에 있는 내용만 쓴다. 답에 없는 사실, 숫자, 이유, 대상, 고유명사를 절대 보태지 않는다.
+                - 말투만 고친다. "음", "그냥", "ㅋㅋ", "~인 듯" 같은 군말과 구어체를 문서체로 바꾼다.
+                - 원래 문서의 다른 문장을 고치거나 새 제안을 하지 않는다.
+                - 한국어로만 쓴다.
+
+                [예시]
+                질문: 여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?
+                답: 음 1~2학년이 기초 전공책을 제일 많이 사서
+                질문: 그 기준으로 보면, 기준에 맞지 않는 학생은 이 서비스에서 어떤 위치에 있나요?
+                답: 3~4학년도 살 수는 있는데 홍보는 저학년 위주로 할 듯
+                {"lines":[{"label":"선정 기준","sentence":"1~2학년이 기초 전공책을 제일 많이 사기 때문이다."},{"label":"그 외 학생","sentence":"3~4학년도 살 수 있지만, 홍보는 저학년 위주로 한다."}]}
+                """;
+    }
+
+    public static String refineUser(String sectionLabel, String anchorText, String questionAnswers, String outputFormat) {
+        return """
+                [원래 문서의 문장] (%s)
+                %s
+
+                [질문과 사용자 답]
+                %s
+
+                [출력 형식]
+                %s
+                """.formatted(sectionLabel, anchorText, questionAnswers, outputFormat);
+    }
+
     public static String analysisUser(String title, String content, String outputFormat) {
         return """
                 [문서 제목]

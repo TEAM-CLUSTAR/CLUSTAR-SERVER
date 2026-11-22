@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.project.domain.review.ai.dto.AnalysisResult;
 import org.project.domain.review.ai.dto.FollowUpInput;
 import org.project.domain.review.ai.dto.FollowUpResult;
+import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.ai.dto.RefineResult;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.entity.ReviewAiCallLog.ReviewAiCall;
 import org.project.domain.review.entity.ReviewAiCallType;
@@ -24,6 +27,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 // 검토 전용 AI 호출.
 // 공용 ChatClient 빈에는 대화 메모리(MessageChatMemoryAdvisor)가 붙어 있어 쓰지 않고 ChatModel을 직접 부른다.
@@ -34,6 +41,7 @@ import java.util.function.Function;
 public class ReviewAiClient {
 
     private static final String JSON_MIME_TYPE = "application/json";
+    private static final Pattern NUMBER = Pattern.compile("\\d+");
 
     private final ChatModel chatModel;
     private final ReviewProperties properties;
@@ -41,6 +49,7 @@ public class ReviewAiClient {
 
     private final BeanOutputConverter<AnalysisResult> analysisConverter = new BeanOutputConverter<>(AnalysisResult.class);
     private final BeanOutputConverter<FollowUpResult> followUpConverter = new BeanOutputConverter<>(FollowUpResult.class);
+    private final BeanOutputConverter<RefineResult> refineConverter = new BeanOutputConverter<>(RefineResult.class);
 
     // 실패하거나 JSON이 깨지면 1초 → 2초 간격으로 최대 3번 시도한다(기존 RAG 생성과 같은 정책)
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
@@ -88,6 +97,69 @@ public class ReviewAiClient {
     public String recoverFollowUp(Exception e, FollowUpInput input) {
         log.warn("AI 후속 질문 생성 실패(재시도 소진) [memoId={}, error={}]", input.memoId(), e.getMessage());
         throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
+    }
+
+    // 질문별 답을 "라벨: 문장" 줄로 다듬는다. 답에 없던 숫자가 나오면 버리고 다시 요청한다
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
+    public String refine(RefineInput input) {
+        ReviewAiCall call = new ReviewAiCall(
+                input.memoId(),
+                ReviewAiCallType.REFINE,
+                properties.getAi().getModel(),
+                ReviewPrompts.refineSystem(),
+                ReviewPrompts.refineUser(
+                        input.sectionLabel(),
+                        input.anchorText(),
+                        formatQuestionAnswers(input.questionAnswers()),
+                        refineConverter.getFormat()
+                )
+        );
+        return request(call, properties.getAi().getRefineTemperature(), text -> parseRefine(text, input.rawText()));
+    }
+
+    @Recover
+    public String recoverRefine(Exception e, RefineInput input) {
+        log.warn("AI 다듬기 실패(재시도 소진) [memoId={}, error={}]", input.memoId(), e.getMessage());
+        throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
+    }
+
+    private String formatQuestionAnswers(List<QuestionAnswers> questionAnswers) {
+        return IntStream.range(0, questionAnswers.size())
+                .mapToObj(i -> {
+                    QuestionAnswers qa = questionAnswers.get(i);
+                    return "%d. 질문: %s\n   답: %s".formatted(i + 1, qa.question(), String.join(" / ", qa.answers()));
+                })
+                .collect(Collectors.joining("\n"));
+    }
+
+    private String parseRefine(String text, String rawAnswers) {
+        RefineResult result = refineConverter.convert(text);
+        if (result == null || result.lines() == null || result.lines().isEmpty()) {
+            throw new IllegalStateException("문장이 없는 다듬기 응답");
+        }
+
+        List<String> lines = result.lines().stream()
+                .filter(line -> line.label() != null && !line.label().isBlank())
+                .filter(line -> line.sentence() != null && !line.sentence().isBlank())
+                .map(line -> line.label().trim() + ": " + line.sentence().trim())
+                .toList();
+        if (lines.isEmpty()) {
+            throw new IllegalStateException("라벨이나 문장이 비어 있는 다듬기 응답");
+        }
+
+        String refined = String.join("\n", lines);
+        rejectNewNumbers(refined, rawAnswers);
+        return refined;
+    }
+
+    // "답에 없는 내용은 넣지 않는다"는 약속을 값싸게 지키는 장치: 답에 없던 숫자가 나오면 실패로 본다
+    private void rejectNewNumbers(String refined, String rawAnswers) {
+        Matcher matcher = NUMBER.matcher(refined);
+        while (matcher.find()) {
+            if (!rawAnswers.contains(matcher.group())) {
+                throw new IllegalStateException("답에 없던 숫자가 다듬은 문장에 들어감: " + matcher.group());
+            }
+        }
     }
 
     // 한 번 호출하고, 응답을 해석하고, 성공/실패를 기록한다

@@ -95,6 +95,7 @@ review:
     model: gemini-2.5-flash
     analysis-temperature: 0.2 # 같은 글에 비슷한 결과가 나오도록 낮게
     question-temperature: 0.3 # 후속 질문은 답에 맞춰 조금 더 유연하게
+    refine-temperature: 0.1   # 다듬기는 답에 없는 내용을 보태지 않도록 가장 낮게
 
 memo:
   recommendation:

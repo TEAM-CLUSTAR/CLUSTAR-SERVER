@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.RefineInput;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
@@ -216,20 +218,71 @@ class ReviewWriterTest {
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.FINDING_ALREADY_APPLIED);
         }
+    }
 
-        private ReviewFinding saveActiveFinding() {
-            Review review = reviewRepository.save(Review.start(saveMemo(), 2, "본문"));
-            return findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, "2. 타깃",
-                    "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", "제목", "짚은 곳", "근거", "질문"));
+    @Nested
+    @DisplayName("다듬기 재료 준비")
+    class PrepareRefine {
+
+        @Autowired
+        private ReviewMessageRepository messageRepository;
+
+        @Test
+        @DisplayName("답을 질문별로 묶는다: 후속 질문 전의 답은 첫 질문에, 후의 답은 후속 질문에")
+        void groupsAnswersByQuestion() {
+            ReviewFinding finding = saveActiveFinding();
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "음 1~2학년이 많이 사서"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.AI, "그 기준으로 보면 어떤 위치에 있나요?"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "3~4학년도 살 수는 있음"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "홍보는 저학년 위주로 할 듯"));
+
+            RefineInput input = reviewWriter.prepareRefine(userIdOf(finding), reviewIdOf(finding), finding.getId());
+
+            assertThat(input.anchorText()).isEqualTo("전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.");
+            assertThat(input.questionAnswers()).containsExactly(
+                    new QuestionAnswers("질문", List.of("음 1~2학년이 많이 사서")),
+                    new QuestionAnswers("그 기준으로 보면 어떤 위치에 있나요?",
+                            List.of("3~4학년도 살 수는 있음", "홍보는 저학년 위주로 할 듯"))
+            );
+            assertThat(input.rawText()).isEqualTo("음 1~2학년이 많이 사서\n3~4학년도 살 수는 있음\n홍보는 저학년 위주로 할 듯");
         }
 
-        private Long userIdOf(ReviewFinding finding) {
-            return finding.getReview().getMemo().getUser().getId();
+        @Test
+        @DisplayName("답하지 않은 후속 질문은 빼고 묶는다")
+        void skipsUnansweredQuestion() {
+            ReviewFinding finding = saveActiveFinding();
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "첫 답"));
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.AI, "후속 질문?"));
+
+            RefineInput input = reviewWriter.prepareRefine(userIdOf(finding), reviewIdOf(finding), finding.getId());
+
+            assertThat(input.questionAnswers()).containsExactly(new QuestionAnswers("질문", List.of("첫 답")));
         }
 
-        private Long reviewIdOf(ReviewFinding finding) {
-            return finding.getReview().getId();
+        @Test
+        @DisplayName("답이 하나도 없으면 ANSWER_REQUIRED")
+        void noAnswers_throws() {
+            ReviewFinding finding = saveActiveFinding();
+
+            assertThatThrownBy(() -> reviewWriter.prepareRefine(userIdOf(finding), reviewIdOf(finding), finding.getId()))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.ANSWER_REQUIRED);
         }
+    }
+
+    private ReviewFinding saveActiveFinding() {
+        Review review = reviewRepository.save(Review.start(saveMemo(), 2, "본문"));
+        return findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, "2. 타깃",
+                "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", "제목", "짚은 곳", "근거", "질문"));
+    }
+
+    private Long userIdOf(ReviewFinding finding) {
+        return finding.getReview().getMemo().getUser().getId();
+    }
+
+    private Long reviewIdOf(ReviewFinding finding) {
+        return finding.getReview().getId();
     }
 
     private Memo saveMemo() {

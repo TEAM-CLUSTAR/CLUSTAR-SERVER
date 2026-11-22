@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.project.domain.review.ai.dto.AnalysisResult;
 import org.project.domain.review.ai.dto.FollowUpInput;
+import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.RefineInput;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.ReviewErrorCode;
@@ -139,6 +141,44 @@ class ReviewAiClientTest {
         assertThat(chatModel.callCount()).isEqualTo(3);
     }
 
+    @Test
+    @DisplayName("다듬기: 질문별 라벨과 문장을 '라벨: 문장' 줄로 이어 돌려주고, 질문과 답을 담아 호출한다")
+    void refine_joinsLabeledLines() {
+        chatModel.respond("""
+                {"lines":[{"label":"선정 기준","sentence":"1~2학년이 기초 전공책을 제일 많이 사기 때문이다."},
+                {"label":"그 외 학생","sentence":"3~4학년도 살 수 있지만, 홍보는 저학년 위주로 한다."}]}
+                """);
+
+        String refined = reviewAiClient.refine(refineInput());
+
+        assertThat(refined).isEqualTo("선정 기준: 1~2학년이 기초 전공책을 제일 많이 사기 때문이다.\n"
+                + "그 외 학생: 3~4학년도 살 수 있지만, 홍보는 저학년 위주로 한다.");
+        Prompt prompt = chatModel.lastPrompt();
+        assertThat(prompt.getContents()).contains("음 1~2학년이 기초 전공책을 제일 많이 사서", "3~4학년도 살 수는 있는데 홍보는 저학년 위주로 할 듯");
+        assertThat(((GoogleGenAiChatOptions) prompt.getOptions()).getTemperature()).isEqualTo(0.1);
+    }
+
+    @Test
+    @DisplayName("다듬기: 답에 없던 숫자가 나오면 버리고 다시 요청한다")
+    void refine_retriesWhenNewNumberAppears() {
+        chatModel.respond("{\"lines\":[{\"label\":\"선정 기준\",\"sentence\":\"1~2학년이 전체 구매의 70%를 차지하기 때문이다.\"}]}");
+        chatModel.respond("{\"lines\":[{\"label\":\"선정 기준\",\"sentence\":\"1~2학년이 기초 전공책을 제일 많이 사기 때문이다.\"}]}");
+
+        String refined = reviewAiClient.refine(refineInput());
+
+        assertThat(refined).isEqualTo("선정 기준: 1~2학년이 기초 전공책을 제일 많이 사기 때문이다.");
+        assertThat(chatModel.callCount()).isEqualTo(2);
+    }
+
+    private RefineInput refineInput() {
+        return new RefineInput(3L, "2. 타깃", "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", List.of(
+                new QuestionAnswers("여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
+                        List.of("음 1~2학년이 기초 전공책을 제일 많이 사서")),
+                new QuestionAnswers("그 기준으로 보면, 기준에 맞지 않는 학생은 어떤 위치에 있나요?",
+                        List.of("3~4학년도 살 수는 있는데 홍보는 저학년 위주로 할 듯"))
+        ));
+    }
+
     private FollowUpInput followUpInput() {
         return new FollowUpInput(3L, "전공책 중고거래 기획서", "본문", "2. 타깃",
                 "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.",
@@ -169,6 +209,7 @@ class ReviewAiClientTest {
             properties.getAi().setModel("test-model");
             properties.getAi().setAnalysisTemperature(0.2);
             properties.getAi().setQuestionTemperature(0.3);
+            properties.getAi().setRefineTemperature(0.1);
             return properties;
         }
     }

@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.review.ai.dto.FollowUpInput;
+import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.RefineInput;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
@@ -52,6 +54,40 @@ public class ReviewWriter {
 
         FollowUpInput followUpInput = firstAnswer ? toFollowUpInput(finding, content) : null;
         return new SavedAnswer(ReviewMessageResponse.from(answer), finding.getStatus(), followUpInput);
+    }
+
+    // 다듬기 재료를 모은다(쓰기 없음). 대화를 순서대로 보며 AI 후속 질문이 나오면 새 질문으로 넘기고,
+    // 사용자 답은 직전 질문에 붙인다. 답이 없는 질문은 뺀다
+    @Transactional(readOnly = true)
+    public RefineInput prepareRefine(Long userId, Long reviewId, Long findingId) {
+        ReviewFinding finding = getAnswerableFinding(userId, reviewId, findingId);
+        List<ReviewMessage> messages = messageRepository.findByFindingIdInOrderByIdAsc(List.of(findingId));
+
+        List<QuestionAnswers> questionAnswers = new ArrayList<>();
+        String currentQuestion = finding.getQuestion();
+        List<String> currentAnswers = new ArrayList<>();
+        for (ReviewMessage message : messages) {
+            if (message.getRole() == ReviewMessageRole.AI) {
+                addIfAnswered(questionAnswers, currentQuestion, currentAnswers);
+                currentQuestion = message.getContent();
+                currentAnswers = new ArrayList<>();
+            } else {
+                currentAnswers.add(message.getContent());
+            }
+        }
+        addIfAnswered(questionAnswers, currentQuestion, currentAnswers);
+
+        if (questionAnswers.isEmpty()) {
+            throw new ReviewException(ReviewErrorCode.ANSWER_REQUIRED);
+        }
+        Memo memo = finding.getReview().getMemo();
+        return new RefineInput(memo.getId(), finding.getSectionLabel(), finding.getAnchorText(), questionAnswers);
+    }
+
+    private void addIfAnswered(List<QuestionAnswers> questionAnswers, String question, List<String> answers) {
+        if (!answers.isEmpty()) {
+            questionAnswers.add(new QuestionAnswers(question, List.copyOf(answers)));
+        }
     }
 
     public ReviewMessageResponse saveAiMessage(Long findingId, String content) {

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.FindingResponse;
+import org.project.domain.review.dto.response.RefineResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
@@ -240,6 +241,42 @@ class ReviewControllerTest {
                 .andExpect(jsonPath("$.msg").value("본문이 짧아 검토할 수 없어요. 300자 이상 작성해 주세요."))
                 .andExpect(jsonPath("$.data.currentLength").doesNotExist())
                 .andExpect(jsonPath("$.data.minLength").value(300));
+    }
+
+    @Test
+    @DisplayName("다듬기는 다듬은 문장과 내 답 원문을 내려준다")
+    @WithMockCustomUser
+    void refine_ok() throws Exception {
+        when(findingService.refine(1L, 12L, 101L)).thenReturn(new RefineResponse(
+                101L, "선정 기준: 1~2학년이 많이 사기 때문이다.", "음 1~2학년이 많이 사서"));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/refine"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.findingId").value(101))
+                .andExpect(jsonPath("$.data.refinedText").value("선정 기준: 1~2학년이 많이 사기 때문이다."))
+                .andExpect(jsonPath("$.data.rawText").value("음 1~2학년이 많이 사서"));
+    }
+
+    @Test
+    @DisplayName("답이 없으면 다듬기는 400")
+    @WithMockCustomUser
+    void refine_noAnswers() throws Exception {
+        when(findingService.refine(1L, 12L, 101L)).thenThrow(new ReviewException(ReviewErrorCode.ANSWER_REQUIRED));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/refine"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    @DisplayName("다듬기 AI가 실패하면 503")
+    @WithMockCustomUser
+    void refine_aiFailed() throws Exception {
+        when(findingService.refine(1L, 12L, 101L)).thenThrow(new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/refine"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(503));
     }
 
     @Test

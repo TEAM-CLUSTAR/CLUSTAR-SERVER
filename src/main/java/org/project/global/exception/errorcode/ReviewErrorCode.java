@@ -12,7 +12,8 @@ public enum ReviewErrorCode implements ErrorCode {
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "진행 중인 검토를 찾을 수 없습니다."),
     FINDING_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 빈틈을 찾을 수 없습니다."),
     FINDING_ALREADY_APPLIED(HttpStatus.CONFLICT, 409, "이미 반영된 빈틈입니다."),
-    ANSWER_TOO_LONG(HttpStatus.BAD_REQUEST, 400, "답변이 너무 길어요. 최대 글자 수 이하로 줄여 주세요.");
+    ANSWER_TOO_LONG(HttpStatus.BAD_REQUEST, 400, "답변이 너무 길어요. 최대 글자 수 이하로 줄여 주세요."),
+    ANSWER_REQUIRED(HttpStatus.BAD_REQUEST, 400, "답을 1개 이상 작성해야 반영할 수 있어요.");
 
     private final HttpStatus status;
     private final int code;

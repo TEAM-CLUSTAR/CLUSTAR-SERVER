@@ -8,6 +8,7 @@ import org.project.domain.review.dto.request.ReviewAnswerRequest;
 import org.project.domain.review.dto.request.ReviewStartRequest;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
+import org.project.domain.review.dto.response.RefineResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.service.ReviewFindingService;
 import org.project.domain.review.service.ReviewService;
@@ -93,6 +94,27 @@ public class ReviewController {
             @Valid @RequestBody ReviewAnswerRequest request
     ) {
         AnswerResponse response = findingService.answer(userDetails.getUserId(), reviewId, findingId, request.content());
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "문장 다듬기",
+            description = """
+                    카드 아래 [반영하기] 버튼. 지금까지 보낸 답만 재료로, 문서에 넣을 문장으로 다듬어 돌려줍니다.
+                    - `refinedText`: 질문마다 "라벨: 문장" 한 줄씩. 본문의 짚은 문장 아래 미리보기 편집창에 넣습니다
+                    - `rawText`: 내 답 원문. '원문 비교'에 보여줍니다
+                    - 서버에 저장하지 않습니다. [취소]는 서버 호출 없이 화면만 닫으면 됩니다
+                    - 답이 없으면 400, AI 실패 시 503([다시 시도] 표시. [원문 그대로 넣기]는 계속 가능)
+                    """
+    )
+    @PostMapping("/{reviewId}/findings/{findingId}/refine")
+    @BusinessExceptionDescription(SwaggerResponseDescription.REFINE_FINDING)
+    public ResponseEntity<ApiResponse<RefineResponse>> refine(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId,
+            @PathVariable Long findingId
+    ) {
+        RefineResponse response = findingService.refine(userDetails.getUserId(), reviewId, findingId);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }
