@@ -148,6 +148,11 @@ public enum SwaggerResponseDescription {
             ReviewErrorCode.APPLY_TEXT_REQUIRED,
             ReviewErrorCode.ANSWER_REQUIRED,
             ReviewErrorCode.ANCHOR_NOT_FOUND
+    ))),
+    END_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND
     )));
 
     private final Set<ErrorCode> errorCodeList;

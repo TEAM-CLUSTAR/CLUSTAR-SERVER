@@ -7,6 +7,7 @@ import org.project.domain.review.ai.ReviewAiClient;
 import org.project.domain.review.ai.dto.AnalysisResult;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.EndReviewResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
@@ -75,6 +76,26 @@ public class ReviewServiceImpl implements ReviewService {
             // 동시에 두 요청이 같은 버전을 저장하려 하면 (memo_id, version) 유니크 제약에 걸린다
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
+    }
+
+    // 반영 문장은 반영할 때 이미 본문에 들어갔고 재임베딩도 끝났으므로, 상태만 '종료'로 바꾼다.
+    // 반영하지 않은 카드는 화면에서만 사라지고 기록(버전)에는 남는다
+    @Override
+    @Transactional
+    public EndReviewResponse endReview(Long userId, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .filter(Review::isActive)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+        Memo memo = review.getMemo();
+        if (Boolean.TRUE.equals(memo.getIsDeleted())) {
+            throw new MemoException(MemoErrorCode.MEMO_NOT_FOUND);
+        }
+        if (!memo.getUser().getId().equals(userId)) {
+            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
+        }
+
+        review.end();
+        return new EndReviewResponse(memo.getId(), review.getVersion());
     }
 
     @Override

@@ -62,6 +62,11 @@ public class Review extends BaseEntity {
         return review;
     }
 
+    // 검토 종료 / 다시 검토로 넘어갈 때. 지우지 않고 기록으로 남긴다
+    public void end() {
+        this.status = ReviewStatus.ENDED;
+    }
+
     public boolean isActive() {
         return this.status == ReviewStatus.ACTIVE;
     }

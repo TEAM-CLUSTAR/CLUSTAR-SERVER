@@ -1,6 +1,7 @@
 package org.project.domain.review.service;
 
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.EndReviewResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 
 public interface ReviewService {
@@ -10,4 +11,7 @@ public interface ReviewService {
 
     // 메모의 현재 버전과 진행 중인 검토(카드·대화 포함)를 조회한다
     ActiveReviewResponse getActiveReview(Long userId, Long memoId);
+
+    // 진행 중 검토를 종료한다(카드·대화·반영 결과는 기록으로 남는다)
+    EndReviewResponse endReview(Long userId, Long reviewId);
 }

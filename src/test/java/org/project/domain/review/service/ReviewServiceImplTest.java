@@ -15,6 +15,7 @@ import org.project.domain.review.ai.dto.AnalysisResult;
 import org.project.domain.review.ai.dto.FindingDraft;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.EndReviewResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
@@ -274,6 +275,58 @@ class ReviewServiceImplTest {
                     .extracting("errorCode")
                     .isEqualTo(MemoErrorCode.FORBIDDEN_MEMO);
             verify(reviewRepository, never()).findLatestVersion(anyLong());
+        }
+    }
+
+    @Nested
+    @DisplayName("검토 종료")
+    class EndReview {
+
+        private static final Long REVIEW_ID = 12L;
+
+        @Test
+        @DisplayName("진행 중 검토를 종료로 바꾸고(기록은 남김) 메모 ID와 현재 버전을 돌려준다")
+        void endsActiveReview() {
+            Review review = withId(Review.start(withId(Memo.createMemo("제목", "본문", user(USER_ID)), MEMO_ID), 3, "본문"), REVIEW_ID);
+            when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(review));
+
+            EndReviewResponse response = reviewService.endReview(USER_ID, REVIEW_ID);
+
+            assertThat(review.getStatus()).isEqualTo(ReviewStatus.ENDED);
+            assertThat(response.memoId()).isEqualTo(MEMO_ID);
+            assertThat(response.currentVersion()).isEqualTo(3);
+            verify(reviewRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("없거나 이미 종료된 검토면 REVIEW_NOT_FOUND")
+        void notActive_throws() {
+            Review ended = withId(Review.start(withId(Memo.createMemo("제목", "본문", user(USER_ID)), MEMO_ID), 3, "본문"), REVIEW_ID);
+            ReflectionTestUtils.setField(ended, "status", ReviewStatus.ENDED);
+            when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(ended));
+            when(reviewRepository.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> reviewService.endReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+            assertThatThrownBy(() -> reviewService.endReview(USER_ID, 99L))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("남의 검토면 FORBIDDEN_MEMO이고 종료하지 않는다")
+        void othersReview_throws() {
+            Review review = withId(Review.start(withId(Memo.createMemo("제목", "본문", user(2L)), MEMO_ID), 3, "본문"), REVIEW_ID);
+            when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(review));
+
+            assertThatThrownBy(() -> reviewService.endReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(MemoException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(MemoErrorCode.FORBIDDEN_MEMO);
+            assertThat(review.getStatus()).isEqualTo(ReviewStatus.ACTIVE);
         }
     }
 

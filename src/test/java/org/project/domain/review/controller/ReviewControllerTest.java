@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.project.domain.review.dto.request.ApplyType;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.ApplyResponse;
+import org.project.domain.review.dto.response.EndReviewResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.RefineResponse;
@@ -323,6 +324,29 @@ class ReviewControllerTest {
                         .content("{\"type\": \"REFINED\", \"text\": \"문장\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    @DisplayName("검토를 종료하면 메모 ID와 현재 버전을 내려준다")
+    @WithMockCustomUser
+    void end_ok() throws Exception {
+        when(reviewService.endReview(1L, 12L)).thenReturn(new EndReviewResponse(3L, 3));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/end"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memoId").value(3))
+                .andExpect(jsonPath("$.data.currentVersion").value(3));
+    }
+
+    @Test
+    @DisplayName("이미 종료된 검토면 404")
+    @WithMockCustomUser
+    void end_notFound() throws Exception {
+        when(reviewService.endReview(1L, 12L)).thenThrow(new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/end"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
     }
 
     @Test

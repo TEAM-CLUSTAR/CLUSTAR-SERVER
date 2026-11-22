@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.project.domain.review.dto.request.ReviewAnswerRequest;
 import org.project.domain.review.dto.request.ReviewApplyRequest;
 import org.project.domain.review.dto.response.ApplyResponse;
+import org.project.domain.review.dto.response.EndReviewResponse;
 import org.project.domain.review.dto.request.ReviewStartRequest;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.AnswerResponse;
@@ -75,6 +76,26 @@ public class ReviewController {
     ) {
         ReviewResponse response = reviewService.startReview(userDetails.getUserId(), request.memoId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
+    }
+
+    @Operation(
+            summary = "검토 종료",
+            description = """
+                    [검토 종료] 버튼. 진행 중 검토를 끝내고 01 기본 화면으로 돌아갑니다.
+                    - 반영한 문장은 이미 본문에 들어가 있으므로 따로 합칠 것이 없습니다(반영 블록 표시만 없애면 됩니다)
+                    - 반영하지 않은 카드와 답은 화면에서 사라지지만, 버전 기록으로는 남습니다
+                    - 응답의 `currentVersion`을 '문서 vN'에 쓰고, 4-t 안내 문구('검토를 마쳤어요…')는 프론트가 띄웁니다
+                    - 없거나 이미 종료된 검토면 404
+                    """
+    )
+    @PostMapping("/{reviewId}/end")
+    @BusinessExceptionDescription(SwaggerResponseDescription.END_REVIEW)
+    public ResponseEntity<ApiResponse<EndReviewResponse>> endReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId
+    ) {
+        EndReviewResponse response = reviewService.endReview(userDetails.getUserId(), reviewId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @Operation(
