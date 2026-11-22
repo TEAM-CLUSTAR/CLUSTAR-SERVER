@@ -13,7 +13,10 @@ import org.project.domain.review.service.ReviewService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.entity.User;
 import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.exception.errorcode.ReviewErrorCode;
+import org.springframework.http.MediaType;
 import org.project.global.security.filter.JWTFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,8 +35,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -98,6 +105,54 @@ class ReviewControllerTest {
         mockMvc.perform(get("/api/v1/ai/reviews/active").param("memoId", "3"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    @DisplayName("검토를 시작하면 201과 새 버전의 카드 목록을 내려준다")
+    @WithMockCustomUser
+    void startReview_created() throws Exception {
+        FindingResponse finding = new FindingResponse(
+                101L, 1, FindingCategory.CRITERIA, "2. 타깃",
+                "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.",
+                "타깃 학년을 고른 기준이 없어요", "짚은 곳", "근거", "질문",
+                FindingStatus.OPEN, List.of(), null
+        );
+        when(reviewService.startReview(1L, 3L)).thenReturn(new ReviewResponse(12L, 2, List.of(finding)));
+
+        mockMvc.perform(post("/api/v1/ai/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memoId\": 3}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(201))
+                .andExpect(jsonPath("$.data.reviewId").value(12))
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.findings[0].status").value("OPEN"))
+                .andExpect(jsonPath("$.data.findings[0].messages").isEmpty());
+    }
+
+    @Test
+    @DisplayName("memoId가 없으면 400이고 서비스를 부르지 않는다")
+    @WithMockCustomUser
+    void startReview_missingMemoId() throws Exception {
+        mockMvc.perform(post("/api/v1/ai/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        verify(reviewService, never()).startReview(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("이미 검토 중이면 409")
+    @WithMockCustomUser
+    void startReview_alreadyInProgress() throws Exception {
+        when(reviewService.startReview(1L, 3L))
+                .thenThrow(new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS));
+
+        mockMvc.perform(post("/api/v1/ai/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memoId\": 3}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
     }
 
     @Retention(RetentionPolicy.RUNTIME)

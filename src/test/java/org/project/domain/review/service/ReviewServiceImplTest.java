@@ -6,11 +6,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.review.ai.ReviewAiClient;
+import org.project.domain.review.ai.dto.AnalysisResult;
+import org.project.domain.review.ai.dto.FindingDraft;
+import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.FindingResponse;
+import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
 import org.project.domain.review.entity.FindingStatus;
 import org.project.domain.review.entity.Review;
@@ -21,9 +27,13 @@ import org.project.domain.review.entity.ReviewStatus;
 import org.project.domain.review.repository.ReviewFindingRepository;
 import org.project.domain.review.repository.ReviewMessageRepository;
 import org.project.domain.review.repository.ReviewRepository;
+import org.project.domain.review.support.ValidFindingDraft;
 import org.project.domain.user.entity.User;
 import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.exception.errorcode.ReviewErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -31,7 +41,11 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +67,120 @@ class ReviewServiceImplTest {
     private ReviewFindingRepository findingRepository;
     @Mock
     private ReviewMessageRepository messageRepository;
+    @Mock
+    private ReviewAiClient reviewAiClient;
+    @Mock
+    private ReviewWriter reviewWriter;
+    @Spy
+    private ReviewProperties reviewProperties = properties();
+
+    @Nested
+    @DisplayName("검토 시작")
+    class StartReview {
+
+        private static final String ANCHOR = "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.";
+
+        @Test
+        @DisplayName("본문이 300자(공백 포함) 이상이면 AI 분석 결과를 걸러서 저장하고 돌려준다")
+        void enoughContent_analyzesAndSaves() {
+            String content = contentOfLength(300);
+            givenMyMemo(content);
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
+            when(reviewAiClient.analyze(MEMO_ID, "전공책 중고거래 기획서", content)).thenReturn(new AnalysisResult(List.of(
+                    draft(ANCHOR), draft("본문에 없는 문장.")
+            )));
+            ReviewResponse saved = new ReviewResponse(12L, 2, List.of());
+            when(reviewWriter.saveNewReview(eq(MEMO_ID), eq(content), any())).thenReturn(saved);
+
+            ReviewResponse response = reviewService.startReview(USER_ID, MEMO_ID);
+
+            assertThat(response).isSameAs(saved);
+            verify(reviewWriter).saveNewReview(eq(MEMO_ID), eq(content), argThat((List<ValidFindingDraft> drafts) ->
+                    drafts.size() == 1 && drafts.get(0).anchorText().equals(ANCHOR)));
+        }
+
+        @Test
+        @DisplayName("본문이 300자 미만이면 CONTENT_TOO_SHORT이고 AI를 부르지 않는다")
+        void shortContent_throws() {
+            givenMyMemo(contentOfLength(299));
+
+            assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.CONTENT_TOO_SHORT);
+            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("이미 검토 중이면 REVIEW_ALREADY_IN_PROGRESS이고 AI를 부르지 않는다")
+        void alreadyInProgress_throws() {
+            Memo memo = givenMyMemo(contentOfLength(300));
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE))
+                    .thenReturn(Optional.of(Review.start(memo, 2, "본문")));
+
+            assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("AI가 빈틈을 줬는데 전부 본문에 없으면 REVIEW_AI_FAILED이고 저장하지 않는다")
+        void allDraftsInvalid_throws() {
+            String content = contentOfLength(300);
+            givenMyMemo(content);
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString()))
+                    .thenReturn(new AnalysisResult(List.of(draft("본문에 없는 문장."))));
+
+            assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
+            verify(reviewWriter, never()).saveNewReview(anyLong(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("AI가 빈틈을 찾지 못하면 카드 없는 검토로 저장한다")
+        void noFindings_savesEmptyReview() {
+            String content = contentOfLength(300);
+            givenMyMemo(content);
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewWriter.saveNewReview(eq(MEMO_ID), eq(content), eq(List.of())))
+                    .thenReturn(new ReviewResponse(12L, 2, List.of()));
+
+            assertThat(reviewService.startReview(USER_ID, MEMO_ID).findings()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("동시에 두 요청이 같은 버전을 저장하려 하면 REVIEW_ALREADY_IN_PROGRESS")
+        void concurrentStart_throws() {
+            String content = contentOfLength(300);
+            givenMyMemo(content);
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewWriter.saveNewReview(anyLong(), anyString(), any()))
+                    .thenThrow(new DataIntegrityViolationException("uk_review_memo_version"));
+
+            assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+
+        // 공백을 섞어 정확히 length 글자(제목 제외, 공백 포함)인 본문. 앞에 짚을 문장이 들어 있다
+        private String contentOfLength(int length) {
+            String base = ANCHOR + "\n";
+            return base + "가 ".repeat(length).substring(0, length - base.length());
+        }
+
+        private FindingDraft draft(String anchorText) {
+            return new FindingDraft("CRITERIA", "2. 타깃", anchorText,
+                    "타깃 학년을 고른 기준이 없어요", "짚은 곳", "근거", "질문");
+        }
+    }
 
     @Nested
     @DisplayName("현재 검토 조회")
@@ -147,9 +275,20 @@ class ReviewServiceImplTest {
     }
 
     private Memo givenMyMemo() {
-        Memo memo = withId(Memo.createMemo("전공책 중고거래 기획서", "본문", user(USER_ID)), MEMO_ID);
+        return givenMyMemo("본문");
+    }
+
+    private Memo givenMyMemo(String content) {
+        Memo memo = withId(Memo.createMemo("전공책 중고거래 기획서", content, user(USER_ID)), MEMO_ID);
         when(memoRepository.findByIdAndNotDeleted(MEMO_ID)).thenReturn(Optional.of(memo));
         return memo;
+    }
+
+    private static ReviewProperties properties() {
+        ReviewProperties properties = new ReviewProperties();
+        properties.setMinContentLength(300);
+        properties.setMaxFindings(10);
+        return properties;
     }
 
     private User user(Long id) {
