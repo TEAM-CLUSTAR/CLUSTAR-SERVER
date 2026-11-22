@@ -103,6 +103,10 @@ memo:
     text-weak-max-results: 3
     max-total-results: 10
     recent-viewed-limit: 6
+  trash:
+    retention-days: 30          # 휴지통 보존 기간(일)
+    purge-cron: "0 30 4 * * *"  # 매일 04:30 (S3 미참조 정리 04:00 이후)
+    purge-batch-size: 100
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
