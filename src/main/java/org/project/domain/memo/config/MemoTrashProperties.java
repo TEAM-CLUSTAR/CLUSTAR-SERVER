@@ -21,4 +21,8 @@ public class MemoTrashProperties {
     // 자동 영구 삭제 시 한 트랜잭션에서 지울 메모 수
     @Min(1)
     private int purgeBatchSize;
+
+    // 휴지통 목록 한 번에 조회할 수 있는 최대 개수 (size 파라미터 상한)
+    @Min(1)
+    private int maxPageSize;
 }

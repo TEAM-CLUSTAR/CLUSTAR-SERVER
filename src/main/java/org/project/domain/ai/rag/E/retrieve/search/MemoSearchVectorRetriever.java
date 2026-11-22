@@ -36,7 +36,7 @@ public class MemoSearchVectorRetriever {
         try {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
             var filter = memoIdFilter == null
-                    ? b.eq("userId", userId)
+                    ? excludeTrashed(b, userId)
                     : b.and(b.eq("userId", userId), b.in("memoId", memoIdFilter.toArray()));
 
             // threshold는 여기서 걸지 않고 topK 후보를 전부 받아서 애플리케이션 레벨에서 거른다.
@@ -97,5 +97,14 @@ public class MemoSearchVectorRetriever {
             log.warn("[MemoSearchVectorRetriever] 벡터 검색 실패: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    // 휴지통 메모는 복원에 대비해 벡터가 남아 있으므로, topK 후보를 차지하지 않도록 검색 단계에서 뺀다.
+    // (memoIdFilter가 있으면 이미 살아 있는 메모 id로 좁혀진 상태라 필요 없음)
+    private FilterExpressionBuilder.Op excludeTrashed(FilterExpressionBuilder b, Long userId) {
+        List<Long> trashedIds = memoRepository.findTrashedIdsByUserId(userId);
+        return trashedIds.isEmpty()
+                ? b.eq("userId", userId)
+                : b.and(b.eq("userId", userId), b.nin("memoId", trashedIds.toArray()));
     }
 }

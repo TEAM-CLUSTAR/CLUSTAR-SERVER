@@ -316,8 +316,9 @@ public class MemoController {
             휴지통에 있는 메모를 휴지통으로 옮긴 최신순으로 조회합니다.
             - totalCount는 휴지통 전체 메모 수입니다(사이드바 개수 표시용).
             - 다음 페이지 조회 시 마지막 카드의 deletedAt과 memoId를 각각 cursorDeletedAt, cursorMemoId로 전달합니다.
+            - size는 1~100 (기본 20). 범위를 벗어나면 400입니다.
             """)
-    @BusinessExceptionDescription(SwaggerResponseDescription.GET_MEMOS)
+    @BusinessExceptionDescription(SwaggerResponseDescription.GET_TRASH_MEMOS)
     public ResponseEntity<ApiResponse<MemoTrashListResponse>> getTrashMemos(
             @AuthenticationPrincipal CustomUserDetails userDetails,
 

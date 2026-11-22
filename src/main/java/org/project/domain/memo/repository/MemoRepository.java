@@ -100,9 +100,9 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     @Query("SELECT COUNT(m) FROM Memo m WHERE m.user.id = :userId AND m.id IN :memoIds AND m.isDeleted = true")
     long countTrashedByIdInAndUserId(@Param("userId") Long userId, @Param("memoIds") List<Long> memoIds);
 
-    // 보존 기간이 지난 휴지통 메모 id (자동 영구 삭제용, 배치 크기만큼씩)
-    @Query("SELECT m.id FROM Memo m WHERE m.isDeleted = true AND m.deletedAt < :cutoff ORDER BY m.id")
-    List<Long> findExpiredTrashedIds(@Param("cutoff") LocalDateTime cutoff, Pageable pageable);
+    // 보존 기간이 지난 휴지통 메모 id (자동 영구 삭제용). afterId보다 큰 id만 배치 크기만큼씩 (ID 커서)
+    @Query("SELECT m.id FROM Memo m WHERE m.isDeleted = true AND m.deletedAt < :cutoff AND m.id > :afterId ORDER BY m.id")
+    List<Long> findExpiredTrashedIds(@Param("cutoff") LocalDateTime cutoff, @Param("afterId") long afterId, Pageable pageable);
 
     // 영구 삭제 직전에 대상 행을 잠근다. 같은 메모의 복원과 동시에 실행돼도
     // "복원됐는데 태그/첨부만 지워진" 상태가 생기지 않도록, 잠근 휴지통 메모만 삭제 대상으로 삼는다.
@@ -110,6 +110,11 @@ public interface MemoRepository extends JpaRepository<Memo,Long>, MemoRepository
     @Query(value = "SELECT memo_id FROM memo WHERE memo_id IN (:memoIds) AND is_deleted = true FOR UPDATE",
             nativeQuery = true)
     List<Long> lockTrashedIds(@Param("memoIds") List<Long> memoIds);
+
+    // 자동 영구 삭제용 잠금. 조회 이후 복원했다가 다시 휴지통에 넣은 메모는 deleted_at이 새로 바뀌므로 제외된다.
+    @Query(value = "SELECT memo_id FROM memo WHERE memo_id IN (:memoIds) AND is_deleted = true AND deleted_at < :cutoff FOR UPDATE",
+            nativeQuery = true)
+    List<Long> lockExpiredTrashedIds(@Param("memoIds") List<Long> memoIds, @Param("cutoff") LocalDateTime cutoff);
 
     // 영구 삭제. 휴지통에 있는 메모만 지운다(연관 태그/첨부 행은 먼저 지워야 함).
     @Modifying(clearAutomatically = true, flushAutomatically = true)

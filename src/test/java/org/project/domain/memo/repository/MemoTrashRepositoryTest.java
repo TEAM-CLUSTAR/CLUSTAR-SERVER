@@ -148,7 +148,7 @@ class MemoTrashRepositoryTest {
     }
 
     @Test
-    @DisplayName("만료 조회는 cutoff 이전에 휴지통으로 옮긴 메모만 배치 크기만큼 반환한다")
+    @DisplayName("만료 조회는 cutoff 이전에 휴지통으로 옮긴 메모만, afterId 다음부터 배치 크기만큼 반환한다")
     void findExpiredTrashedIds() {
         Memo expired1 = saveTrashed(user, "만료1", BASE.minusDays(40));
         Memo expired2 = saveTrashed(otherUser, "만료2", BASE.minusDays(31));
@@ -158,10 +158,51 @@ class MemoTrashRepositoryTest {
 
         LocalDateTime cutoff = BASE.minusDays(30);
 
-        assertThat(memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, 10)))
+        assertThat(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 10)))
                 .containsExactly(expired1.getId(), expired2.getId());
-        assertThat(memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, 1)))
+        assertThat(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 1)))
                 .containsExactly(expired1.getId());
+        // ID 커서: 앞 배치의 마지막 ID 다음부터
+        assertThat(memoRepository.findExpiredTrashedIds(cutoff, expired1.getId(), PageRequest.of(0, 1)))
+                .containsExactly(expired2.getId());
+    }
+
+    @Test
+    @DisplayName("자동 삭제용 잠금은 보존 기간이 지난 휴지통 메모만 잡는다 (복원 후 다시 휴지통에 넣은 메모 제외)")
+    void lockExpiredTrashedIds() {
+        Memo expired = saveTrashed(user, "만료", BASE.minusDays(40));
+        Memo reTrashed = saveTrashed(user, "조회 후 복원했다가 다시 삭제", BASE);
+        Memo alive = saveMemo(user, "살아있음");
+        flushAndClear();
+
+        List<Long> ids = List.of(expired.getId(), reTrashed.getId(), alive.getId());
+
+        assertThat(memoRepository.lockExpiredTrashedIds(ids, BASE.minusDays(30)))
+                .containsExactly(expired.getId());
+    }
+
+    @Test
+    @DisplayName("수정 저장은 바뀐 컬럼만 UPDATE해서, 그 사이 커밋된 휴지통 이동을 되돌리지 않는다")
+    void editAfterConcurrentTrash_keepsTrashState() {
+        Memo memo = saveMemo(user, "원래 제목");
+        flushAndClear();
+
+        // 편집 요청이 메모를 읽어 둔 상태
+        Memo loaded = memoRepository.findById(memo.getId()).orElseThrow();
+        // 그 사이 다른 요청이 휴지통으로 이동 (영속성 컨텍스트를 건드리지 않는 직접 UPDATE)
+        em.getEntityManager().createNativeQuery(
+                        "UPDATE memo SET is_deleted = true, deleted_at = :at WHERE memo_id = :id")
+                .setParameter("at", BASE)
+                .setParameter("id", memo.getId())
+                .executeUpdate();
+        // 편집 저장
+        loaded.update("새 제목", "새 본문");
+        flushAndClear();
+
+        Memo found = memoRepository.findById(memo.getId()).orElseThrow();
+        assertThat(found.getTitle()).isEqualTo("새 제목");
+        assertThat(found.getIsDeleted()).isTrue();
+        assertThat(found.getDeletedAt()).isEqualTo(BASE);
     }
 
     @Test

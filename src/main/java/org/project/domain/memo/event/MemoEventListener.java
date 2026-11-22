@@ -19,15 +19,21 @@ public class MemoEventListener {
         log.info("메모 영구 삭제 완료 - S3 파일 삭제 시작: memoIds={}", event.memoIds());
 
         for (MemoPurgedEvent.PurgedMemo memo : event.memos()) {
-            memo.imageKeys().forEach(key ->
-                    s3DeletionHandler.deleteOrRecord(key, memo.memoId(), "image")
-            );
-            memo.fileKeys().forEach(key ->
-                    s3DeletionHandler.deleteOrRecord(key, memo.memoId(), "file")
-            );
+            memo.imageKeys().forEach(key -> deleteQuietly(key, memo.memoId(), "image"));
+            memo.fileKeys().forEach(key -> deleteQuietly(key, memo.memoId(), "file"));
         }
 
         log.info("S3 파일 삭제 완료: memoIds={}", event.memoIds());
+    }
+
+    // 한 키의 삭제와 실패 기록이 모두 실패해도(예: DB 장애) 같은 묶음의 나머지 키는 계속 처리한다.
+    // 이렇게 남은 S3 객체는 DB 참조가 없으므로 S3 미참조 정리 스케줄러가 다시 지운다.
+    private void deleteQuietly(String key, Long memoId, String fileType) {
+        try {
+            s3DeletionHandler.deleteOrRecord(key, memoId, fileType);
+        } catch (Exception e) {
+            log.error("S3 삭제와 실패 기록 모두 실패 - 미참조 정리로 처리 예정: memoId={} key={}", memoId, key, e);
+        }
     }
 
     @Async

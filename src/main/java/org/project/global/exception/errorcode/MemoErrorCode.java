@@ -22,7 +22,8 @@ public enum MemoErrorCode implements ErrorCode {
     UNSUPPORTED_EXTENSION(HttpStatus.BAD_REQUEST, 400, "지원하지 않는 확장자입니다."),
     EMPTY_SEARCH_QUERY(HttpStatus.BAD_REQUEST, 400, "검색어를 입력해주세요."),
     EMPTY_MEMO_IDS(HttpStatus.BAD_REQUEST, 400, "선택된 메모가 없습니다."),
-    TRASH_MEMO_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "휴지통에서 해당 메모를 찾을 수 없습니다.");
+    TRASH_MEMO_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "휴지통에서 해당 메모를 찾을 수 없습니다."),
+    INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, 400, "한 번에 조회할 개수(size)는 1 이상 100 이하로 요청해 주세요.");
 
     private final HttpStatus status;
     private final int code;

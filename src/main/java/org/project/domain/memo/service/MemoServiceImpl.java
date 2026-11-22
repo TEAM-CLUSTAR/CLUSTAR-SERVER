@@ -859,6 +859,11 @@ public class MemoServiceImpl implements MemoService {
 
     @Override
     public MemoTrashListResponse getTrashMemos(Long userId, LocalDateTime cursorDeletedAt, Long cursorMemoId, int size) {
+        // 0 이하면 쿼리에서 예외, 너무 크면 휴지통 전체를 한 번에 조립하게 되므로 조회 전에 막는다
+        if (size < 1 || size > memoTrashProperties.getMaxPageSize()) {
+            throw new MemoException(MemoErrorCode.INVALID_PAGE_SIZE);
+        }
+
         long totalCount = memoRepository.countTrashedMemos(userId);
 
         List<Memo> memos = memoRepository.findTrashedMemos(userId, cursorDeletedAt, cursorMemoId, size);
@@ -912,7 +917,7 @@ public class MemoServiceImpl implements MemoService {
     public void deleteTrashMemoPermanently(Long userId, Long memoId) {
         getMyTrashedMemoOrThrow(memoId, userId);
 
-        if (purgeTrashedMemos(List.of(memoId)) == 0) {
+        if (purgeTrashedMemos(List.of(memoId), null) == 0) {
             throw new MemoException(MemoErrorCode.TRASH_MEMO_NOT_FOUND);
         }
     }
@@ -925,7 +930,7 @@ public class MemoServiceImpl implements MemoService {
         // IN 절이 너무 길어지지 않도록 배치 크기만큼 나눠서 지운다 (한 트랜잭션이라 중간 실패 시 전체 롤백)
         int chunkSize = memoTrashProperties.getPurgeBatchSize();
         for (int from = 0; from < memoIds.size(); from += chunkSize) {
-            purgeTrashedMemos(memoIds.subList(from, Math.min(from + chunkSize, memoIds.size())));
+            purgeTrashedMemos(memoIds.subList(from, Math.min(from + chunkSize, memoIds.size())), null);
         }
     }
 
@@ -934,18 +939,21 @@ public class MemoServiceImpl implements MemoService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public int purgeExpiredTrash(LocalDateTime cutoff, int batchSize) {
         int totalPurged = 0;
+        long lastCheckedId = 0;
 
+        // 삭제 건수가 아니라 "어디까지 확인했는지(ID)"로 진행한다.
+        // 한 배치가 그 사이 모두 복원돼 0건이어도 뒤의 만료 메모를 계속 처리하고, 같은 ID를 다시 보지 않는다.
         while (true) {
-            List<Long> memoIds = memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, batchSize));
+            List<Long> memoIds = memoRepository.findExpiredTrashedIds(cutoff, lastCheckedId, PageRequest.of(0, batchSize));
             if (memoIds.isEmpty()) {
                 break;
             }
 
-            Integer purged = transactionTemplate.execute(status -> purgeTrashedMemos(memoIds));
+            Integer purged = transactionTemplate.execute(status -> purgeTrashedMemos(memoIds, cutoff));
             totalPurged += purged == null ? 0 : purged;
+            lastCheckedId = memoIds.get(memoIds.size() - 1);
 
-            // 마지막 배치이거나, 조회된 메모가 그 사이 복원돼 하나도 못 지웠으면 종료 (무한 반복 방지)
-            if (memoIds.size() < batchSize || purged == null || purged == 0) {
+            if (memoIds.size() < batchSize) {
                 break;
             }
         }
@@ -954,15 +962,19 @@ public class MemoServiceImpl implements MemoService {
     }
 
     // 휴지통 메모 영구 삭제. 호출하는 쪽 트랜잭션 안에서 실행돼야 한다.
-    // 대상 행 잠금 → S3 키 수집 → 태그/첨부/메모 행 삭제 → 커밋 후 S3·벡터 정리(이벤트)
+    // 대상 행 잠금 → S3 키 수집 → 태그/첨부/벡터/메모 행 삭제 → 커밋 후 S3 정리(이벤트)
+    // expiredBefore: 자동 삭제면 보존 기간 기준 시각(잠글 때 다시 확인), 사용자 요청이면 null
     // 반환값 = 실제로 삭제한 메모 수
-    private int purgeTrashedMemos(List<Long> memoIds) {
+    private int purgeTrashedMemos(List<Long> memoIds, LocalDateTime expiredBefore) {
         if (memoIds.isEmpty()) {
             return 0;
         }
 
-        // 복원과 동시에 실행돼도 휴지통에 남아 있는 메모만 지우도록 잠금으로 대상을 확정한다
-        List<Long> targetIds = memoRepository.lockTrashedIds(memoIds);
+        // 복원과 동시에 실행돼도 휴지통에 남아 있는 메모만 지우도록 잠금으로 대상을 확정한다.
+        // 자동 삭제는 조회 이후 복원했다가 다시 휴지통에 넣은 메모(새 보존 기간)를 지우지 않도록 기준 시각도 다시 본다.
+        List<Long> targetIds = expiredBefore == null
+                ? memoRepository.lockTrashedIds(memoIds)
+                : memoRepository.lockExpiredTrashedIds(memoIds, expiredBefore);
         if (targetIds.isEmpty()) {
             return 0;
         }
@@ -974,10 +986,12 @@ public class MemoServiceImpl implements MemoService {
                 .collect(Collectors.groupingBy(file -> file.getMemo().getId(),
                         Collectors.mapping(MemoFile::getFileS3Key, Collectors.toList())));
 
-        // FK 순서대로 자식 → 메모
+        // FK 순서대로 자식 → 메모. 벡터는 같은 DB라 이 트랜잭션에서 함께 지운다
+        // (커밋 후 따로 지우면 실패 시 메모가 이미 없어 다시 지울 방법이 없다)
         memoTagRepository.deleteByMemoIdIn(targetIds);
         memoImageRepository.deleteByMemoIdIn(targetIds);
         memoFileRepository.deleteByMemoIdIn(targetIds);
+        vectorStoreRepository.deleteByMemoIds(targetIds);
         int deleted = memoRepository.deleteTrashedByIdIn(targetIds);
 
         List<MemoPurgedEvent.PurgedMemo> purgedMemos = targetIds.stream()

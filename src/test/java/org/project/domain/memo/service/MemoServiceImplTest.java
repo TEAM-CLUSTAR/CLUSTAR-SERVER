@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -67,6 +69,7 @@ import java.util.concurrent.Executor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -740,6 +743,21 @@ class MemoServiceImplTest {
             return memo;
         }
 
+        @BeforeEach
+        void maxPageSize() {
+            lenient().when(memoTrashProperties.getMaxPageSize()).thenReturn(100);
+        }
+
+        @ParameterizedTest(name = "size={0}")
+        @ValueSource(ints = {0, -1, 101})
+        @DisplayName("휴지통 목록 size가 1~100을 벗어나면 조회 전에 INVALID_PAGE_SIZE")
+        void getTrashMemos_invalidSize_throws(int size) {
+            assertThatThrownBy(() -> memoService.getTrashMemos(userId, null, null, size))
+                    .isInstanceOf(MemoException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.INVALID_PAGE_SIZE);
+            verify(memoRepository, never()).findTrashedMemos(any(), any(), any(), anyInt());
+        }
+
         @Test
         @DisplayName("휴지통 목록은 총 개수·대표 이미지·첨부 개수·deletedAt을 담아 반환한다")
         void getTrashMemos_returnsCardInfo() {
@@ -858,10 +876,13 @@ class MemoServiceImplTest {
 
             memoService.deleteTrashMemoPermanently(userId, memoId);
 
-            InOrder order = inOrder(memoTagRepository, memoImageRepository, memoFileRepository, memoRepository);
+            InOrder order = inOrder(memoTagRepository, memoImageRepository, memoFileRepository,
+                    vectorStoreRepository, memoRepository);
             order.verify(memoTagRepository).deleteByMemoIdIn(List.of(memoId));
             order.verify(memoImageRepository).deleteByMemoIdIn(List.of(memoId));
             order.verify(memoFileRepository).deleteByMemoIdIn(List.of(memoId));
+            // 벡터는 커밋 후 비동기가 아니라 같은 트랜잭션에서 지운다
+            order.verify(vectorStoreRepository).deleteByMemoIds(List.of(memoId));
             order.verify(memoRepository).deleteTrashedByIdIn(List.of(memoId));
 
             ArgumentCaptor<MemoPurgedEvent> captor = ArgumentCaptor.forClass(MemoPurgedEvent.class);
@@ -882,6 +903,7 @@ class MemoServiceImplTest {
                     .isInstanceOf(MemoException.class)
                     .hasFieldOrPropertyWithValue("errorCode", MemoErrorCode.TRASH_MEMO_NOT_FOUND);
             verify(memoTagRepository, never()).deleteByMemoIdIn(any());
+            verify(vectorStoreRepository, never()).deleteByMemoIds(any());
             verify(memoRepository, never()).deleteTrashedByIdIn(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -940,33 +962,37 @@ class MemoServiceImplTest {
         }
 
         @Test
-        @DisplayName("만료 정리는 배치 크기보다 적게 조회될 때까지 배치마다 영구 삭제한다")
-        void purgeExpiredTrash_loopsByBatch() {
+        @DisplayName("만료 정리는 ID 커서로 배치를 넘기며, 배치 크기보다 적게 조회될 때까지 영구 삭제한다")
+        void purgeExpiredTrash_loopsByIdCursor() {
             LocalDateTime cutoff = LocalDateTime.of(2026, 10, 22, 0, 0);
-            given(memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, 2)))
-                    .willReturn(List.of(1L, 2L), List.of(3L));
-            given(memoRepository.lockTrashedIds(anyList())).willAnswer(inv -> inv.getArgument(0));
+            given(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 2))).willReturn(List.of(1L, 2L));
+            given(memoRepository.findExpiredTrashedIds(cutoff, 2L, PageRequest.of(0, 2))).willReturn(List.of(3L));
+            given(memoRepository.lockExpiredTrashedIds(anyList(), eq(cutoff))).willAnswer(inv -> inv.getArgument(0));
             given(memoRepository.deleteTrashedByIdIn(anyList()))
                     .willAnswer(inv -> ((List<?>) inv.getArgument(0)).size());
 
             int purged = memoService.purgeExpiredTrash(cutoff, 2);
 
             assertThat(purged).isEqualTo(3);
-            verify(memoRepository, times(2)).findExpiredTrashedIds(cutoff, PageRequest.of(0, 2));
             verify(eventPublisher, times(2)).publishEvent(any(MemoPurgedEvent.class));
+            // 자동 삭제는 보존 기간 조건이 있는 잠금만 쓴다
+            verify(memoRepository, never()).lockTrashedIds(any());
         }
 
         @Test
-        @DisplayName("조회된 메모를 하나도 못 지우면(그 사이 복원) 같은 배치를 반복하지 않고 멈춘다")
-        void purgeExpiredTrash_stopsWhenNothingPurged() {
+        @DisplayName("한 배치가 그 사이 모두 복원돼 0건이어도 멈추지 않고 뒤의 만료 메모를 계속 처리한다")
+        void purgeExpiredTrash_continuesPastFullyRestoredBatch() {
             LocalDateTime cutoff = LocalDateTime.of(2026, 10, 22, 0, 0);
-            given(memoRepository.findExpiredTrashedIds(cutoff, PageRequest.of(0, 2))).willReturn(List.of(1L, 2L));
-            given(memoRepository.lockTrashedIds(List.of(1L, 2L))).willReturn(List.of());
+            given(memoRepository.findExpiredTrashedIds(cutoff, 0L, PageRequest.of(0, 2))).willReturn(List.of(1L, 2L));
+            given(memoRepository.findExpiredTrashedIds(cutoff, 2L, PageRequest.of(0, 2))).willReturn(List.of(3L));
+            given(memoRepository.lockExpiredTrashedIds(List.of(1L, 2L), cutoff)).willReturn(List.of());
+            given(memoRepository.lockExpiredTrashedIds(List.of(3L), cutoff)).willReturn(List.of(3L));
+            given(memoRepository.deleteTrashedByIdIn(List.of(3L))).willReturn(1);
 
             int purged = memoService.purgeExpiredTrash(cutoff, 2);
 
-            assertThat(purged).isZero();
-            verify(memoRepository, times(1)).findExpiredTrashedIds(cutoff, PageRequest.of(0, 2));
+            assertThat(purged).isEqualTo(1);
+            verify(memoRepository).deleteTrashedByIdIn(List.of(3L));
         }
     }
 

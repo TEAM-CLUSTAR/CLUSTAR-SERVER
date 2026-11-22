@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +26,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MemoSearchVectorRetriever 테스트")
@@ -41,9 +44,10 @@ class MemoSearchVectorRetrieverTest {
 
     @BeforeEach
     void setUp() {
-        given(memoSearchProperties.getVectorTopK()).willReturn(10);
-        given(memoSearchProperties.getSemanticSimilarityThreshold()).willReturn(0.67);
-        given(memoSearchProperties.getSemanticRelativeGap()).willReturn(0.05);
+        // 검색 결과가 없는 테스트에서는 일부 값이 쓰이지 않으므로 lenient
+        lenient().when(memoSearchProperties.getVectorTopK()).thenReturn(10);
+        lenient().when(memoSearchProperties.getSemanticSimilarityThreshold()).thenReturn(0.67);
+        lenient().when(memoSearchProperties.getSemanticRelativeGap()).thenReturn(0.05);
     }
 
     private Document doc(long memoId, double distance) {
@@ -85,5 +89,31 @@ class MemoSearchVectorRetrieverTest {
         List<Memo> result = retriever.retrieve(userId, "검색어", null);
 
         assertThat(result).extracting(Memo::getId).containsExactly(3L, 4L);
+    }
+
+    @Test
+    @DisplayName("휴지통 메모는 벡터 검색 단계에서 제외해 topK 후보를 차지하지 않는다")
+    void trashedMemos_excludedFromVectorSearchFilter() {
+        given(memoRepository.findTrashedIdsByUserId(userId)).willReturn(List.of(7L, 8L));
+        given(vectorStore.similaritySearch(any(SearchRequest.class))).willReturn(List.of());
+
+        retriever.retrieve(userId, "검색어", null);
+
+        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(captor.capture());
+        String filter = captor.getValue().getFilterExpression().toString();
+        assertThat(filter).contains("NIN").contains("7").contains("8");
+    }
+
+    @Test
+    @DisplayName("휴지통이 비어 있으면 기존처럼 userId 조건만 건다")
+    void noTrashedMemos_userIdFilterOnly() {
+        given(vectorStore.similaritySearch(any(SearchRequest.class))).willReturn(List.of());
+
+        retriever.retrieve(userId, "검색어", null);
+
+        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(captor.capture());
+        assertThat(captor.getValue().getFilterExpression().toString()).doesNotContain("NIN");
     }
 }

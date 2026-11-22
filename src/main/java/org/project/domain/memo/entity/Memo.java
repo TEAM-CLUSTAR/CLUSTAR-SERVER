@@ -2,6 +2,7 @@ package org.project.domain.memo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 import org.project.domain.memo.entity.converter.SourceMemoSnapshotsConverter;
 import org.project.domain.tag.entity.Tag;
 import org.project.domain.user.entity.User;
@@ -12,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// 바뀐 컬럼만 UPDATE한다. 수정 저장이 그 사이 커밋된 휴지통 이동(is_deleted, deleted_at)이나
+// 열람 기록(last_viewed_at)을 읽어 둔 옛 값으로 덮어쓰지 않게 하기 위함.
+@DynamicUpdate
 @Entity
 @Getter
 @Builder
