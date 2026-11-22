@@ -40,7 +40,7 @@ class MemoImageRepositoryTest {
 
     @Test
     @DisplayName("memo로 연결된 MemoImage가 모두 삭제된다")
-    void deleteByMemo_success() {
+    void deleteByMemoIdIn_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
@@ -76,7 +76,7 @@ class MemoImageRepositoryTest {
         em.clear();
 
         // when
-        memoImageRepository.deleteByMemo(memo);
+        memoImageRepository.deleteByMemoIdIn(List.of(memo.getId()));
         em.flush();
         em.clear();
 

@@ -11,9 +11,12 @@ import org.project.domain.memo.dto.response.MemoDetailResponse;
 import org.project.domain.memo.dto.response.MemoListDashboardResponse;
 import org.project.domain.memo.dto.response.MemoPresignedUrlResponse;
 import org.project.domain.memo.dto.response.MemoResponse;
+import org.project.domain.memo.dto.response.MemoTrashListResponse;
 import org.project.domain.memo.service.MemoService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.entity.User;
+import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.security.filter.JWTFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -1082,7 +1085,8 @@ class MemoControllerTest {
                     LocalDateTime.of(2026, 1, 16, 10, 30),
                     LocalDateTime.of(2026, 1, 16, 11, 30),
                     false,  // AI 생성 아님
-                    List.of()  // sourceList 비어있음
+                    List.of(),  // sourceMemoTitleList 비어있음
+                    List.of()   // sourceMemos 비어있음
             );
 
             when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
@@ -1138,7 +1142,8 @@ class MemoControllerTest {
                     LocalDateTime.of(2026, 1, 16, 12, 0),
                     LocalDateTime.of(2026, 1, 16, 12, 30),
                     false,  // AI 생성 아님
-                    List.of()  // sourceList 비어있음
+                    List.of(),  // sourceMemoTitleList 비어있음
+                    List.of()   // sourceMemos 비어있음
             );
 
             when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
@@ -1178,7 +1183,7 @@ class MemoControllerTest {
                     LocalDateTime.of(2026, 1, 16, 13, 0),
                     LocalDateTime.of(2026, 1, 16, 13, 30),
                     false,
-                    List.of()
+                    List.of(), List.of()
             );
 
             when(memoService.getOneMemoDetail(eq(userId), eq(memoId)))
@@ -1228,6 +1233,97 @@ class MemoControllerTest {
 
             verify(memoService, times(1))
                     .deleteMemo(eq(userId), eq(memoId));
+        }
+    }
+
+    @Nested
+    @DisplayName("휴지통 API 테스트")
+    class TrashTest {
+
+        @Test
+        @DisplayName("GET /trash는 상세조회(/{memoId})로 잡히지 않고 커서 파라미터와 함께 휴지통 목록을 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void getTrashMemos_Success() throws Exception {
+            LocalDateTime deletedAt = LocalDateTime.of(2026, 11, 20, 10, 0);
+            MemoTrashListResponse response = MemoTrashListResponse.from(3L, List.of(
+                    new MemoTrashListResponse.TrashMemoResponse(
+                            100L, "제목", "본문", null, 1, 2, false,
+                            deletedAt.minusDays(1), deletedAt.minusDays(1), deletedAt, List.of())
+            ));
+            when(memoService.getTrashMemos(1L, deletedAt.plusHours(1), 200L, 10)).thenReturn(response);
+
+            mockMvc.perform(get("/api/v1/memo/trash")
+                            .param("cursorDeletedAt", "2026-11-20T11:00:00")
+                            .param("cursorMemoId", "200")
+                            .param("size", "10"))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.totalCount").value(3))
+                    .andExpect(jsonPath("$.data.memos[0].memoId").value(100))
+                    .andExpect(jsonPath("$.data.memos[0].imageCount").value(1))
+                    .andExpect(jsonPath("$.data.memos[0].fileCount").value(2))
+                    .andExpect(jsonPath("$.data.memos[0].deletedAt").value("2026-11-20T10:00:00"));
+
+            verify(memoService, never()).getOneMemoDetail(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("GET /trash/{memoId}는 휴지통 메모 상세를 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void getTrashMemoDetail_Success() throws Exception {
+            MemoDetailResponse detail = new MemoDetailResponse(
+                    100L, "제목", "본문", List.of(), List.of(), List.of(),
+                    LocalDateTime.now(), LocalDateTime.now(), false, List.of(), List.of());
+            when(memoService.getTrashMemoDetail(1L, 100L)).thenReturn(detail);
+
+            mockMvc.perform(get("/api/v1/memo/trash/{memoId}", 100L))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memoId").value(100));
+        }
+
+        @Test
+        @DisplayName("PATCH /trash/{memoId}/restore는 복원된 메모 정보를 반환한다")
+        @WithMockCustomUser(userId = 1L)
+        void restoreMemo_Success() throws Exception {
+            when(memoService.restoreMemo(1L, 100L)).thenReturn(
+                    new MemoResponse(100L, "제목", LocalDateTime.now(), LocalDateTime.now()));
+
+            mockMvc.perform(patch("/api/v1/memo/trash/{memoId}/restore", 100L))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.memoId").value(100));
+        }
+
+        @Test
+        @DisplayName("휴지통에 없는 메모를 복원하면 404 TRASH_MEMO_NOT_FOUND")
+        @WithMockCustomUser(userId = 1L)
+        void restoreMemo_NotInTrash() throws Exception {
+            when(memoService.restoreMemo(1L, 100L))
+                    .thenThrow(new MemoException(MemoErrorCode.TRASH_MEMO_NOT_FOUND));
+
+            mockMvc.perform(patch("/api/v1/memo/trash/{memoId}/restore", 100L))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(404));
+        }
+
+        @Test
+        @DisplayName("DELETE /trash/{memoId}는 영구 삭제한다 (휴지통 이동 API와 구분)")
+        @WithMockCustomUser(userId = 1L)
+        void deleteTrashMemoPermanently_Success() throws Exception {
+            mockMvc.perform(delete("/api/v1/memo/trash/{memoId}", 100L))
+                    .andExpect(status().isOk());
+
+            verify(memoService).deleteTrashMemoPermanently(1L, 100L);
+            verify(memoService, never()).deleteMemo(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("DELETE /trash는 휴지통을 비운다")
+        @WithMockCustomUser(userId = 1L)
+        void emptyTrash_Success() throws Exception {
+            mockMvc.perform(delete("/api/v1/memo/trash"))
+                    .andExpect(status().isOk());
+
+            verify(memoService).emptyTrash(1L);
         }
     }
 

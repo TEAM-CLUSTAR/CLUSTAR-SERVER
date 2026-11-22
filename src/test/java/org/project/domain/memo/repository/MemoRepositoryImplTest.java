@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -209,7 +210,7 @@ class MemoRepositoryImplTest {
         Memo memo = Memo.createMemo("삭제메모", "content", user);
         em.persist(memo);
 
-        memo.delete(); // isDeleted = true
+        ReflectionTestUtils.setField(memo, "isDeleted", true);
         em.flush();
         em.clear();
 
@@ -267,7 +268,7 @@ class MemoRepositoryImplTest {
         Memo deleted = Memo.createMemo("삭제됨", "content", user);
         em.persist(alive);
         em.persist(deleted);
-        deleted.delete();
+        ReflectionTestUtils.setField(deleted, "isDeleted", true);
         em.flush();
         em.clear();
 

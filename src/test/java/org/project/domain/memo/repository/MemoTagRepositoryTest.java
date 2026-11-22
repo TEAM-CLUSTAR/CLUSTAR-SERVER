@@ -41,7 +41,7 @@ class MemoTagRepositoryTest {
 
     @Test
     @DisplayName("memo 기준으로 MemoTag가 모두 삭제된다")
-    void deleteByMemo_success() {
+    void deleteByMemoIdIn_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
@@ -68,7 +68,7 @@ class MemoTagRepositoryTest {
         em.clear();
 
         // when
-        memoTagRepository.deleteByMemo(memo);
+        memoTagRepository.deleteByMemoIdIn(List.of(memo.getId()));
         em.flush();
         em.clear();
 

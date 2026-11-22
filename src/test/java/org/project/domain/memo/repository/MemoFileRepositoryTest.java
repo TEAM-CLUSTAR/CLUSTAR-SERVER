@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -34,7 +35,7 @@ class MemoFileRepositoryTest {
 
     @Test
     @DisplayName("memo 기준으로 MemoFile을 모두 삭제한다")
-    void deleteByMemo_success() {
+    void deleteByMemoIdIn_success() {
         // given
         User user = userRepository.save(
                 User.createSocialUser(
@@ -73,7 +74,7 @@ class MemoFileRepositoryTest {
         em.clear();
 
         // when
-        memoFileRepository.deleteByMemo(memo);
+        memoFileRepository.deleteByMemoIdIn(List.of(memo.getId()));
 
         em.flush();
         em.clear();
