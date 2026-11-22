@@ -3,6 +3,9 @@ package org.project.domain.review.service;
 import lombok.RequiredArgsConstructor;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.review.ai.ReviewAiClient;
+import org.project.domain.review.ai.dto.AnalysisResult;
+import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
@@ -13,9 +16,15 @@ import org.project.domain.review.entity.ReviewStatus;
 import org.project.domain.review.repository.ReviewFindingRepository;
 import org.project.domain.review.repository.ReviewMessageRepository;
 import org.project.domain.review.repository.ReviewRepository;
+import org.project.domain.review.support.FindingDrafts;
+import org.project.domain.review.support.ValidFindingDraft;
 import org.project.global.exception.domainException.MemoException;
+import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.MemoErrorCode;
+import org.project.global.exception.errorcode.ReviewErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -34,6 +43,38 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final ReviewFindingRepository findingRepository;
     private final ReviewMessageRepository messageRepository;
+    private final ReviewAiClient reviewAiClient;
+    private final ReviewWriter reviewWriter;
+    private final ReviewProperties reviewProperties;
+
+    // AI 분석(수 초)이 끝날 때까지 DB 커넥션을 잡고 있지 않도록 트랜잭션 밖에서 실행하고,
+    // 저장만 ReviewWriter의 짧은 트랜잭션으로 처리한다
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ReviewResponse startReview(Long userId, Long memoId) {
+        Memo memo = getMyMemo(userId, memoId);
+        String content = memo.getContent();
+        validateContentLength(content);
+        if (reviewRepository.findByMemoIdAndStatus(memoId, ReviewStatus.ACTIVE).isPresent()) {
+            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+
+        AnalysisResult analysis = reviewAiClient.analyze(memoId, memo.getTitle(), content);
+        List<ValidFindingDraft> drafts = FindingDrafts.sanitize(
+                content, analysis.findings(), reviewProperties.getMaxFindings());
+
+        // AI가 빈틈을 줬는데 전부 본문에서 못 찾았다면 '빈틈 0개'가 아니라 분석 실패다
+        if (drafts.isEmpty() && !analysis.findings().isEmpty()) {
+            throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
+        }
+
+        try {
+            return reviewWriter.saveNewReview(memoId, content, drafts);
+        } catch (DataIntegrityViolationException e) {
+            // 동시에 두 요청이 같은 버전을 저장하려 하면 (memo_id, version) 유니크 제약에 걸린다
+            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+    }
 
     @Override
     public ActiveReviewResponse getActiveReview(Long userId, Long memoId) {
@@ -73,6 +114,14 @@ public class ReviewServiceImpl implements ReviewService {
                         message -> message.getFinding().getId(),
                         Collectors.mapping(ReviewMessageResponse::from, Collectors.toList())
                 ));
+    }
+
+    // 본문만(제목 제외), 공백 포함으로 센다. 이모지 등이 2칸으로 세지지 않도록 코드 포인트 기준
+    private void validateContentLength(String content) {
+        int length = content == null ? 0 : content.codePointCount(0, content.length());
+        if (length < reviewProperties.getMinContentLength()) {
+            throw new ReviewException(ReviewErrorCode.CONTENT_TOO_SHORT);
+        }
     }
 
     // 휴지통 메모는 조회되지 않아 MEMO_NOT_FOUND로 응답한다(메모 상세 조회와 같은 규칙)

@@ -2,16 +2,22 @@ package org.project.domain.review.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.project.domain.review.dto.request.ReviewStartRequest;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.service.ReviewService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.annotation.BusinessExceptionDescription;
 import org.project.global.config.swagger.SwaggerResponseDescription;
 import org.project.global.response.ApiResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,5 +47,25 @@ public class ReviewController {
     ) {
         ActiveReviewResponse response = reviewService.getActiveReview(userDetails.getUserId(), memoId);
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(
+            summary = "검토 시작",
+            description = """
+                    [검토하기] 버튼. AI가 본문 전체를 읽고 빈틈 카드를 만들어 새 버전으로 저장합니다.
+                    - 본문(제목 제외, 공백 포함)이 300자 이상이어야 합니다
+                    - 진행 중인 검토가 있으면 409, AI 호출이 실패하면 503(아무것도 저장되지 않음)
+                    - AI 분석이 끝날 때까지 응답을 기다립니다(수 초). 요청 전에 본문 자동 저장을 먼저 끝내 주세요
+                    - 응답의 `version`이 새 문서 버전(첫 검토는 2), `findings`가 비어 있으면 짚을 곳이 없는 것입니다
+                    """
+    )
+    @PostMapping
+    @BusinessExceptionDescription(SwaggerResponseDescription.START_REVIEW)
+    public ResponseEntity<ApiResponse<ReviewResponse>> startReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ReviewStartRequest request
+    ) {
+        ReviewResponse response = reviewService.startReview(userDetails.getUserId(), request.memoId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 }

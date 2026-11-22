@@ -1,8 +1,12 @@
 package org.project.domain.review.service;
 
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.ReviewResponse;
 
 public interface ReviewService {
+
+    // AI가 본문을 분석해 빈틈 카드를 만들고 새 버전으로 저장한다
+    ReviewResponse startReview(Long userId, Long memoId);
 
     // 메모의 현재 버전과 진행 중인 검토(카드·대화 포함)를 조회한다
     ActiveReviewResponse getActiveReview(Long userId, Long memoId);
