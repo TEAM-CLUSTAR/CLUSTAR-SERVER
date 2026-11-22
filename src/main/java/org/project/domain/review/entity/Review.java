@@ -61,4 +61,8 @@ public class Review extends BaseEntity {
         review.contentSnapshot = contentSnapshot;
         return review;
     }
+
+    public boolean isActive() {
+        return this.status == ReviewStatus.ACTIVE;
+    }
 }

@@ -27,6 +27,10 @@ public class ReviewProperties {
     @Min(1)
     private int maxFindings;
 
+    // 답 하나의 최대 길이(공백 포함). 피그마에 "개발과 협의"로 남아 있던 값
+    @Min(1)
+    private int maxAnswerLength;
+
     @Valid
     private Ai ai = new Ai();
 
@@ -42,5 +46,10 @@ public class ReviewProperties {
         @DecimalMin("0.0")
         @DecimalMax("2.0")
         private double analysisTemperature;
+
+        // 후속 질문은 사용자 답에 맞춰 조금 더 유연하게
+        @DecimalMin("0.0")
+        @DecimalMax("2.0")
+        private double questionTemperature;
     }
 }

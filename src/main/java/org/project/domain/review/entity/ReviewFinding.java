@@ -98,4 +98,13 @@ public class ReviewFinding extends BaseEntity {
         finding.status = FindingStatus.OPEN;
         return finding;
     }
+
+    // 답을 하나라도 보내면 '답하는 중'
+    public void markAnswering() {
+        this.status = FindingStatus.ANSWERING;
+    }
+
+    public boolean isApplied() {
+        return this.status == FindingStatus.APPLIED;
+    }
 }

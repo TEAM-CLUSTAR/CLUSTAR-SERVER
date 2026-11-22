@@ -3,17 +3,20 @@ package org.project.domain.review.controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
 import org.project.domain.review.entity.FindingStatus;
 import org.project.domain.review.entity.ReviewMessageRole;
+import org.project.domain.review.service.ReviewFindingService;
 import org.project.domain.review.service.ReviewService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.domain.user.entity.User;
 import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.ReviewException;
+import org.project.global.exception.domainException.ReviewLengthException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.ReviewErrorCode;
 import org.springframework.http.MediaType;
@@ -53,6 +56,8 @@ class ReviewControllerTest {
     private MockMvc mockMvc;
     @MockBean
     private ReviewService reviewService;
+    @MockBean
+    private ReviewFindingService findingService;
     @MockBean
     private JWTFilter jwtFilter;
 
@@ -151,6 +156,102 @@ class ReviewControllerTest {
         mockMvc.perform(post("/api/v1/ai/reviews")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memoId\": 3}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    @DisplayName("첫 답을 보내면 내 답과 AI 후속 질문을 함께 내려준다")
+    @WithMockCustomUser
+    void answer_withFollowUp() throws Exception {
+        when(findingService.answer(1L, 12L, 101L, "1~2학년이 많이 사서")).thenReturn(new AnswerResponse(
+                101L, FindingStatus.ANSWERING,
+                new ReviewMessageResponse(501L, ReviewMessageRole.USER, "1~2학년이 많이 사서", LocalDateTime.now()),
+                new ReviewMessageResponse(502L, ReviewMessageRole.AI, "그 기준으로 보면 어떤 위치에 있나요?", LocalDateTime.now())
+        ));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/answers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"1~2학년이 많이 사서\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.findingId").value(101))
+                .andExpect(jsonPath("$.data.status").value("ANSWERING"))
+                .andExpect(jsonPath("$.data.answer.role").value("USER"))
+                .andExpect(jsonPath("$.data.aiMessage.role").value("AI"));
+    }
+
+    @Test
+    @DisplayName("두 번째 답부터는 aiMessage를 null로 내려준다")
+    @WithMockCustomUser
+    void answer_withoutFollowUp() throws Exception {
+        when(findingService.answer(1L, 12L, 101L, "둘째 답")).thenReturn(new AnswerResponse(
+                101L, FindingStatus.ANSWERING,
+                new ReviewMessageResponse(503L, ReviewMessageRole.USER, "둘째 답", LocalDateTime.now()),
+                null
+        ));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/answers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"둘째 답\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.aiMessage").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("빈 답이면 400이고 서비스를 부르지 않는다")
+    @WithMockCustomUser
+    void answer_blank() throws Exception {
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/answers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"   \"}"))
+                .andExpect(status().isBadRequest());
+        verify(findingService, never()).answer(anyLong(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    @DisplayName("답이 너무 길면 400과 함께 최대 글자 수를 알려준다(현재 글자 수는 알려주지 않음)")
+    @WithMockCustomUser
+    void answer_tooLong() throws Exception {
+        when(findingService.answer(1L, 12L, 101L, "긴 답"))
+                .thenThrow(ReviewLengthException.answerTooLong(1000));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/answers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"긴 답\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("답변이 너무 길어요. 1000자 이하로 줄여 주세요."))
+                .andExpect(jsonPath("$.data.currentLength").doesNotExist())
+                .andExpect(jsonPath("$.data.maxLength").value(1000))
+                .andExpect(jsonPath("$.data.minLength").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("본문이 짧으면 400과 함께 최소 글자 수를 알려준다(현재 글자 수는 알려주지 않음)")
+    @WithMockCustomUser
+    void startReview_contentTooShort() throws Exception {
+        when(reviewService.startReview(1L, 3L))
+                .thenThrow(ReviewLengthException.contentTooShort(300));
+
+        mockMvc.perform(post("/api/v1/ai/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memoId\": 3}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value("본문이 짧아 검토할 수 없어요. 300자 이상 작성해 주세요."))
+                .andExpect(jsonPath("$.data.currentLength").doesNotExist())
+                .andExpect(jsonPath("$.data.minLength").value(300));
+    }
+
+    @Test
+    @DisplayName("이미 반영한 카드면 409")
+    @WithMockCustomUser
+    void answer_alreadyApplied() throws Exception {
+        when(findingService.answer(1L, 12L, 101L, "답"))
+                .thenThrow(new ReviewException(ReviewErrorCode.FINDING_ALREADY_APPLIED));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/findings/101/answers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"답\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
     }

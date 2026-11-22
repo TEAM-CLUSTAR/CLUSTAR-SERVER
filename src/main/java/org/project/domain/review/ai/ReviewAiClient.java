@@ -3,6 +3,8 @@ package org.project.domain.review.ai;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.domain.review.ai.dto.AnalysisResult;
+import org.project.domain.review.ai.dto.FollowUpInput;
+import org.project.domain.review.ai.dto.FollowUpResult;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.entity.ReviewAiCallLog.ReviewAiCall;
 import org.project.domain.review.entity.ReviewAiCallType;
@@ -38,6 +40,7 @@ public class ReviewAiClient {
     private final ReviewAiCallLogWriter logWriter;
 
     private final BeanOutputConverter<AnalysisResult> analysisConverter = new BeanOutputConverter<>(AnalysisResult.class);
+    private final BeanOutputConverter<FollowUpResult> followUpConverter = new BeanOutputConverter<>(FollowUpResult.class);
 
     // 실패하거나 JSON이 깨지면 1초 → 2초 간격으로 최대 3번 시도한다(기존 RAG 생성과 같은 정책)
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
@@ -55,6 +58,35 @@ public class ReviewAiClient {
     @Recover
     public AnalysisResult recoverAnalyze(Exception e, Long memoId, String title, String content) {
         log.error("AI 검토 분석 실패(재시도 소진) [memoId={}, error={}]", memoId, e.getMessage(), e);
+        throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
+    }
+
+    // 사용자의 첫 답을 보고 후속 질문 하나를 만든다
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
+    public String followUp(FollowUpInput input) {
+        ReviewAiCall call = new ReviewAiCall(
+                input.memoId(),
+                ReviewAiCallType.FOLLOW_UP,
+                properties.getAi().getModel(),
+                ReviewPrompts.followUpSystem(),
+                ReviewPrompts.followUpUser(
+                        input.memoTitle(),
+                        input.memoContent(),
+                        input.sectionLabel(),
+                        input.anchorText(),
+                        input.reason(),
+                        input.evidence(),
+                        input.question(),
+                        input.answer(),
+                        followUpConverter.getFormat()
+                )
+        );
+        return request(call, properties.getAi().getQuestionTemperature(), this::parseFollowUp);
+    }
+
+    @Recover
+    public String recoverFollowUp(Exception e, FollowUpInput input) {
+        log.warn("AI 후속 질문 생성 실패(재시도 소진) [memoId={}, error={}]", input.memoId(), e.getMessage());
         throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
     }
 
@@ -87,6 +119,14 @@ public class ReviewAiClient {
             throw new IllegalStateException("findings가 없는 분석 응답");
         }
         return result;
+    }
+
+    private String parseFollowUp(String text) {
+        FollowUpResult result = followUpConverter.convert(text);
+        if (result == null || result.question() == null || result.question().isBlank()) {
+            throw new IllegalStateException("질문이 없는 후속 질문 응답");
+        }
+        return result.question().trim();
     }
 
     private String extractText(ChatResponse response) {

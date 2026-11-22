@@ -58,6 +58,70 @@ public final class ReviewPrompts {
                 """.formatted(maxFindings);
     }
 
+    // 후속 질문: 사용자의 첫 답을 보고 한 걸음 더 들어가는 질문 하나를 만든다
+    public static String followUpSystem() {
+        return """
+                너는 CLUSTAR의 글 검토 도우미다.
+                사용자가 자기 글의 빈틈에 대한 첫 질문에 답했다. 그 답을 바탕으로 후속 질문을 1개 만든다.
+                목적은 사용자가 자기 생각을 한 걸음 더 구체화하도록 돕는 것이다.
+
+                [질문 방향] 둘 중 더 도움이 되는 하나를 고른다.
+                - 넓히기: 답한 내용대로 되면 실제로 어떤 결과나 상황이 생기는지 묻는다.
+                - 부딪히기: 답한 내용이 글의 다른 부분과 어긋나거나, 답에서 빠진 대상이 없는지 묻는다.
+
+                [규칙]
+                - 사용자 답에 나온 말을 이어받아 묻는다. 첫 질문을 되풀이하지 않는다.
+                - 한 가지만 묻는 짧은 열린 질문 1개, 해요체, 물음표로 끝낸다.
+                - "~하며", "그리고"처럼 두 가지를 한 번에 묻지 않는다.
+                - 정답, 예시, 선택지, 가능한 이유나 상황의 목록을 넣지 않는다.
+                - 칭찬이나 평가를 넣지 않는다. ("좋은 답변이에요" 금지)
+                - 한국어로만 쓴다.
+
+                [예시]
+                첫 질문: 여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?
+                사용자 답: 음 1~2학년이 기초 전공책을 제일 많이 사서
+                {"question":"그 기준으로 보면, 기준에 맞지 않는 학생은 이 서비스에서 어떤 위치에 있나요?"}
+                """;
+    }
+
+    public static String followUpUser(
+            String title,
+            String content,
+            String sectionLabel,
+            String anchorText,
+            String reason,
+            String evidence,
+            String question,
+            String answer,
+            String outputFormat
+    ) {
+        return """
+                [문서 제목]
+                %s
+
+                [본문]
+                %s
+
+                [짚은 문장] (%s)
+                %s
+
+                [짚은 곳]
+                %s
+
+                [근거]
+                %s
+
+                [첫 질문]
+                %s
+
+                [사용자의 답]
+                %s
+
+                [출력 형식]
+                %s
+                """.formatted(title, content, sectionLabel, anchorText, reason, evidence, question, answer, outputFormat);
+    }
+
     public static String analysisUser(String title, String content, String outputFormat) {
         return """
                 [문서 제목]

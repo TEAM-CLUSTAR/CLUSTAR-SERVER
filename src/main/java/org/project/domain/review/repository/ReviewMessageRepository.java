@@ -1,6 +1,7 @@
 package org.project.domain.review.repository;
 
 import org.project.domain.review.entity.ReviewMessage;
+import org.project.domain.review.entity.ReviewMessageRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
@@ -11,4 +12,7 @@ public interface ReviewMessageRepository extends JpaRepository<ReviewMessage, Lo
     // 카드 여러 장의 대화를 한 번에 조회한다(카드마다 조회하는 N+1 방지).
     // 답과 후속 질문을 한 트랜잭션에서 저장하면 createdAt이 같을 수 있어 id로 정렬한다
     List<ReviewMessage> findByFindingIdInOrderByIdAsc(Collection<Long> findingIds);
+
+    // 첫 답인지 판단할 때 쓴다(사용자 답 개수)
+    long countByFindingIdAndRole(Long findingId, ReviewMessageRole role);
 }

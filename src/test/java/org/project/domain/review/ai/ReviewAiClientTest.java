@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.project.domain.review.ai.dto.AnalysisResult;
+import org.project.domain.review.ai.dto.FollowUpInput;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.global.exception.domainException.ReviewException;
 import org.project.global.exception.errorcode.ReviewErrorCode;
@@ -111,6 +112,41 @@ class ReviewAiClientTest {
         verify(logWriter, times(3)).failure(any(), isNull(), any());
     }
 
+    @Test
+    @DisplayName("후속 질문: 첫 질문과 사용자 답을 담아 호출하고 질문 문장을 돌려준다")
+    void followUp_returnsQuestion() {
+        chatModel.respond("{\"question\":\"그 기준으로 보면, 기준에 맞지 않는 학생은 어떤 위치에 있나요?\"}");
+
+        String question = reviewAiClient.followUp(followUpInput());
+
+        assertThat(question).isEqualTo("그 기준으로 보면, 기준에 맞지 않는 학생은 어떤 위치에 있나요?");
+        Prompt prompt = chatModel.lastPrompt();
+        assertThat(prompt.getContents()).contains(
+                "여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
+                "음 1~2학년이 기초 전공책을 제일 많이 사서");
+        assertThat(((GoogleGenAiChatOptions) prompt.getOptions()).getTemperature()).isEqualTo(0.3);
+    }
+
+    @Test
+    @DisplayName("후속 질문: 빈 질문이 오거나 계속 실패하면 3번 시도 후 REVIEW_AI_FAILED")
+    void followUp_failsAfterMaxAttempts() {
+        chatModel.respond("{\"question\":\"  \"}");
+
+        assertThatThrownBy(() -> reviewAiClient.followUp(followUpInput()))
+                .isInstanceOf(ReviewException.class)
+                .extracting("errorCode")
+                .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
+        assertThat(chatModel.callCount()).isEqualTo(3);
+    }
+
+    private FollowUpInput followUpInput() {
+        return new FollowUpInput(3L, "전공책 중고거래 기획서", "본문", "2. 타깃",
+                "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.",
+                "짚은 곳", "근거",
+                "여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
+                "음 1~2학년이 기초 전공책을 제일 많이 사서");
+    }
+
     @TestConfiguration
     @EnableRetry
     @Import(ReviewAiClient.class)
@@ -132,6 +168,7 @@ class ReviewAiClientTest {
             properties.setMaxFindings(10);
             properties.getAi().setModel("test-model");
             properties.getAi().setAnalysisTemperature(0.2);
+            properties.getAi().setQuestionTemperature(0.3);
             return properties;
         }
     }

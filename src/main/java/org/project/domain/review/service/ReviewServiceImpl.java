@@ -20,6 +20,7 @@ import org.project.domain.review.support.FindingDrafts;
 import org.project.domain.review.support.ValidFindingDraft;
 import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.ReviewException;
+import org.project.global.exception.domainException.ReviewLengthException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.ReviewErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -120,7 +121,7 @@ public class ReviewServiceImpl implements ReviewService {
     private void validateContentLength(String content) {
         int length = content == null ? 0 : content.codePointCount(0, content.length());
         if (length < reviewProperties.getMinContentLength()) {
-            throw new ReviewException(ReviewErrorCode.CONTENT_TOO_SHORT);
+            throw ReviewLengthException.contentTooShort(reviewProperties.getMinContentLength());
         }
     }
 

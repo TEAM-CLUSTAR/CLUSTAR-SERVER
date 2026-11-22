@@ -121,6 +121,14 @@ public enum SwaggerResponseDescription {
             ReviewErrorCode.CONTENT_TOO_SHORT,
             ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
             ReviewErrorCode.REVIEW_AI_FAILED
+    ))),
+    ANSWER_FINDING(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.FINDING_NOT_FOUND,
+            ReviewErrorCode.FINDING_ALREADY_APPLIED,
+            ReviewErrorCode.ANSWER_TOO_LONG
     )));
 
     private final Set<ErrorCode> errorCodeList;

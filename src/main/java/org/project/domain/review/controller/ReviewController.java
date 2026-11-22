@@ -4,9 +4,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.project.domain.review.dto.request.ReviewAnswerRequest;
 import org.project.domain.review.dto.request.ReviewStartRequest;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
+import org.project.domain.review.dto.response.AnswerResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
+import org.project.domain.review.service.ReviewFindingService;
 import org.project.domain.review.service.ReviewService;
 import org.project.domain.user.dto.CustomUserDetails;
 import org.project.global.annotation.BusinessExceptionDescription;
@@ -16,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final ReviewFindingService findingService;
 
     @Operation(
             summary = "현재 검토 조회",
@@ -67,5 +72,27 @@ public class ReviewController {
     ) {
         ReviewResponse response = reviewService.startReview(userDetails.getUserId(), request.memoId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
+    }
+
+    @Operation(
+            summary = "답 보내기",
+            description = """
+                    빈틈 카드 입력창의 ↑ 버튼. 내 답을 저장하고 카드를 ANSWERING으로 바꿉니다.
+                    - 첫 답이면 AI가 후속 질문을 만들어 `aiMessage`로 함께 돌려줍니다(수 초 소요)
+                    - 두 번째 답부터는 `aiMessage`가 null입니다. 이때 프론트가 고정 안내 문구를 보여줍니다
+                    - 후속 질문 생성이 실패해도 답은 저장되고 `aiMessage`만 null로 옵니다(에러 아님)
+                    - 답은 1000자 이하, 이미 반영한 카드면 409
+                    """
+    )
+    @PostMapping("/{reviewId}/findings/{findingId}/answers")
+    @BusinessExceptionDescription(SwaggerResponseDescription.ANSWER_FINDING)
+    public ResponseEntity<ApiResponse<AnswerResponse>> answer(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId,
+            @PathVariable Long findingId,
+            @Valid @RequestBody ReviewAnswerRequest request
+    ) {
+        AnswerResponse response = findingService.answer(userDetails.getUserId(), reviewId, findingId, request.content());
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

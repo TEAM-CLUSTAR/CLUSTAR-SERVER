@@ -1,22 +1,33 @@
 package org.project.domain.review.service;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
+import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
 import org.project.domain.review.entity.FindingStatus;
 import org.project.domain.review.entity.Review;
+import org.project.domain.review.entity.ReviewFinding;
+import org.project.domain.review.entity.ReviewMessage;
+import org.project.domain.review.entity.ReviewMessageRole;
 import org.project.domain.review.entity.ReviewStatus;
 import org.project.domain.review.repository.ReviewFindingRepository;
+import org.project.domain.review.repository.ReviewMessageRepository;
 import org.project.domain.review.repository.ReviewRepository;
 import org.project.domain.review.support.ValidFindingDraft;
 import org.project.domain.user.entity.User;
 import org.project.domain.user.repository.UserRepository;
 import org.project.global.config.querydsl.QuerydslTestConfig;
+import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.ReviewException;
+import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.ReviewErrorCode;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+
+import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -92,6 +103,133 @@ class ReviewWriterTest {
                 .isInstanceOf(ReviewException.class)
                 .extracting("errorCode")
                 .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+    }
+
+    @Nested
+    @DisplayName("답 저장")
+    class SaveAnswer {
+
+        @Autowired
+        private ReviewMessageRepository messageRepository;
+        @Autowired
+        private TestEntityManager em;
+
+        @Test
+        @DisplayName("첫 답이면 답을 저장하고 '답하는 중'으로 바꾸며, 후속 질문에 쓸 재료를 돌려준다")
+        void firstAnswer_savesAndReturnsFollowUpInput() {
+            ReviewFinding finding = saveActiveFinding();
+
+            SavedAnswer saved = reviewWriter.saveAnswer(userIdOf(finding), reviewIdOf(finding), finding.getId(), "1~2학년이 제일 많이 사서");
+
+            assertThat(saved.answer().role()).isEqualTo(ReviewMessageRole.USER);
+            assertThat(saved.answer().content()).isEqualTo("1~2학년이 제일 많이 사서");
+            assertThat(saved.status()).isEqualTo(FindingStatus.ANSWERING);
+            assertThat(saved.followUpInput()).isNotNull();
+            assertThat(saved.followUpInput().question()).isEqualTo("질문");
+            assertThat(saved.followUpInput().answer()).isEqualTo("1~2학년이 제일 많이 사서");
+            assertThat(saved.followUpInput().memoContent()).isEqualTo("본문");
+            assertThat(findingRepository.findById(finding.getId()).orElseThrow().getStatus()).isEqualTo(FindingStatus.ANSWERING);
+        }
+
+        @Test
+        @DisplayName("두 번째 답부터는 후속 질문 재료를 돌려주지 않는다")
+        void secondAnswer_hasNoFollowUpInput() {
+            ReviewFinding finding = saveActiveFinding();
+            reviewWriter.saveAnswer(userIdOf(finding), reviewIdOf(finding), finding.getId(), "첫 답");
+
+            SavedAnswer saved = reviewWriter.saveAnswer(userIdOf(finding), reviewIdOf(finding), finding.getId(), "둘째 답");
+
+            assertThat(saved.followUpInput()).isNull();
+            assertThat(messageRepository.findByFindingIdInOrderByIdAsc(List.of(finding.getId())))
+                    .extracting(ReviewMessage::getContent).containsExactly("첫 답", "둘째 답");
+        }
+
+        @Test
+        @DisplayName("AI 후속 질문을 대화에 저장한다")
+        void saveAiMessage() {
+            ReviewFinding finding = saveActiveFinding();
+
+            ReviewMessageResponse message = reviewWriter.saveAiMessage(finding.getId(), "후속 질문?");
+
+            assertThat(message.role()).isEqualTo(ReviewMessageRole.AI);
+            assertThat(message.content()).isEqualTo("후속 질문?");
+        }
+
+        @Test
+        @DisplayName("다른 검토의 카드면 FINDING_NOT_FOUND")
+        void findingOfAnotherReview_throws() {
+            ReviewFinding finding = saveActiveFinding();
+
+            assertThatThrownBy(() -> reviewWriter.saveAnswer(userIdOf(finding), 9999L, finding.getId(), "답"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.FINDING_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("종료된 검토면 REVIEW_NOT_FOUND")
+        void endedReview_throws() {
+            ReviewFinding finding = saveActiveFinding();
+            ReflectionTestUtils.setField(finding.getReview(), "status", ReviewStatus.ENDED);
+            em.flush();
+
+            assertThatThrownBy(() -> reviewWriter.saveAnswer(userIdOf(finding), reviewIdOf(finding), finding.getId(), "답"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("남의 검토면 FORBIDDEN_MEMO")
+        void othersReview_throws() {
+            ReviewFinding finding = saveActiveFinding();
+
+            assertThatThrownBy(() -> reviewWriter.saveAnswer(userIdOf(finding) + 1, reviewIdOf(finding), finding.getId(), "답"))
+                    .isInstanceOf(MemoException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(MemoErrorCode.FORBIDDEN_MEMO);
+        }
+
+        @Test
+        @DisplayName("메모가 휴지통에 있으면 MEMO_NOT_FOUND")
+        void trashedMemo_throws() {
+            ReviewFinding finding = saveActiveFinding();
+            Long userId = userIdOf(finding);
+            Long reviewId = reviewIdOf(finding);
+            memoRepository.moveToTrash(finding.getReview().getMemo().getId(), LocalDateTime.now());
+
+            assertThatThrownBy(() -> reviewWriter.saveAnswer(userId, reviewId, finding.getId(), "답"))
+                    .isInstanceOf(MemoException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(MemoErrorCode.MEMO_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("이미 반영한 카드면 FINDING_ALREADY_APPLIED")
+        void appliedFinding_throws() {
+            ReviewFinding finding = saveActiveFinding();
+            ReflectionTestUtils.setField(finding, "status", FindingStatus.APPLIED);
+            em.flush();
+
+            assertThatThrownBy(() -> reviewWriter.saveAnswer(userIdOf(finding), reviewIdOf(finding), finding.getId(), "답"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.FINDING_ALREADY_APPLIED);
+        }
+
+        private ReviewFinding saveActiveFinding() {
+            Review review = reviewRepository.save(Review.start(saveMemo(), 2, "본문"));
+            return findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, "2. 타깃",
+                    "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", "제목", "짚은 곳", "근거", "질문"));
+        }
+
+        private Long userIdOf(ReviewFinding finding) {
+            return finding.getReview().getMemo().getUser().getId();
+        }
+
+        private Long reviewIdOf(ReviewFinding finding) {
+            return finding.getReview().getId();
+        }
     }
 
     private Memo saveMemo() {

@@ -31,6 +31,7 @@ import org.project.domain.review.support.ValidFindingDraft;
 import org.project.domain.user.entity.User;
 import org.project.global.exception.domainException.MemoException;
 import org.project.global.exception.domainException.ReviewException;
+import org.project.global.exception.domainException.ReviewLengthException;
 import org.project.global.exception.errorcode.MemoErrorCode;
 import org.project.global.exception.errorcode.ReviewErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -105,9 +106,11 @@ class ReviewServiceImplTest {
             givenMyMemo(contentOfLength(299));
 
             assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
-                    .isInstanceOf(ReviewException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ReviewErrorCode.CONTENT_TOO_SHORT);
+                    .isInstanceOfSatisfying(ReviewLengthException.class, e -> {
+                        assertThat(e.getErrorCode()).isEqualTo(ReviewErrorCode.CONTENT_TOO_SHORT);
+                        assertThat(e.getDetail().minLength()).isEqualTo(300);
+                        assertThat(e.getMessage()).isEqualTo("본문이 짧아 검토할 수 없어요. 300자 이상 작성해 주세요.");
+                    });
             verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString());
         }
 
