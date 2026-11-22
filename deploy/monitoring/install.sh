@@ -38,6 +38,8 @@ chmod -R a+rX "$root/grafana"
 install -m 0644 "$source_dir/compose.yaml" "$root/compose.yaml"
 install -m 0644 "$source_dir/prometheus.yml" "$root/prometheus.yml"
 sudo -n docker compose --project-directory "$root" --env-file "$root/monitoring.env" up -d
+# Alert provisioning is loaded at Grafana startup, even if Compose did not recreate it.
+sudo -n docker compose --project-directory "$root" --env-file "$root/monitoring.env" restart grafana
 
 install -d -m 0755 /opt/clustar/caddy/grafana
 config=/opt/clustar/caddy/Caddyfile
