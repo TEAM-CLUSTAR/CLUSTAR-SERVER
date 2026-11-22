@@ -70,7 +70,7 @@ class ReviewAiClientTest {
     void analyze_parsesJsonAndSendsDocument() {
         chatModel.respond(VALID_JSON);
 
-        AnalysisResult result = reviewAiClient.analyze(3L, "전공책 중고거래 기획서", "본문 내용");
+        AnalysisResult result = reviewAiClient.analyze(3L, "전공책 중고거래 기획서", "본문 내용", List.of());
 
         assertThat(result.findings()).hasSize(1);
         assertThat(result.findings().get(0).category()).isEqualTo("CRITERIA");
@@ -91,7 +91,7 @@ class ReviewAiClientTest {
         chatModel.respond("JSON이 아닌 응답");
         chatModel.respond(VALID_JSON);
 
-        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문");
+        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of());
 
         assertThat(result.findings()).hasSize(1);
         assertThat(chatModel.callCount()).isEqualTo(2);
@@ -106,12 +106,32 @@ class ReviewAiClientTest {
         chatModel.fail();
         chatModel.fail();
 
-        assertThatThrownBy(() -> reviewAiClient.analyze(3L, "제목", "본문"))
+        assertThatThrownBy(() -> reviewAiClient.analyze(3L, "제목", "본문", List.of()))
                 .isInstanceOf(ReviewException.class)
                 .extracting("errorCode")
                 .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
         assertThat(chatModel.callCount()).isEqualTo(3);
         verify(logWriter, times(3)).failure(any(), isNull(), any());
+    }
+
+    @Test
+    @DisplayName("다시 검토: 이미 짚은 문장 목록을 '다시 짚지 말 것'으로 함께 보낸다")
+    void analyze_sendsAlreadyFoundAnchors() {
+        chatModel.respond("{\"findings\":[]}");
+
+        reviewAiClient.analyze(3L, "제목", "본문", List.of("학생회가 사물함 관리를 맡는다."));
+
+        assertThat(chatModel.lastPrompt().getContents()).contains("[이미 짚은 문장]", "- 학생회가 사물함 관리를 맡는다.");
+    }
+
+    @Test
+    @DisplayName("처음 검토는 '이미 짚은 문장' 칸을 넣지 않는다")
+    void analyze_firstReviewHasNoAlreadyFoundSection() {
+        chatModel.respond("{\"findings\":[]}");
+
+        reviewAiClient.analyze(3L, "제목", "본문", List.of());
+
+        assertThat(chatModel.lastPrompt().getContents()).doesNotContain("[이미 짚은 문장]");
     }
 
     @Test

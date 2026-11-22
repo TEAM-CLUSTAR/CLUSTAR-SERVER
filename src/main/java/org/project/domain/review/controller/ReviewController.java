@@ -79,6 +79,26 @@ public class ReviewController {
     }
 
     @Operation(
+            summary = "다시 검토",
+            description = """
+                    [다시 검토하기] 버튼. 반영한 문장이 들어간 지금 본문으로 다시 분석해 새 버전을 만듭니다.
+                    - 지금 버전은 종료로 남고(기록 보존), 응답의 `reviewId`가 새로 바뀝니다. 이후 요청은 새 ID로 보내 주세요
+                    - 반영하지 않은 카드는 AI 결과와 상관없이 대화째 그대로 옮겨집니다(답하던 내용 유지)
+                    - 반영한 카드는 목록에서 빠지고, AI가 찾은 새 빈틈이 추가됩니다. 번호는 본문 순서로 다시 매깁니다
+                    - AI가 실패하면 503이고 지금 버전은 그대로 남습니다
+                    """
+    )
+    @PostMapping("/{reviewId}/rerun")
+    @BusinessExceptionDescription(SwaggerResponseDescription.RERUN_REVIEW)
+    public ResponseEntity<ApiResponse<ReviewResponse>> rerunReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId
+    ) {
+        ReviewResponse response = reviewService.rerunReview(userDetails.getUserId(), reviewId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
+    }
+
+    @Operation(
             summary = "검토 종료",
             description = """
                     [검토 종료] 버튼. 진행 중 검토를 끝내고 01 기본 화면으로 돌아갑니다.

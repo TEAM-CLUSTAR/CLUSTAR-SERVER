@@ -10,6 +10,7 @@ import org.project.domain.review.ai.dto.QuestionAnswers;
 import org.project.domain.review.dto.request.ApplyType;
 import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
 import org.project.domain.review.entity.FindingCategory;
@@ -364,6 +365,111 @@ class ReviewWriterTest {
             Review review = reviewRepository.save(Review.start(memo, 2, content));
             return findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, "2. 타깃",
                     ANCHOR, "제목", "짚은 곳", "근거", "질문"));
+        }
+    }
+
+    @Nested
+    @DisplayName("다시 검토")
+    class Rerun {
+
+        private static final String A = "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.";
+        private static final String B = "판매자는 졸업 예정자와 3~4학년이다.";
+        private static final String D = "거래는 학생회관 사물함을 통한 비대면 방식으로 진행한다.";
+        private static final String C = "학생회가 사물함 관리를 맡는다.";
+        private static final String CONTENT = String.join("\n",
+                "2. 타깃", A, "선정 기준: 많이 사기 때문이다.", B, D, C);
+
+        @Autowired
+        private ReviewMessageRepository messageRepository;
+
+        private Review oldReview;
+        private ReviewFinding findingB;
+
+        // v2: A는 반영함, B는 답하는 중(대화 2개), C는 아직 안 건드림
+        private void givenVersionTwo() {
+            User user = userRepository.save(User.createSocialUser("test@test.com", "테스터", null, "google"));
+            Memo memo = memoRepository.save(Memo.createMemo("전공책 중고거래 기획서", CONTENT, user));
+            oldReview = reviewRepository.save(Review.start(memo, 2, "v2 때 본문"));
+
+            ReviewFinding findingA = finding(oldReview, 1, A);
+            findingA.apply("선정 기준: 많이 사기 때문이다.");
+            findingB = finding(oldReview, 2, B);
+            findingB.markAnswering();
+            findingRepository.saveAll(List.of(findingA, findingB, finding(oldReview, 3, C)));
+            messageRepository.save(ReviewMessage.of(findingB, ReviewMessageRole.USER, "책이 남는 학년이라서"));
+            messageRepository.save(ReviewMessage.of(findingB, ReviewMessageRole.AI, "그럼 2학년은 어떤가요?"));
+        }
+
+        @Test
+        @DisplayName("준비: 현재 본문과, 반영하지 않은 카드의 문장만 '이미 짚은 문장'으로 돌려준다")
+        void prepare_returnsUnappliedAnchors() {
+            givenVersionTwo();
+
+            RerunInput input = reviewWriter.prepareRerun(userIdOf(findingB), oldReview.getId());
+
+            assertThat(input.content()).isEqualTo(CONTENT);
+            assertThat(input.title()).isEqualTo("전공책 중고거래 기획서");
+            assertThat(input.excludedAnchors()).containsExactly(B, C);
+        }
+
+        @Test
+        @DisplayName("저장: 이전 버전은 종료로 남기고, 반영 안 한 카드는 대화째 복사, 새 빈틈은 추가, 본문 순서로 번호를 다시 매긴다")
+        void save_createsNextVersion() {
+            givenVersionTwo();
+
+            ReviewResponse response = reviewWriter.saveRerun(oldReview.getId(), CONTENT,
+                    List.of(draft(D), draft(B)), 10);
+
+            assertThat(response.version()).isEqualTo(3);
+            assertThat(response.reviewId()).isNotEqualTo(oldReview.getId());
+            assertThat(response.findings()).extracting(FindingResponse::anchorText).containsExactly(B, D, C);
+            assertThat(response.findings()).extracting(FindingResponse::number).containsExactly(1, 2, 3);
+
+            FindingResponse copiedB = response.findings().get(0);
+            assertThat(copiedB.findingId()).isNotEqualTo(findingB.getId());
+            assertThat(copiedB.status()).isEqualTo(FindingStatus.ANSWERING);
+            assertThat(copiedB.messages()).extracting(ReviewMessageResponse::content)
+                    .containsExactly("책이 남는 학년이라서", "그럼 2학년은 어떤가요?");
+            assertThat(response.findings().get(1).status()).isEqualTo(FindingStatus.OPEN);
+
+            Review saved = reviewRepository.findById(response.reviewId()).orElseThrow();
+            assertThat(saved.isActive()).isTrue();
+            assertThat(saved.getContentSnapshot()).isEqualTo(CONTENT);
+            assertThat(oldReview.getStatus()).isEqualTo(ReviewStatus.ENDED);
+            // 이전 버전 기록은 그대로
+            assertThat(findingRepository.findByReviewIdOrderByNumberAsc(oldReview.getId())).hasSize(3);
+            assertThat(messageRepository.countByFindingIdAndRole(findingB.getId(), ReviewMessageRole.USER)).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("저장: 남은 카드와 새 빈틈을 합쳐 최대 개수를 넘지 않는다(남은 카드가 우선)")
+        void save_respectsMaxFindings() {
+            givenVersionTwo();
+
+            ReviewResponse response = reviewWriter.saveRerun(oldReview.getId(), CONTENT, List.of(draft(D)), 2);
+
+            assertThat(response.findings()).extracting(FindingResponse::anchorText).containsExactly(B, C);
+        }
+
+        @Test
+        @DisplayName("이미 종료된 검토면 REVIEW_NOT_FOUND")
+        void endedReview_throws() {
+            givenVersionTwo();
+            oldReview.end();
+
+            assertThatThrownBy(() -> reviewWriter.saveRerun(oldReview.getId(), CONTENT, List.of(), 10))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+            assertThatThrownBy(() -> reviewWriter.prepareRerun(userIdOf(findingB), oldReview.getId()))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        private ReviewFinding finding(Review review, int number, String anchor) {
+            return ReviewFinding.create(review, number, FindingCategory.CRITERIA, "2. 타깃",
+                    anchor, "제목 " + number, "짚은 곳", "근거", "질문");
         }
     }
 

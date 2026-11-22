@@ -327,6 +327,28 @@ class ReviewControllerTest {
     }
 
     @Test
+    @DisplayName("다시 검토하면 201과 새 버전(새 reviewId)의 카드 목록을 내려준다")
+    @WithMockCustomUser
+    void rerun_created() throws Exception {
+        when(reviewService.rerunReview(1L, 12L)).thenReturn(new ReviewResponse(14L, 3, List.of()));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/rerun"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.reviewId").value(14))
+                .andExpect(jsonPath("$.data.version").value(3));
+    }
+
+    @Test
+    @DisplayName("이미 종료된 검토를 다시 검토하면 404")
+    @WithMockCustomUser
+    void rerun_notFound() throws Exception {
+        when(reviewService.rerunReview(1L, 12L)).thenThrow(new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        mockMvc.perform(post("/api/v1/ai/reviews/12/rerun"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("검토를 종료하면 메모 ID와 현재 버전을 내려준다")
     @WithMockCustomUser
     void end_ok() throws Exception {

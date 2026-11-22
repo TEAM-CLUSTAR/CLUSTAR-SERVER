@@ -21,6 +21,7 @@ import org.project.domain.review.entity.ReviewStatus;
 import org.project.domain.review.repository.ReviewFindingRepository;
 import org.project.domain.review.repository.ReviewMessageRepository;
 import org.project.domain.review.repository.ReviewRepository;
+import org.project.domain.review.support.AnchorTextLocator;
 import org.project.domain.review.support.AppliedTextInserter;
 import org.project.domain.review.support.ValidFindingDraft;
 import org.project.global.exception.domainException.MemoException;
@@ -32,8 +33,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 // 검토 DB 쓰기만 모아 둔 곳.
 // AI 호출(수 초)은 서비스에서 트랜잭션 밖에서 하고, 저장만 여기서 짧은 트랜잭션으로 처리한다
@@ -165,12 +170,7 @@ public class ReviewWriter {
         if (!finding.getReview().isActive()) {
             throw new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
-        if (Boolean.TRUE.equals(memo.getIsDeleted())) {
-            throw new MemoException(MemoErrorCode.MEMO_NOT_FOUND);
-        }
-        if (!memo.getUser().getId().equals(userId)) {
-            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
-        }
+        validateMyMemo(memo, userId);
         if (finding.isApplied()) {
             throw new ReviewException(ReviewErrorCode.FINDING_ALREADY_APPLIED);
         }
@@ -221,5 +221,110 @@ public class ReviewWriter {
         return ReviewResponse.of(review, findings.stream()
                 .map(finding -> FindingResponse.of(finding, List.of()))
                 .toList());
+    }
+
+    // 다시 검토 재료(쓰기 없음): 지금 본문과, 반영하지 않은 카드의 문장
+    @Transactional(readOnly = true)
+    public RerunInput prepareRerun(Long userId, Long reviewId) {
+        Review review = getActiveReview(reviewId);
+        Memo memo = review.getMemo();
+        validateMyMemo(memo, userId);
+
+        List<String> excludedAnchors = findingRepository.findByReviewIdOrderByNumberAsc(reviewId).stream()
+                .filter(finding -> !finding.isApplied())
+                .map(ReviewFinding::getAnchorText)
+                .toList();
+        return new RerunInput(memo.getId(), memo.getTitle(), memo.getContent(), excludedAnchors);
+    }
+
+    // 다시 검토 저장: 지금 버전은 종료로 남기고 새 버전을 만든다.
+    // 반영 안 한 카드는 대화째 새 버전으로 복사(AI 결과와 상관없이 항상 다시 나온다), AI가 찾은 새 빈틈은 추가.
+    // 반영한 카드는 옮기지 않는다(그 문장은 이미 본문에 들어가 있다). 카드 번호는 본문 순서로 다시 매긴다
+    public ReviewResponse saveRerun(Long reviewId, String content, List<ValidFindingDraft> drafts, int maxFindings) {
+        Review previous = getActiveReview(reviewId);
+
+        List<ReviewFinding> carried = findingRepository.findByReviewIdOrderByNumberAsc(reviewId).stream()
+                .filter(finding -> !finding.isApplied())
+                .toList();
+        Set<String> carriedAnchors = carried.stream().map(ReviewFinding::getAnchorText).collect(Collectors.toSet());
+        // 남은 카드를 우선 채우고, 빈자리만큼만 새 빈틈을 받는다(AI가 같은 문장을 또 짚었으면 버림)
+        List<ValidFindingDraft> newDrafts = drafts.stream()
+                .filter(draft -> !carriedAnchors.contains(draft.anchorText()))
+                .limit(Math.max(0, maxFindings - carried.size()))
+                .toList();
+
+        previous.end();
+        Memo memo = previous.getMemo();
+        int version = reviewRepository.findLatestVersion(memo.getId()).orElse(ORIGINAL_VERSION) + 1;
+        Review next = reviewRepository.save(Review.start(memo, version, content));
+
+        List<Slot> slots = new ArrayList<>();
+        carried.forEach(finding -> slots.add(new Slot(positionOf(content, finding.getAnchorText()), finding, null)));
+        newDrafts.forEach(draft -> slots.add(new Slot(positionOf(content, draft.anchorText()), null, draft)));
+        slots.sort(Comparator.comparingInt(Slot::position));
+
+        Map<Long, List<ReviewMessage>> carriedMessages = findMessagesOf(carried);
+        List<FindingResponse> responses = new ArrayList<>();
+        for (int i = 0; i < slots.size(); i++) {
+            Slot slot = slots.get(i);
+            ReviewFinding finding = slot.carried() != null
+                    ? slot.carried().copyTo(next, i + 1)
+                    : createFinding(next, i + 1, slot.draft());
+            findingRepository.save(finding);
+
+            List<ReviewMessageResponse> messages = slot.carried() == null
+                    ? List.of()
+                    : copyMessages(carriedMessages.getOrDefault(slot.carried().getId(), List.of()), finding);
+            responses.add(FindingResponse.of(finding, messages));
+        }
+        return ReviewResponse.of(next, responses);
+    }
+
+    // 새 버전 카드 한 장의 자리: 옮긴 카드(carried) 또는 새 빈틈(draft) 중 하나
+    private record Slot(int position, ReviewFinding carried, ValidFindingDraft draft) {
+    }
+
+    // 본문에서의 위치. 옮긴 카드인데 본문에서 문장이 사라졌으면(다른 탭에서 고침 등) 맨 뒤로 보낸다
+    private int positionOf(String content, String anchorText) {
+        return AnchorTextLocator.locate(content, anchorText)
+                .map(AnchorTextLocator.Located::start)
+                .orElse(Integer.MAX_VALUE);
+    }
+
+    private Map<Long, List<ReviewMessage>> findMessagesOf(List<ReviewFinding> findings) {
+        if (findings.isEmpty()) {
+            return Map.of();
+        }
+        return messageRepository.findByFindingIdInOrderByIdAsc(findings.stream().map(ReviewFinding::getId).toList())
+                .stream()
+                .collect(Collectors.groupingBy(message -> message.getFinding().getId()));
+    }
+
+    // 이전 버전 대화는 그대로 두고 새 카드에 같은 순서로 복사한다
+    private List<ReviewMessageResponse> copyMessages(List<ReviewMessage> messages, ReviewFinding target) {
+        return messages.stream()
+                .map(message -> messageRepository.save(ReviewMessage.of(target, message.getRole(), message.getContent())))
+                .map(ReviewMessageResponse::from)
+                .toList();
+    }
+
+    private ReviewFinding createFinding(Review review, int number, ValidFindingDraft draft) {
+        return ReviewFinding.create(review, number, draft.category(), draft.sectionLabel(), draft.anchorText(),
+                draft.title(), draft.reason(), draft.evidence(), draft.question());
+    }
+
+    private Review getActiveReview(Long reviewId) {
+        return reviewRepository.findById(reviewId)
+                .filter(Review::isActive)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    private void validateMyMemo(Memo memo, Long userId) {
+        if (Boolean.TRUE.equals(memo.getIsDeleted())) {
+            throw new MemoException(MemoErrorCode.MEMO_NOT_FOUND);
+        }
+        if (!memo.getUser().getId().equals(userId)) {
+            throw new MemoException(MemoErrorCode.FORBIDDEN_MEMO);
+        }
     }
 }

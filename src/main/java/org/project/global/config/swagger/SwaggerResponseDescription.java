@@ -149,6 +149,14 @@ public enum SwaggerResponseDescription {
             ReviewErrorCode.ANSWER_REQUIRED,
             ReviewErrorCode.ANCHOR_NOT_FOUND
     ))),
+    RERUN_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.CONTENT_TOO_SHORT,
+            ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
+            ReviewErrorCode.REVIEW_AI_FAILED
+    ))),
     END_REVIEW(new LinkedHashSet<>(Set.of(
             MemoErrorCode.MEMO_NOT_FOUND,
             MemoErrorCode.FORBIDDEN_MEMO,

@@ -88,7 +88,7 @@ class ReviewServiceImplTest {
             String content = contentOfLength(300);
             givenMyMemo(content);
             when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
-            when(reviewAiClient.analyze(MEMO_ID, "전공책 중고거래 기획서", content)).thenReturn(new AnalysisResult(List.of(
+            when(reviewAiClient.analyze(MEMO_ID, "전공책 중고거래 기획서", content, List.of())).thenReturn(new AnalysisResult(List.of(
                     draft(ANCHOR), draft("본문에 없는 문장.")
             )));
             ReviewResponse saved = new ReviewResponse(12L, 2, List.of());
@@ -112,7 +112,7 @@ class ReviewServiceImplTest {
                         assertThat(e.getDetail().minLength()).isEqualTo(300);
                         assertThat(e.getMessage()).isEqualTo("본문이 짧아 검토할 수 없어요. 300자 이상 작성해 주세요.");
                     });
-            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString());
+            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString(), any());
         }
 
         @Test
@@ -126,7 +126,7 @@ class ReviewServiceImplTest {
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
-            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString());
+            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString(), any());
         }
 
         @Test
@@ -135,7 +135,7 @@ class ReviewServiceImplTest {
             String content = contentOfLength(300);
             givenMyMemo(content);
             when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
-            when(reviewAiClient.analyze(anyLong(), anyString(), anyString()))
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any()))
                     .thenReturn(new AnalysisResult(List.of(draft("본문에 없는 문장."))));
 
             assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
@@ -151,7 +151,7 @@ class ReviewServiceImplTest {
             String content = contentOfLength(300);
             givenMyMemo(content);
             when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
-            when(reviewAiClient.analyze(anyLong(), anyString(), anyString())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
             when(reviewWriter.saveNewReview(eq(MEMO_ID), eq(content), eq(List.of())))
                     .thenReturn(new ReviewResponse(12L, 2, List.of()));
 
@@ -164,7 +164,7 @@ class ReviewServiceImplTest {
             String content = contentOfLength(300);
             givenMyMemo(content);
             when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
-            when(reviewAiClient.analyze(anyLong(), anyString(), anyString())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
             when(reviewWriter.saveNewReview(anyLong(), anyString(), any()))
                     .thenThrow(new DataIntegrityViolationException("uk_review_memo_version"));
 
@@ -183,6 +183,76 @@ class ReviewServiceImplTest {
         private FindingDraft draft(String anchorText) {
             return new FindingDraft("CRITERIA", "2. 타깃", anchorText,
                     "타깃 학년을 고른 기준이 없어요", "짚은 곳", "근거", "질문");
+        }
+    }
+
+    @Nested
+    @DisplayName("다시 검토")
+    class RerunReview {
+
+        private static final Long REVIEW_ID = 12L;
+        private static final String ANCHOR = "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.";
+        private static final String LEFT = "학생회가 사물함 관리를 맡는다.";
+        private static final String CONTENT = ANCHOR + "\n" + LEFT + "\n" + "가 ".repeat(150);
+
+        @Test
+        @DisplayName("반영 안 한 카드의 문장을 '이미 짚은 문장'으로 넘겨 분석하고, 거른 결과로 새 버전을 저장한다")
+        void analyzesWithExcludedAnchorsAndSaves() {
+            when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
+                    .thenReturn(new RerunInput(MEMO_ID, "제목", CONTENT, List.of(LEFT)));
+            when(reviewAiClient.analyze(MEMO_ID, "제목", CONTENT, List.of(LEFT)))
+                    .thenReturn(new AnalysisResult(List.of(draft(ANCHOR), draft("본문에 없는 문장."))));
+            ReviewResponse saved = new ReviewResponse(14L, 3, List.of());
+            when(reviewWriter.saveRerun(eq(REVIEW_ID), eq(CONTENT), any(), eq(10))).thenReturn(saved);
+
+            assertThat(reviewService.rerunReview(USER_ID, REVIEW_ID)).isSameAs(saved);
+            verify(reviewWriter).saveRerun(eq(REVIEW_ID), eq(CONTENT), argThat((List<ValidFindingDraft> drafts) ->
+                    drafts.size() == 1 && drafts.get(0).anchorText().equals(ANCHOR)), eq(10));
+        }
+
+        @Test
+        @DisplayName("본문이 300자 미만이면 CONTENT_TOO_SHORT이고 AI를 부르지 않는다")
+        void shortContent_throws() {
+            when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
+                    .thenReturn(new RerunInput(MEMO_ID, "제목", "짧은 본문", List.of()));
+
+            assertThatThrownBy(() -> reviewService.rerunReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(ReviewLengthException.class);
+            verify(reviewAiClient, never()).analyze(anyLong(), anyString(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("AI가 준 빈틈이 전부 본문에 없으면 REVIEW_AI_FAILED이고 이전 버전을 건드리지 않는다")
+        void allInvalid_throws() {
+            when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
+                    .thenReturn(new RerunInput(MEMO_ID, "제목", CONTENT, List.of()));
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any()))
+                    .thenReturn(new AnalysisResult(List.of(draft("본문에 없는 문장."))));
+
+            assertThatThrownBy(() -> reviewService.rerunReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
+            verify(reviewWriter, never()).saveRerun(anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt());
+        }
+
+        @Test
+        @DisplayName("동시에 두 번 눌러 같은 버전을 저장하려 하면 REVIEW_ALREADY_IN_PROGRESS")
+        void concurrentRerun_throws() {
+            when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
+                    .thenReturn(new RerunInput(MEMO_ID, "제목", CONTENT, List.of()));
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewWriter.saveRerun(anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenThrow(new DataIntegrityViolationException("uk_review_memo_version"));
+
+            assertThatThrownBy(() -> reviewService.rerunReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+
+        private FindingDraft draft(String anchorText) {
+            return new FindingDraft("CRITERIA", "2. 타깃", anchorText, "제목", "짚은 곳", "근거", "질문");
         }
     }
 

@@ -1,5 +1,8 @@
 package org.project.domain.review.ai;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 // AI 검토 프롬프트 모음. 기획 문서(노션 'AI 검토 기능 요구사항', 피그마 와이어프레임)의 규칙을 옮긴 것
 public final class ReviewPrompts {
 
@@ -159,7 +162,15 @@ public final class ReviewPrompts {
                 """.formatted(sectionLabel, anchorText, questionAnswers, outputFormat);
     }
 
-    public static String analysisUser(String title, String content, String outputFormat) {
+    // excludedAnchors: 다시 검토할 때 아직 반영하지 않은 카드의 문장. 서버가 그대로 들고 가므로 AI는 새 빈틈만 찾는다
+    public static String analysisUser(String title, String content, List<String> excludedAnchors, String outputFormat) {
+        String excluded = excludedAnchors.isEmpty() ? "" : """
+                [이미 짚은 문장]
+                아래 문장에는 이미 빈틈 카드가 있다. 이 문장들은 다시 짚지 말고, 그 밖의 새 빈틈만 찾는다.
+                %s
+
+                """.formatted(excludedAnchors.stream().map(anchor -> "- " + anchor).collect(Collectors.joining("\n")));
+
         return """
                 [문서 제목]
                 %s
@@ -167,8 +178,8 @@ public final class ReviewPrompts {
                 [본문]
                 %s
 
-                [출력 형식]
+                %s[출력 형식]
                 %s
-                """.formatted(title, content, outputFormat);
+                """.formatted(title, content, excluded, outputFormat);
     }
 }

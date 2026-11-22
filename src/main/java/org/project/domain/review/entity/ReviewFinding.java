@@ -99,6 +99,14 @@ public class ReviewFinding extends BaseEntity {
         return finding;
     }
 
+    // 다시 검토할 때 반영하지 않은 카드를 새 버전으로 옮긴다(이전 버전의 카드는 기록으로 그대로 둔다)
+    public ReviewFinding copyTo(Review nextReview, int nextNumber) {
+        ReviewFinding copy = create(nextReview, nextNumber, category, sectionLabel, anchorText,
+                title, reason, evidence, question);
+        copy.status = this.status;
+        return copy;
+    }
+
     // 답을 하나라도 보내면 '답하는 중'
     public void markAnswering() {
         this.status = FindingStatus.ANSWERING;

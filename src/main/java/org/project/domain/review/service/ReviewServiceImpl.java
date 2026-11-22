@@ -61,14 +61,7 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
 
-        AnalysisResult analysis = reviewAiClient.analyze(memoId, memo.getTitle(), content);
-        List<ValidFindingDraft> drafts = FindingDrafts.sanitize(
-                content, analysis.findings(), reviewProperties.getMaxFindings());
-
-        // AI가 빈틈을 줬는데 전부 본문에서 못 찾았다면 '빈틈 0개'가 아니라 분석 실패다
-        if (drafts.isEmpty() && !analysis.findings().isEmpty()) {
-            throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
-        }
+        List<ValidFindingDraft> drafts = analyzeAndSanitize(memoId, memo.getTitle(), content, List.of());
 
         try {
             return reviewWriter.saveNewReview(memoId, content, drafts);
@@ -76,6 +69,37 @@ public class ReviewServiceImpl implements ReviewService {
             // 동시에 두 요청이 같은 버전을 저장하려 하면 (memo_id, version) 유니크 제약에 걸린다
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
+    }
+
+    // 재료 준비(읽기) → AI 분석(트랜잭션 밖, 반영 안 한 카드 문장은 제외하라고 알림) → 새 버전 저장(짧은 트랜잭션).
+    // AI가 실패하면 저장 단계까지 가지 않으므로 지금 버전이 그대로 남는다
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ReviewResponse rerunReview(Long userId, Long reviewId) {
+        RerunInput input = reviewWriter.prepareRerun(userId, reviewId);
+        validateContentLength(input.content());
+
+        List<ValidFindingDraft> drafts = analyzeAndSanitize(
+                input.memoId(), input.title(), input.content(), input.excludedAnchors());
+
+        try {
+            return reviewWriter.saveRerun(reviewId, input.content(), drafts, reviewProperties.getMaxFindings());
+        } catch (DataIntegrityViolationException e) {
+            // [다시 검토하기]를 동시에 두 번 누르면 같은 버전을 저장하려다 유니크 제약에 걸린다
+            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+    }
+
+    private List<ValidFindingDraft> analyzeAndSanitize(Long memoId, String title, String content, List<String> excludedAnchors) {
+        AnalysisResult analysis = reviewAiClient.analyze(memoId, title, content, excludedAnchors);
+        List<ValidFindingDraft> drafts = FindingDrafts.sanitize(
+                content, analysis.findings(), reviewProperties.getMaxFindings());
+
+        // AI가 빈틈을 줬는데 전부 본문에서 못 찾았다면 '빈틈 0개'가 아니라 분석 실패다
+        if (drafts.isEmpty() && !analysis.findings().isEmpty()) {
+            throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
+        }
+        return drafts;
     }
 
     // 반영 문장은 반영할 때 이미 본문에 들어갔고 재임베딩도 끝났으므로, 상태만 '종료'로 바꾼다.

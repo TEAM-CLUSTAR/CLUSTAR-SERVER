@@ -53,19 +53,20 @@ public class ReviewAiClient {
 
     // 실패하거나 JSON이 깨지면 1초 → 2초 간격으로 최대 3번 시도한다(기존 RAG 생성과 같은 정책)
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
-    public AnalysisResult analyze(Long memoId, String title, String content) {
+    // excludedAnchors: 다시 검토일 때 이미 카드가 있는 문장(처음 검토면 빈 목록)
+    public AnalysisResult analyze(Long memoId, String title, String content, List<String> excludedAnchors) {
         ReviewAiCall call = new ReviewAiCall(
                 memoId,
                 ReviewAiCallType.ANALYSIS,
                 properties.getAi().getModel(),
                 ReviewPrompts.analysisSystem(properties.getMaxFindings()),
-                ReviewPrompts.analysisUser(title, content, analysisConverter.getFormat())
+                ReviewPrompts.analysisUser(title, content, excludedAnchors, analysisConverter.getFormat())
         );
         return request(call, properties.getAi().getAnalysisTemperature(), this::parseAnalysis);
     }
 
     @Recover
-    public AnalysisResult recoverAnalyze(Exception e, Long memoId, String title, String content) {
+    public AnalysisResult recoverAnalyze(Exception e, Long memoId, String title, String content, List<String> excludedAnchors) {
         log.error("AI 검토 분석 실패(재시도 소진) [memoId={}, error={}]", memoId, e.getMessage(), e);
         throw new ReviewException(ReviewErrorCode.REVIEW_AI_FAILED);
     }

@@ -82,7 +82,7 @@ class ReviewGeminiSmokeTest {
 
     private void run(ReviewAiClient client, String title, String content, StringBuilder report) {
         long startedAt = System.currentTimeMillis();
-        AnalysisResult result = client.analyze(0L, title, content);
+        AnalysisResult result = client.analyze(0L, title, content, List.of());
         long latency = System.currentTimeMillis() - startedAt;
         List<ValidFindingDraft> kept = FindingDrafts.sanitize(content, result.findings(), 10);
 
