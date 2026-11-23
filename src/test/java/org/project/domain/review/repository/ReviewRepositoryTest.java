@@ -6,6 +6,9 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.review.entity.FindingCategory;
 import org.project.domain.review.entity.Review;
+import org.project.domain.review.entity.ReviewAiCallLog;
+import org.project.domain.review.entity.ReviewAiCallLog.ReviewAiCall;
+import org.project.domain.review.entity.ReviewAiCallType;
 import org.project.domain.review.entity.ReviewFinding;
 import org.project.domain.review.entity.ReviewMessage;
 import org.project.domain.review.entity.ReviewMessageRole;
@@ -41,6 +44,8 @@ class ReviewRepositoryTest {
     private MemoRepository memoRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private ReviewAiCallLogRepository callLogRepository;
     @Autowired
     private TestEntityManager em;
 
@@ -100,6 +105,9 @@ class ReviewRepositoryTest {
         Review review = reviewRepository.save(Review.start(memo, 2, "본문"));
         ReviewFinding finding = findingRepository.save(finding(review, 1));
         messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "답"));
+        callLogRepository.save(ReviewAiCallLog.success(
+                new ReviewAiCall(memo.getId(), ReviewAiCallType.ANALYSIS, "model", "system", "본문과 답이 담긴 요청"),
+                "응답", 10L));
         em.flush();
 
         memoRepository.moveToTrash(memo.getId(), LocalDateTime.now());
@@ -108,6 +116,23 @@ class ReviewRepositoryTest {
         assertThat(reviewRepository.count()).isZero();
         assertThat(findingRepository.count()).isZero();
         assertThat(messageRepository.count()).isZero();
+        assertThat(callLogRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("소제목과 카드 제목이 255자를 넘어도 그대로 저장된다")
+    void longSectionLabelAndTitle_areSaved() {
+        Review review = reviewRepository.save(Review.start(saveMemo(), 2, "본문"));
+        String longText = "가".repeat(300);
+
+        findingRepository.save(ReviewFinding.create(review, 1, FindingCategory.CRITERIA, longText,
+                "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", longText, "짚은 곳", "근거", "질문"));
+        em.flush();
+        em.clear();
+
+        ReviewFinding saved = findingRepository.findByReviewIdOrderByNumberAsc(review.getId()).get(0);
+        assertThat(saved.getSectionLabel()).isEqualTo(longText);
+        assertThat(saved.getTitle()).isEqualTo(longText);
     }
 
     private Memo saveMemo() {

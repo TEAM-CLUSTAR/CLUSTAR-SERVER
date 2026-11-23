@@ -132,7 +132,8 @@ public final class ReviewPrompts {
                 사용자가 질문에 답한 내용을, 원래 문서의 해당 문장 아래에 들어갈 문장으로 다듬는다.
 
                 [규칙]
-                - 질문 하나당 한 줄을 만든다. 줄마다 짧은 라벨 하나와 문장 하나.
+                - 질문 하나당 한 줄을 만든다. 질문 수와 lines 수가 반드시 같아야 하고, 질문 순서대로 쓴다. 어떤 질문도 빠뜨리지 않는다.
+                - 줄마다 짧은 라벨 하나와 문장 하나. label과 sentence는 비워 두지 않는다.
                 - label: 그 질문이 묻는 것을 요약한 2~8자 명사구. 예: "선정 기준", "그 외 학생"
                 - sentence: 문서체("~다")로 끝나는 문장. 한 질문에 답이 여러 개면 한 문장으로 자연스럽게 합친다.
                 - 사용자 답에 있는 내용만 쓴다. 답에 없는 사실, 숫자, 이유, 대상, 고유명사를 절대 보태지 않는다.
@@ -149,7 +150,7 @@ public final class ReviewPrompts {
                 """;
     }
 
-    public static String refineUser(String sectionLabel, String anchorText, String questionAnswers, String outputFormat) {
+    public static String refineUser(String sectionLabel, String anchorText, int questionCount, String questionAnswers, String outputFormat) {
         return """
                 [원래 문서의 문장] (%s)
                 %s
@@ -157,9 +158,11 @@ public final class ReviewPrompts {
                 [질문과 사용자 답]
                 %s
 
+                질문이 %d개이므로 lines도 정확히 %d개를 질문 순서대로 만든다.
+
                 [출력 형식]
                 %s
-                """.formatted(sectionLabel, anchorText, questionAnswers, outputFormat);
+                """.formatted(sectionLabel, anchorText, questionAnswers, questionCount, questionCount, outputFormat);
     }
 
     // excludedAnchors: 다시 검토할 때 아직 반영하지 않은 카드의 문장. 서버가 그대로 들고 가므로 AI는 새 빈틈만 찾는다

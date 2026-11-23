@@ -38,6 +38,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ReviewServiceImpl implements ReviewService {
 
+    private static final String VERSION_UNIQUE_CONSTRAINT = "uk_review_memo_version";
+
     // 한 번도 검토하지 않은 원본 문서의 버전
     private static final int ORIGINAL_VERSION = 1;
 
@@ -66,8 +68,7 @@ public class ReviewServiceImpl implements ReviewService {
         try {
             return reviewWriter.saveNewReview(memoId, content, drafts);
         } catch (DataIntegrityViolationException e) {
-            // 동시에 두 요청이 같은 버전을 저장하려 하면 (memo_id, version) 유니크 제약에 걸린다
-            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+            throw toInProgressIfVersionConflict(e);
         }
     }
 
@@ -83,11 +84,22 @@ public class ReviewServiceImpl implements ReviewService {
                 input.memoId(), input.title(), input.content(), input.excludedAnchors());
 
         try {
-            return reviewWriter.saveRerun(reviewId, input.content(), drafts, reviewProperties.getMaxFindings());
+            return reviewWriter.saveRerun(input.memoId(), reviewId, input.content(), drafts, reviewProperties.getMaxFindings());
         } catch (DataIntegrityViolationException e) {
-            // [다시 검토하기]를 동시에 두 번 누르면 같은 버전을 저장하려다 유니크 제약에 걸린다
-            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+            throw toInProgressIfVersionConflict(e);
         }
+    }
+
+    // 저장 전 메모 잠금으로 막지만, 혹시 같은 버전을 두 번 저장하려 하면 (memo_id, version) 유니크 제약이 마지막으로 막는다.
+    // 그 경우만 '진행 중' 409로 바꾸고, 다른 DB 오류(글자 수 초과 등)는 원인이 로그에 남도록 그대로 던진다
+    private RuntimeException toInProgressIfVersionConflict(DataIntegrityViolationException e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase().contains(VERSION_UNIQUE_CONSTRAINT)) {
+                return new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+            }
+        }
+        return e;
     }
 
     private List<ValidFindingDraft> analyzeAndSanitize(Long memoId, String title, String content, List<String> excludedAnchors) {

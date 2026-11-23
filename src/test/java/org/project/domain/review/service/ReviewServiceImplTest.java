@@ -174,6 +174,20 @@ class ReviewServiceImplTest {
                     .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
 
+        @Test
+        @DisplayName("버전 충돌이 아닌 DB 오류(예: 글자 수 초과)는 '진행 중' 409로 바꾸지 않고 그대로 던진다")
+        void otherDataIntegrityError_isNotInProgress() {
+            String content = contentOfLength(300);
+            givenMyMemo(content);
+            when(reviewRepository.findByMemoIdAndStatus(MEMO_ID, ReviewStatus.ACTIVE)).thenReturn(Optional.empty());
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewWriter.saveNewReview(anyLong(), anyString(), any()))
+                    .thenThrow(new DataIntegrityViolationException("value too long for column section_label"));
+
+            assertThatThrownBy(() -> reviewService.startReview(USER_ID, MEMO_ID))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        }
+
         // 공백을 섞어 정확히 length 글자(제목 제외, 공백 포함)인 본문. 앞에 짚을 문장이 들어 있다
         private String contentOfLength(int length) {
             String base = ANCHOR + "\n";
@@ -203,10 +217,10 @@ class ReviewServiceImplTest {
             when(reviewAiClient.analyze(MEMO_ID, "제목", CONTENT, List.of(LEFT)))
                     .thenReturn(new AnalysisResult(List.of(draft(ANCHOR), draft("본문에 없는 문장."))));
             ReviewResponse saved = new ReviewResponse(14L, 3, List.of());
-            when(reviewWriter.saveRerun(eq(REVIEW_ID), eq(CONTENT), any(), eq(10))).thenReturn(saved);
+            when(reviewWriter.saveRerun(eq(MEMO_ID), eq(REVIEW_ID), eq(CONTENT), any(), eq(10))).thenReturn(saved);
 
             assertThat(reviewService.rerunReview(USER_ID, REVIEW_ID)).isSameAs(saved);
-            verify(reviewWriter).saveRerun(eq(REVIEW_ID), eq(CONTENT), argThat((List<ValidFindingDraft> drafts) ->
+            verify(reviewWriter).saveRerun(eq(MEMO_ID), eq(REVIEW_ID), eq(CONTENT), argThat((List<ValidFindingDraft> drafts) ->
                     drafts.size() == 1 && drafts.get(0).anchorText().equals(ANCHOR)), eq(10));
         }
 
@@ -233,7 +247,7 @@ class ReviewServiceImplTest {
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
-            verify(reviewWriter, never()).saveRerun(anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt());
+            verify(reviewWriter, never()).saveRerun(anyLong(), anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt());
         }
 
         @Test
@@ -242,13 +256,26 @@ class ReviewServiceImplTest {
             when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
                     .thenReturn(new RerunInput(MEMO_ID, "제목", CONTENT, List.of()));
             when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
-            when(reviewWriter.saveRerun(anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt()))
+            when(reviewWriter.saveRerun(anyLong(), anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt()))
                     .thenThrow(new DataIntegrityViolationException("uk_review_memo_version"));
 
             assertThatThrownBy(() -> reviewService.rerunReview(USER_ID, REVIEW_ID))
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("버전 충돌이 아닌 DB 오류는 '진행 중' 409로 바꾸지 않고 그대로 던진다")
+        void otherDataIntegrityError_isNotInProgress() {
+            when(reviewWriter.prepareRerun(USER_ID, REVIEW_ID))
+                    .thenReturn(new RerunInput(MEMO_ID, "제목", CONTENT, List.of()));
+            when(reviewAiClient.analyze(anyLong(), anyString(), anyString(), any())).thenReturn(new AnalysisResult(List.of()));
+            when(reviewWriter.saveRerun(anyLong(), anyLong(), anyString(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenThrow(new DataIntegrityViolationException("value too long for column section_label"));
+
+            assertThatThrownBy(() -> reviewService.rerunReview(USER_ID, REVIEW_ID))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         }
 
         private FindingDraft draft(String anchorText) {

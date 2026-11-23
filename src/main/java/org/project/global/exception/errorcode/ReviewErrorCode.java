@@ -15,7 +15,8 @@ public enum ReviewErrorCode implements ErrorCode {
     ANSWER_TOO_LONG(HttpStatus.BAD_REQUEST, 400, "답변이 너무 길어요. 최대 글자 수 이하로 줄여 주세요."),
     ANSWER_REQUIRED(HttpStatus.BAD_REQUEST, 400, "답을 1개 이상 작성해야 반영할 수 있어요."),
     APPLY_TEXT_REQUIRED(HttpStatus.BAD_REQUEST, 400, "반영할 문장을 입력해 주세요."),
-    ANCHOR_NOT_FOUND(HttpStatus.CONFLICT, 409, "본문이 바뀌어 반영할 위치를 찾을 수 없어요.");
+    ANCHOR_NOT_FOUND(HttpStatus.CONFLICT, 409, "본문이 바뀌어 반영할 위치를 찾을 수 없어요."),
+    MEMO_IN_TRASH(HttpStatus.CONFLICT, 409, "검토하는 동안 메모가 휴지통으로 옮겨졌어요. 메모를 복원한 뒤 다시 검토해 주세요.");
 
     private final HttpStatus status;
     private final int code;

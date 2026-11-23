@@ -114,6 +114,19 @@ class ReviewWriterTest {
                 .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
     }
 
+    @Test
+    @DisplayName("분석하는 사이 메모가 휴지통으로 갔으면 MEMO_IN_TRASH이고 검토를 저장하지 않는다")
+    void trashedWhileAnalyzing_throws() {
+        Memo memo = saveMemo();
+        memoRepository.moveToTrash(memo.getId(), LocalDateTime.now());
+
+        assertThatThrownBy(() -> reviewWriter.saveNewReview(memo.getId(), "본문", List.of(draft("첫 문장."))))
+                .isInstanceOf(ReviewException.class)
+                .extracting("errorCode")
+                .isEqualTo(ReviewErrorCode.MEMO_IN_TRASH);
+        assertThat(reviewRepository.findLatestVersion(memo.getId())).isEmpty();
+    }
+
     @Nested
     @DisplayName("답 저장")
     class SaveAnswer {
@@ -162,6 +175,30 @@ class ReviewWriterTest {
 
             assertThat(message.role()).isEqualTo(ReviewMessageRole.AI);
             assertThat(message.content()).isEqualTo("후속 질문?");
+        }
+
+        @Test
+        @DisplayName("질문을 기다리는 사이 카드를 반영했으면 질문을 저장하지 않고 null을 돌려준다")
+        void saveAiMessage_appliedFinding_returnsNull() {
+            ReviewFinding finding = saveActiveFinding();
+            finding.apply("반영한 문장");
+
+            ReviewMessageResponse message = reviewWriter.saveAiMessage(finding.getId(), "후속 질문?");
+
+            assertThat(message).isNull();
+            assertThat(messageRepository.countByFindingIdAndRole(finding.getId(), ReviewMessageRole.AI)).isZero();
+        }
+
+        @Test
+        @DisplayName("질문을 기다리는 사이 검토가 끝났으면(종료·다시 검토) 질문을 저장하지 않고 null을 돌려준다")
+        void saveAiMessage_endedReview_returnsNull() {
+            ReviewFinding finding = saveActiveFinding();
+            finding.getReview().end();
+
+            ReviewMessageResponse message = reviewWriter.saveAiMessage(finding.getId(), "후속 질문?");
+
+            assertThat(message).isNull();
+            assertThat(messageRepository.countByFindingIdAndRole(finding.getId(), ReviewMessageRole.AI)).isZero();
         }
 
         @Test
@@ -417,7 +454,7 @@ class ReviewWriterTest {
         void save_createsNextVersion() {
             givenVersionTwo();
 
-            ReviewResponse response = reviewWriter.saveRerun(oldReview.getId(), CONTENT,
+            ReviewResponse response = reviewWriter.saveRerun(memoIdOf(oldReview), oldReview.getId(), CONTENT,
                     List.of(draft(D), draft(B)), 10);
 
             assertThat(response.version()).isEqualTo(3);
@@ -446,7 +483,7 @@ class ReviewWriterTest {
         void save_respectsMaxFindings() {
             givenVersionTwo();
 
-            ReviewResponse response = reviewWriter.saveRerun(oldReview.getId(), CONTENT, List.of(draft(D)), 2);
+            ReviewResponse response = reviewWriter.saveRerun(memoIdOf(oldReview), oldReview.getId(), CONTENT, List.of(draft(D)), 2);
 
             assertThat(response.findings()).extracting(FindingResponse::anchorText).containsExactly(B, C);
         }
@@ -457,7 +494,7 @@ class ReviewWriterTest {
             givenVersionTwo();
             oldReview.end();
 
-            assertThatThrownBy(() -> reviewWriter.saveRerun(oldReview.getId(), CONTENT, List.of(), 10))
+            assertThatThrownBy(() -> reviewWriter.saveRerun(memoIdOf(oldReview), oldReview.getId(), CONTENT, List.of(), 10))
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
@@ -465,6 +502,21 @@ class ReviewWriterTest {
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("분석하는 사이 메모가 휴지통으로 갔으면 MEMO_IN_TRASH이고 이전 버전은 진행 중으로 남는다")
+        void trashedWhileAnalyzing_throws() {
+            givenVersionTwo();
+            Long memoId = memoIdOf(oldReview);
+            memoRepository.moveToTrash(memoId, LocalDateTime.now());
+
+            assertThatThrownBy(() -> reviewWriter.saveRerun(memoId, oldReview.getId(), CONTENT, List.of(draft(D)), 10))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.MEMO_IN_TRASH);
+            assertThat(reviewRepository.findById(oldReview.getId()).orElseThrow().isActive()).isTrue();
+            assertThat(reviewRepository.findLatestVersion(memoId)).contains(2);
         }
 
         private ReviewFinding finding(Review review, int number, String anchor) {
@@ -481,6 +533,10 @@ class ReviewWriterTest {
 
     private Long userIdOf(ReviewFinding finding) {
         return finding.getReview().getMemo().getUser().getId();
+    }
+
+    private Long memoIdOf(Review review) {
+        return review.getMemo().getId();
     }
 
     private Long reviewIdOf(ReviewFinding finding) {

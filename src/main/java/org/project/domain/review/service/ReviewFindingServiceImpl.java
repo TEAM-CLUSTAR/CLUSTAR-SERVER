@@ -69,8 +69,9 @@ public class ReviewFindingServiceImpl implements ReviewFindingService {
         try {
             String question = reviewAiClient.followUp(saved.followUpInput());
             return reviewWriter.saveAiMessage(findingId, question);
-        } catch (ReviewException e) {
-            log.warn("후속 질문 없이 응답 [findingId={}]", findingId);
+        } catch (RuntimeException e) {
+            // 답은 이미 저장됐다. 질문만 없을 뿐이니 실패로 응답하지 않는다(실패로 보이면 같은 답을 다시 보내 중복된다)
+            log.warn("후속 질문 없이 응답 [findingId={}, error={}]", findingId, e.getMessage(), e);
             return null;
         }
     }

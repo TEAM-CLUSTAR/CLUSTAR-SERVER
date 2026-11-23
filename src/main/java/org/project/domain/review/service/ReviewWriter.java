@@ -104,8 +104,18 @@ public class ReviewWriter {
         }
     }
 
+    // 질문을 만드는 몇 초 사이 카드를 반영했거나 검토가 끝났으면(종료·다시 검토) 답할 곳이 없으니 저장하지 않고 null
     public ReviewMessageResponse saveAiMessage(Long findingId, String content) {
-        ReviewFinding finding = findingRepository.getReferenceById(findingId);
+        findingRepository.lockById(findingId)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.FINDING_NOT_FOUND));
+        ReviewFinding finding = findingRepository.findById(findingId)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.FINDING_NOT_FOUND));
+        // 같은 요청에서 답을 저장할 때 읽어 둔 카드·검토가 캐시에 남아 있으므로(open-in-view) DB에서 다시 읽는다
+        entityManager.refresh(finding);
+        entityManager.refresh(finding.getReview());
+        if (!finding.getReview().isActive() || finding.isApplied()) {
+            return null;
+        }
         return ReviewMessageResponse.from(messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.AI, content)));
     }
 
@@ -139,6 +149,20 @@ public class ReviewWriter {
         entityManager.createNativeQuery("SELECT memo_id FROM memo WHERE memo_id = :memoId FOR UPDATE")
                 .setParameter("memoId", memoId)
                 .getResultList();
+    }
+
+    // 검토 저장용 메모 잠금. 잠근 시점의 휴지통 여부를 DB에서 바로 읽는다(먼저 읽어 둔 엔티티는 옛 상태일 수 있다)
+    private void lockLiveMemo(Long memoId) {
+        List<?> rows = entityManager
+                .createNativeQuery("SELECT is_deleted FROM memo WHERE memo_id = :memoId FOR UPDATE")
+                .setParameter("memoId", memoId)
+                .getResultList();
+        if (rows.isEmpty()) {
+            throw new MemoException(MemoErrorCode.MEMO_NOT_FOUND);
+        }
+        if (Boolean.TRUE.equals(rows.get(0))) {
+            throw new ReviewException(ReviewErrorCode.MEMO_IN_TRASH);
+        }
     }
 
     // 내 답 원문: 보낸 순서대로 줄바꿈으로 잇는다(다듬기 응답의 rawText와 같은 규칙)
@@ -192,7 +216,9 @@ public class ReviewWriter {
     }
 
     public ReviewResponse saveNewReview(Long memoId, String content, List<ValidFindingDraft> drafts) {
-        // 서비스에서 확인한 뒤 AI가 분석하는 사이 다른 요청이 먼저 저장했을 수 있어 한 번 더 확인한다
+        // AI가 분석하는 사이 다른 요청이 먼저 저장했거나 메모가 휴지통으로 갔을 수 있다.
+        // 메모를 잠근 뒤 다시 확인해야, 동시에 들어온 요청이 둘 다 통과해 진행 중 검토가 2개 생기지 않는다
+        lockLiveMemo(memoId);
         if (reviewRepository.findByMemoIdAndStatus(memoId, ReviewStatus.ACTIVE).isPresent()) {
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
@@ -240,10 +266,20 @@ public class ReviewWriter {
     // 다시 검토 저장: 지금 버전은 종료로 남기고 새 버전을 만든다.
     // 반영 안 한 카드는 대화째 새 버전으로 복사(AI 결과와 상관없이 항상 다시 나온다), AI가 찾은 새 빈틈은 추가.
     // 반영한 카드는 옮기지 않는다(그 문장은 이미 본문에 들어가 있다). 카드 번호는 본문 순서로 다시 매긴다
-    public ReviewResponse saveRerun(Long reviewId, String content, List<ValidFindingDraft> drafts, int maxFindings) {
-        Review previous = getActiveReview(reviewId);
+    public ReviewResponse saveRerun(Long memoId, Long reviewId, String content, List<ValidFindingDraft> drafts, int maxFindings) {
+        // 메모를 먼저 잠그고 나서 검토·카드를 읽는다. 동시에 누른 다른 요청이 이미 끝낸 버전이면 여기서 걸러진다
+        lockLiveMemo(memoId);
+        Review previous = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+        // 요청 하나가 영속성 컨텍스트를 끝까지 쓰므로(open-in-view) 준비 단계에서 읽어 둔 옛 상태가 남아 있다. DB에서 다시 읽는다
+        entityManager.refresh(previous);
+        if (!previous.isActive() || !previous.getMemo().getId().equals(memoId)) {
+            throw new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
 
-        List<ReviewFinding> carried = findingRepository.findByReviewIdOrderByNumberAsc(reviewId).stream()
+        List<ReviewFinding> findings = findingRepository.findByReviewIdOrderByNumberAsc(reviewId);
+        findings.forEach(entityManager::refresh);
+        List<ReviewFinding> carried = findings.stream()
                 .filter(finding -> !finding.isApplied())
                 .toList();
         Set<String> carriedAnchors = carried.stream().map(ReviewFinding::getAnchorText).collect(Collectors.toSet());

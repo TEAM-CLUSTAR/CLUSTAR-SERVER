@@ -25,7 +25,9 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +43,8 @@ import java.util.stream.IntStream;
 public class ReviewAiClient {
 
     private static final String JSON_MIME_TYPE = "application/json";
-    private static final Pattern NUMBER = Pattern.compile("\\d+");
+    // 1,000처럼 쉼표가 낀 숫자와 3.5 같은 소수를 한 덩어리로 본다
+    private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
 
     private final ChatModel chatModel;
     private final ReviewProperties properties;
@@ -111,6 +114,7 @@ public class ReviewAiClient {
                 ReviewPrompts.refineUser(
                         input.sectionLabel(),
                         input.anchorText(),
+                        input.questionAnswers().size(),
                         formatQuestionAnswers(input.questionAnswers()),
                         refineConverter.getFormat()
                 )
@@ -154,13 +158,23 @@ public class ReviewAiClient {
     }
 
     // "답에 없는 내용은 넣지 않는다"는 약속을 값싸게 지키는 장치: 답에 없던 숫자가 나오면 실패로 본다
+    // 글자 포함이 아니라 숫자끼리 비교한다(1000 안의 100은 다른 숫자, 1,000과 1000은 같은 숫자)
     private void rejectNewNumbers(String refined, String rawAnswers) {
-        Matcher matcher = NUMBER.matcher(refined);
-        while (matcher.find()) {
-            if (!rawAnswers.contains(matcher.group())) {
-                throw new IllegalStateException("답에 없던 숫자가 다듬은 문장에 들어감: " + matcher.group());
+        Set<String> answerNumbers = extractNumbers(rawAnswers);
+        for (String number : extractNumbers(refined)) {
+            if (!answerNumbers.contains(number)) {
+                throw new IllegalStateException("답에 없던 숫자가 다듬은 문장에 들어감: " + number);
             }
         }
+    }
+
+    private Set<String> extractNumbers(String text) {
+        Set<String> numbers = new HashSet<>();
+        Matcher matcher = NUMBER.matcher(text);
+        while (matcher.find()) {
+            numbers.add(matcher.group().replace(",", ""));
+        }
+        return numbers;
     }
 
     // 한 번 호출하고, 응답을 해석하고, 성공/실패를 기록한다

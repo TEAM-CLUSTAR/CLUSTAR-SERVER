@@ -6,15 +6,21 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+import org.project.domain.memo.entity.Memo;
 import org.project.global.entity.BaseEntity;
 
 // 검토 AI 호출 기록(디버깅·품질 확인용). 시도마다 한 줄씩 남긴다.
-// 메모가 지워져도 기록은 남도록 FK 없이 memoId만 둔다
+// 요청 원문에 메모 본문과 사용자 답이 들어가므로, 메모가 영구 삭제되면 DB가 기록도 함께 지운다
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -30,6 +36,12 @@ public class ReviewAiCallLog extends BaseEntity {
 
     @Column(name = "memo_id", nullable = false)
     private Long memoId;
+
+    // FK + ON DELETE CASCADE만 걸기 위한 연결. 저장은 위 memoId로 한다
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "memo_id", insertable = false, updatable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Memo memo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "call_type", nullable = false)

@@ -103,6 +103,21 @@ class ReviewFindingServiceImplTest {
         }
 
         @Test
+        @DisplayName("답 저장 뒤 질문 저장에서 예상 못 한 오류가 나도 500이 아니라 aiMessage만 null로 돌려준다")
+        void saveAiMessageFails_answerStillOk() {
+            FollowUpInput input = followUpInput("첫 답");
+            when(reviewWriter.saveAnswer(USER_ID, REVIEW_ID, FINDING_ID, "첫 답"))
+                    .thenReturn(new SavedAnswer(message(501L, ReviewMessageRole.USER, "첫 답"), FindingStatus.ANSWERING, input));
+            when(reviewAiClient.followUp(input)).thenReturn("후속 질문?");
+            when(reviewWriter.saveAiMessage(FINDING_ID, "후속 질문?")).thenThrow(new IllegalStateException("DB 연결 끊김"));
+
+            AnswerResponse response = findingService.answer(USER_ID, REVIEW_ID, FINDING_ID, "첫 답");
+
+            assertThat(response.answer().messageId()).isEqualTo(501L);
+            assertThat(response.aiMessage()).isNull();
+        }
+
+        @Test
         @DisplayName("답은 1000자까지 허용하고, 넘으면 ANSWER_TOO_LONG이며 저장하지 않는다")
         void tooLongAnswer_throws() {
             when(reviewWriter.saveAnswer(USER_ID, REVIEW_ID, FINDING_ID, "가".repeat(1000)))

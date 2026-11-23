@@ -44,14 +44,14 @@ public class ReviewFinding extends BaseEntity {
     private FindingCategory category;
 
     // 위치. 예: "2. 타깃"
-    @Column(name = "section_label")
+    @Column(name = "section_label", columnDefinition = "TEXT")
     private String sectionLabel;
 
     // AI가 짚은 본문 문장 원문. 프론트는 이 문장으로 밑줄을 긋고, 서버는 반영 위치를 찾는다
     @Column(name = "anchor_text", nullable = false, columnDefinition = "TEXT")
     private String anchorText;
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = false, columnDefinition = "TEXT")
     private String title;
 
     // 짚은 곳

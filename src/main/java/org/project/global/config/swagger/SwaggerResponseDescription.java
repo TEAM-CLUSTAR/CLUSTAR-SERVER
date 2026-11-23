@@ -120,7 +120,8 @@ public enum SwaggerResponseDescription {
             MemoErrorCode.FORBIDDEN_MEMO,
             ReviewErrorCode.CONTENT_TOO_SHORT,
             ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
-            ReviewErrorCode.REVIEW_AI_FAILED
+            ReviewErrorCode.REVIEW_AI_FAILED,
+            ReviewErrorCode.MEMO_IN_TRASH
     ))),
     ANSWER_FINDING(new LinkedHashSet<>(Set.of(
             MemoErrorCode.MEMO_NOT_FOUND,
@@ -155,7 +156,8 @@ public enum SwaggerResponseDescription {
             ReviewErrorCode.REVIEW_NOT_FOUND,
             ReviewErrorCode.CONTENT_TOO_SHORT,
             ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
-            ReviewErrorCode.REVIEW_AI_FAILED
+            ReviewErrorCode.REVIEW_AI_FAILED,
+            ReviewErrorCode.MEMO_IN_TRASH
     ))),
     END_REVIEW(new LinkedHashSet<>(Set.of(
             MemoErrorCode.MEMO_NOT_FOUND,

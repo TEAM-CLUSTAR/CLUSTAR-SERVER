@@ -190,6 +190,57 @@ class ReviewAiClientTest {
         assertThat(chatModel.callCount()).isEqualTo(2);
     }
 
+    @Test
+    @DisplayName("다듬기: 질문 수만큼, 질문 순서대로 한 줄씩 만들라고 개수를 알려 준다")
+    void refine_tellsLineCountMatchingQuestions() {
+        chatModel.respond("{\"lines\":[{\"label\":\"선정 기준\",\"sentence\":\"1~2학년이 많이 사기 때문이다.\"}]}");
+
+        reviewAiClient.refine(refineInput());
+
+        assertThat(chatModel.lastPrompt().getContents()).contains("질문이 2개이므로 lines도 정확히 2개");
+    }
+
+    @Test
+    @DisplayName("다듬기: 답의 숫자 일부만 떼어 쓴 숫자(1000 → 100)는 답에 없던 숫자로 보고 다시 요청한다")
+    void refine_rejectsNumberThatIsOnlyPartOfAnswerNumber() {
+        chatModel.respond("{\"lines\":[{\"label\":\"예산\",\"sentence\":\"예산은 100원이다.\"}]}");
+        chatModel.respond("{\"lines\":[{\"label\":\"예산\",\"sentence\":\"예산은 1000원이다.\"}]}");
+
+        String refined = reviewAiClient.refine(singleAnswerInput("예산은 1000원"));
+
+        assertThat(refined).isEqualTo("예산: 예산은 1000원이다.");
+        assertThat(chatModel.callCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("다듬기: 15%를 5%로 바꾼 것도 답에 없던 숫자로 본다")
+    void refine_rejectsChangedPercent() {
+        chatModel.respond("{\"lines\":[{\"label\":\"수수료\",\"sentence\":\"수수료는 5%이다.\"}]}");
+        chatModel.respond("{\"lines\":[{\"label\":\"수수료\",\"sentence\":\"수수료는 15%이다.\"}]}");
+
+        String refined = reviewAiClient.refine(singleAnswerInput("수수료 15%"));
+
+        assertThat(refined).isEqualTo("수수료: 수수료는 15%이다.");
+        assertThat(chatModel.callCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("다듬기: 1,000과 1000처럼 쉼표만 다른 숫자는 같은 숫자로 본다")
+    void refine_acceptsSameNumberWithoutComma() {
+        chatModel.respond("{\"lines\":[{\"label\":\"예산\",\"sentence\":\"예산은 1000원이다.\"}]}");
+
+        String refined = reviewAiClient.refine(singleAnswerInput("예산은 1,000원"));
+
+        assertThat(refined).isEqualTo("예산: 예산은 1000원이다.");
+        assertThat(chatModel.callCount()).isEqualTo(1);
+    }
+
+    private RefineInput singleAnswerInput(String answer) {
+        return new RefineInput(3L, "4. 운영", "수수료는 받지 않고 학생회 예산으로 운영한다.", List.of(
+                new QuestionAnswers("운영 비용은 어떻게 마련하나요?", List.of(answer))
+        ));
+    }
+
     private RefineInput refineInput() {
         return new RefineInput(3L, "2. 타깃", "전공책이 필요한 1~2학년 재학생을 주 사용자로 한다.", List.of(
                 new QuestionAnswers("여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
