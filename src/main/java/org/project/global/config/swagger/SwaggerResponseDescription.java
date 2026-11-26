@@ -108,6 +108,61 @@ public enum SwaggerResponseDescription {
             MemoErrorCode.TOO_MANY_FILES,
             MemoErrorCode.IMAGE_TOO_LARGE,
             MemoErrorCode.FILE_TOO_LARGE
+    ))),
+
+    // == AI 검토 == //
+    GET_ACTIVE_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO
+    ))),
+    START_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.CONTENT_TOO_SHORT,
+            ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
+            ReviewErrorCode.REVIEW_AI_FAILED,
+            ReviewErrorCode.MEMO_IN_TRASH
+    ))),
+    ANSWER_FINDING(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.FINDING_NOT_FOUND,
+            ReviewErrorCode.FINDING_ALREADY_APPLIED,
+            ReviewErrorCode.ANSWER_TOO_LONG
+    ))),
+    REFINE_FINDING(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.FINDING_NOT_FOUND,
+            ReviewErrorCode.FINDING_ALREADY_APPLIED,
+            ReviewErrorCode.ANSWER_REQUIRED,
+            ReviewErrorCode.REVIEW_AI_FAILED
+    ))),
+    APPLY_FINDING(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.FINDING_NOT_FOUND,
+            ReviewErrorCode.FINDING_ALREADY_APPLIED,
+            ReviewErrorCode.APPLY_TEXT_REQUIRED,
+            ReviewErrorCode.ANSWER_REQUIRED,
+            ReviewErrorCode.ANCHOR_NOT_FOUND
+    ))),
+    RERUN_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND,
+            ReviewErrorCode.CONTENT_TOO_SHORT,
+            ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS,
+            ReviewErrorCode.REVIEW_AI_FAILED,
+            ReviewErrorCode.MEMO_IN_TRASH
+    ))),
+    END_REVIEW(new LinkedHashSet<>(Set.of(
+            MemoErrorCode.MEMO_NOT_FOUND,
+            MemoErrorCode.FORBIDDEN_MEMO,
+            ReviewErrorCode.REVIEW_NOT_FOUND
     )));
 
     private final Set<ErrorCode> errorCodeList;

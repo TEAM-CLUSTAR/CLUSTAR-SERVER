@@ -87,6 +87,16 @@ spring:
           jdbc:
             initialize-schema: never
 
+review:
+  min-content-length: 300     # 검토 가능한 최소 본문 길이(제목 제외, 공백 포함)
+  max-findings: 10            # 한 번 검토할 때 최대 빈틈 카드 수
+  max-answer-length: 1000     # 답 하나의 최대 길이(공백 포함)
+  ai:
+    model: gemini-2.5-flash
+    analysis-temperature: 0.2 # 같은 글에 비슷한 결과가 나오도록 낮게
+    question-temperature: 0.3 # 후속 질문은 답에 맞춰 조금 더 유연하게
+    refine-temperature: 0.1   # 다듬기는 답에 없는 내용을 보태지 않도록 가장 낮게
+
 memo:
   recommendation:
     cohesion-threshold: 0.62
