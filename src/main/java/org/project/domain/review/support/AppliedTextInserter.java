@@ -9,8 +9,9 @@ public final class AppliedTextInserter {
     private AppliedTextInserter() {
     }
 
-    public static Optional<String> insertAfterAnchorLine(String content, String anchorText, String appliedText) {
-        return AnchorTextLocator.locate(content, anchorText)
+    // 같은 문장이 여러 장에 있으면 카드의 소제목 아래 문장을 기준으로 한다
+    public static Optional<String> insertAfterAnchorLine(String content, String sectionLabel, String anchorText, String appliedText) {
+        return AnchorTextLocator.locate(content, sectionLabel, anchorText)
                 .map(located -> {
                     int anchorEnd = located.start() + located.text().length();
                     int lineEnd = content.indexOf('\n', anchorEnd);

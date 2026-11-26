@@ -53,6 +53,8 @@ public class ReviewAiClient {
     private final BeanOutputConverter<AnalysisResult> analysisConverter = new BeanOutputConverter<>(AnalysisResult.class);
     private final BeanOutputConverter<FollowUpResult> followUpConverter = new BeanOutputConverter<>(FollowUpResult.class);
     private final BeanOutputConverter<RefineResult> refineConverter = new BeanOutputConverter<>(RefineResult.class);
+    // 분석 응답 스키마. 유형을 세 값으로 묶어 Gemini가 스키마 밖의 유형을 만들지 못하게 한다
+    private final String analysisSchema = AnalysisSchema.withCategoryEnum(analysisConverter.getJsonSchema());
 
     // 실패하거나 JSON이 깨지면 1초 → 2초 간격으로 최대 3번 시도한다(기존 RAG 생성과 같은 정책)
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
@@ -65,7 +67,7 @@ public class ReviewAiClient {
                 ReviewPrompts.analysisSystem(properties.getMaxFindings()),
                 ReviewPrompts.analysisUser(title, content, excludedAnchors, analysisConverter.getFormat())
         );
-        return request(call, properties.getAi().getAnalysisTemperature(), this::parseAnalysis);
+        return request(call, properties.getAi().getAnalysisTemperature(), analysisSchema, this::parseAnalysis);
     }
 
     @Recover
@@ -94,7 +96,7 @@ public class ReviewAiClient {
                         followUpConverter.getFormat()
                 )
         );
-        return request(call, properties.getAi().getQuestionTemperature(), this::parseFollowUp);
+        return request(call, properties.getAi().getQuestionTemperature(), null, this::parseFollowUp);
     }
 
     @Recover
@@ -119,7 +121,7 @@ public class ReviewAiClient {
                         refineConverter.getFormat()
                 )
         );
-        return request(call, properties.getAi().getRefineTemperature(), text -> parseRefine(text, input.rawText()));
+        return request(call, properties.getAi().getRefineTemperature(), null, text -> parseRefine(text, input.rawText()));
     }
 
     @Recover
@@ -178,7 +180,8 @@ public class ReviewAiClient {
     }
 
     // 한 번 호출하고, 응답을 해석하고, 성공/실패를 기록한다
-    private <T> T request(ReviewAiCall call, double temperature, Function<String, T> parser) {
+    // responseSchema: 응답 JSON 모양을 Gemini에 강제할 때만 넘긴다(없으면 null)
+    private <T> T request(ReviewAiCall call, double temperature, String responseSchema, Function<String, T> parser) {
         long startedAt = System.currentTimeMillis();
         String responseText = null;
         try {
@@ -188,6 +191,7 @@ public class ReviewAiClient {
                             .model(call.model())
                             .temperature(temperature)
                             .responseMimeType(JSON_MIME_TYPE)
+                            .responseSchema(responseSchema)
                             .build()
             ));
             responseText = extractText(response);

@@ -129,9 +129,13 @@ public class ReviewWriter {
         lockMemo(finding.getReview().getMemo().getId());
         Memo memo = finding.getReview().getMemo();
         validateAnswerable(finding, memo, userId);
+        // 다듬은 문장이든 원문이든 내 답이 1개 이상 있어야 반영할 수 있다(API를 바로 불러도 막힌다)
+        if (messageRepository.countByFindingIdAndRole(findingId, ReviewMessageRole.USER) == 0) {
+            throw new ReviewException(ReviewErrorCode.ANSWER_REQUIRED);
+        }
 
         String appliedText = type == ApplyType.RAW ? rawAnswers(findingId) : text;
-        String newContent = AppliedTextInserter.insertAfterAnchorLine(memo.getContent(), finding.getAnchorText(), appliedText)
+        String newContent = AppliedTextInserter.insertAfterAnchorLine(memo.getContent(), finding.getSectionLabel(), finding.getAnchorText(), appliedText)
                 .orElseThrow(() -> new ReviewException(ReviewErrorCode.ANCHOR_NOT_FOUND));
 
         memo.update(memo.getTitle(), newContent);
@@ -171,9 +175,6 @@ public class ReviewWriter {
                 .filter(message -> message.getRole() == ReviewMessageRole.USER)
                 .map(ReviewMessage::getContent)
                 .toList();
-        if (answers.isEmpty()) {
-            throw new ReviewException(ReviewErrorCode.ANSWER_REQUIRED);
-        }
         return String.join("\n", answers);
     }
 
@@ -295,8 +296,8 @@ public class ReviewWriter {
         Review next = reviewRepository.save(Review.start(memo, version, content));
 
         List<Slot> slots = new ArrayList<>();
-        carried.forEach(finding -> slots.add(new Slot(positionOf(content, finding.getAnchorText()), finding, null)));
-        newDrafts.forEach(draft -> slots.add(new Slot(positionOf(content, draft.anchorText()), null, draft)));
+        carried.forEach(finding -> slots.add(new Slot(positionOf(content, finding.getSectionLabel(), finding.getAnchorText()), finding, null)));
+        newDrafts.forEach(draft -> slots.add(new Slot(positionOf(content, draft.sectionLabel(), draft.anchorText()), null, draft)));
         slots.sort(Comparator.comparingInt(Slot::position));
 
         Map<Long, List<ReviewMessage>> carriedMessages = findMessagesOf(carried);
@@ -321,8 +322,8 @@ public class ReviewWriter {
     }
 
     // 본문에서의 위치. 옮긴 카드인데 본문에서 문장이 사라졌으면(다른 탭에서 고침 등) 맨 뒤로 보낸다
-    private int positionOf(String content, String anchorText) {
-        return AnchorTextLocator.locate(content, anchorText)
+    private int positionOf(String content, String sectionLabel, String anchorText) {
+        return AnchorTextLocator.locate(content, sectionLabel, anchorText)
                 .map(AnchorTextLocator.Located::start)
                 .orElse(Integer.MAX_VALUE);
     }

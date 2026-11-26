@@ -86,6 +86,42 @@ class ReviewAiClientTest {
     }
 
     @Test
+    @DisplayName("글의 목적(documentGoal)을 먼저 쓰게 하고, 함께 와도 빈틈 목록을 읽는다")
+    void analyze_readsDocumentGoalWithFindings() {
+        chatModel.respond(VALID_JSON.replaceFirst("\\{", "{\"documentGoal\":\"버려지는 전공책을 싸게 다시 쓰게 한다\","));
+
+        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of());
+
+        assertThat(result.documentGoal()).isEqualTo("버려지는 전공책을 싸게 다시 쓰게 한다");
+        assertThat(result.findings()).hasSize(1);
+        assertThat(chatModel.lastPrompt().getContents()).contains("documentGoal");
+    }
+
+    @Test
+    @DisplayName("분석 호출은 유형을 세 값으로 묶은 응답 스키마를 함께 보내고, Gemini 스키마로 읽힌다")
+    void analyze_sendsSchemaWithCategoryEnum() {
+        chatModel.respond(VALID_JSON);
+
+        reviewAiClient.analyze(3L, "제목", "본문", List.of());
+
+        String schema = ((GoogleGenAiChatOptions) chatModel.lastPrompt().getOptions()).getResponseSchema();
+        assertThat(schema).contains("\"enum\":[\"CRITERIA\",\"STAKEHOLDER\",\"EDGE_CASE\"]").doesNotContain("$schema");
+        // 필드별 규칙이 스키마 설명으로 실린다
+        assertThat(schema).contains("'~습니다'는 쓰지 않는다", "계획이나 해결책을 요구하지 않는다");
+        assertThat(com.google.genai.types.Schema.fromJson(schema).properties()).isPresent();
+    }
+
+    @Test
+    @DisplayName("후속 질문·다듬기는 응답 스키마를 보내지 않는다")
+    void followUp_sendsNoSchema() {
+        chatModel.respond("{\"question\":\"그 기준에 맞지 않는 학생은 어떻게 되나요?\"}");
+
+        reviewAiClient.followUp(new FollowUpInput(3L, "제목", "본문", "", "문장", "짚은 곳", "근거", "첫 질문", "답"));
+
+        assertThat(((GoogleGenAiChatOptions) chatModel.lastPrompt().getOptions()).getResponseSchema()).isNull();
+    }
+
+    @Test
     @DisplayName("첫 응답이 JSON이 아니면 다시 요청해서 성공한다")
     void analyze_retriesOnBrokenJson() {
         chatModel.respond("JSON이 아닌 응답");

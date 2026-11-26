@@ -331,6 +331,7 @@ class ReviewWriterTest {
         @DisplayName("다듬은 문장을 짚은 문장 다음 줄에 넣고, 카드를 반영됨으로 바꾸고, 재임베딩 이벤트를 낸다")
         void refined_insertsIntoMemoAndMarksApplied() {
             ReviewFinding finding = saveFindingInMemo(CONTENT);
+            answer(finding);
 
             ApplyResponse response = reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(),
                     ApplyType.REFINED, "선정 기준: 1~2학년이 많이 사기 때문이다.");
@@ -372,9 +373,39 @@ class ReviewWriterTest {
         }
 
         @Test
+        @DisplayName("같은 문장이 다른 장에도 있으면 카드의 소제목(2. 타깃) 아래 문장 다음 줄에 넣는다")
+        void duplicatedSentence_insertsInFindingSection() {
+            String content = "1. 배경\n" + ANCHOR + "\n2. 타깃\n" + ANCHOR + "\n판매자는 졸업 예정자와 3~4학년이다.";
+            ReviewFinding finding = saveFindingInMemo(content);
+            answer(finding);
+
+            ApplyResponse response = reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(),
+                    ApplyType.REFINED, "추가 문장");
+
+            assertThat(response.content()).isEqualTo(
+                    "1. 배경\n" + ANCHOR + "\n2. 타깃\n" + ANCHOR + "\n추가 문장\n판매자는 졸업 예정자와 3~4학년이다.");
+        }
+
+        @Test
+        @DisplayName("다듬은 문장 반영이어도 답이 없으면 ANSWER_REQUIRED이고 본문은 그대로다")
+        void refinedWithoutAnswers_throws() {
+            ReviewFinding finding = saveFindingInMemo(CONTENT);
+
+            assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(),
+                    ApplyType.REFINED, "답 없이 보낸 문장"))
+                    .isInstanceOf(ReviewException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ReviewErrorCode.ANSWER_REQUIRED);
+            assertThat(memoRepository.findById(finding.getReview().getMemo().getId()).orElseThrow().getContent())
+                    .isEqualTo(CONTENT);
+            assertThat(events.stream(MemoTextUpdatedEvent.class)).isEmpty();
+        }
+
+        @Test
         @DisplayName("본문이 바뀌어 짚은 문장을 못 찾으면 ANCHOR_NOT_FOUND이고 반영하지 않는다")
         void anchorMissing_throws() {
             ReviewFinding finding = saveFindingInMemo("2. 타깃\n누군가 고쳐 쓴 문장.");
+            answer(finding);
 
             assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장"))
                     .isInstanceOf(ReviewException.class)
@@ -388,12 +419,17 @@ class ReviewWriterTest {
         @DisplayName("이미 반영한 카드면 FINDING_ALREADY_APPLIED(두 번 눌러도 한 번만 들어감)")
         void appliedTwice_throws() {
             ReviewFinding finding = saveFindingInMemo(CONTENT);
+            answer(finding);
             reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장");
 
             assertThatThrownBy(() -> reviewWriter.apply(userIdOf(finding), reviewIdOf(finding), finding.getId(), ApplyType.REFINED, "문장"))
                     .isInstanceOf(ReviewException.class)
                     .extracting("errorCode")
                     .isEqualTo(ReviewErrorCode.FINDING_ALREADY_APPLIED);
+        }
+
+        private void answer(ReviewFinding finding) {
+            messageRepository.save(ReviewMessage.of(finding, ReviewMessageRole.USER, "내 답"));
         }
 
         private ReviewFinding saveFindingInMemo(String content) {

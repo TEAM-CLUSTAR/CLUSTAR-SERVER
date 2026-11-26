@@ -84,6 +84,19 @@ class FindingDraftsTest {
         assertThat(result.get(0).anchorText()).isEqualTo(TARGET);
     }
 
+    @Test
+    @DisplayName("같은 문장이 여러 장에 있으면 AI가 적은 소제목 위치로 순서를 정한다")
+    void duplicatedSentence_sortsBySectionPosition() {
+        String content = "1. 배경\n세부 내용은 추후 정한다.\n2. 타깃\n" + TARGET + "\n3. 거래 방식\n세부 내용은 추후 정한다.\n";
+
+        List<ValidFindingDraft> result = FindingDrafts.sanitize(content, List.of(
+                new FindingDraft("CRITERIA", "3. 거래 방식", "세부 내용은 추후 정한다.", "제목", "짚은 곳", "근거", "질문"),
+                new FindingDraft("CRITERIA", "2. 타깃", TARGET, "제목", "짚은 곳", "근거", "질문")
+        ), 10);
+
+        assertThat(result).extracting(ValidFindingDraft::sectionLabel).containsExactly("2. 타깃", "3. 거래 방식");
+    }
+
     private FindingDraft draft(String category, String anchorText) {
         return new FindingDraft(category, "섹션", anchorText, "제목", "짚은 곳", "근거", "질문");
     }

@@ -36,7 +36,7 @@ public final class FindingDrafts {
             return Optional.empty();
         }
 
-        return AnchorTextLocator.locate(content, draft.anchorText())
+        return AnchorTextLocator.locate(content, draft.sectionLabel(), draft.anchorText())
                 .map(located -> new Positioned(
                         new ValidFindingDraft(
                                 category.get(),
