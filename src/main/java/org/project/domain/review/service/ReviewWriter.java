@@ -8,11 +8,13 @@ import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.review.ai.dto.FollowUpInput;
 import org.project.domain.review.ai.dto.QuestionAnswers;
 import org.project.domain.review.ai.dto.RefineInput;
+import org.project.domain.review.ai.dto.ResolvedGap;
 import org.project.domain.review.dto.request.ApplyType;
 import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.dto.response.FindingResponse;
 import org.project.domain.review.dto.response.ReviewMessageResponse;
 import org.project.domain.review.dto.response.ReviewResponse;
+import org.project.domain.review.entity.FindingStatus;
 import org.project.domain.review.entity.Review;
 import org.project.domain.review.entity.ReviewFinding;
 import org.project.domain.review.entity.ReviewMessage;
@@ -261,7 +263,12 @@ public class ReviewWriter {
                 .filter(finding -> !finding.isApplied())
                 .map(ReviewFinding::getAnchorText)
                 .toList();
-        return new RerunInput(memo.getId(), memo.getTitle(), memo.getContent(), excludedAnchors);
+        // 반영한 카드는 새 버전으로 옮기지 않으므로, 이전 버전들까지 모아 AI에게 '이미 반영한 빈틈'으로 알린다
+        List<ResolvedGap> resolvedGaps = findingRepository
+                .findByReview_Memo_IdAndStatusOrderByIdAsc(memo.getId(), FindingStatus.APPLIED).stream()
+                .map(finding -> new ResolvedGap(finding.getTitle(), finding.getAnchorText(), finding.getAppliedText()))
+                .toList();
+        return new RerunInput(memo.getId(), memo.getTitle(), memo.getContent(), excludedAnchors, resolvedGaps);
     }
 
     // 다시 검토 저장: 지금 버전은 종료로 남기고 새 버전을 만든다.

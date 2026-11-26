@@ -144,7 +144,7 @@ class ReviewGeminiSmokeTest {
 
     private Map<String, Object> run(ReviewAiClient client, EvalMemo memo) {
         long startedAt = System.currentTimeMillis();
-        AnalysisResult result = client.analyze(0L, memo.title(), memo.content(), List.of());
+        AnalysisResult result = client.analyze(0L, memo.title(), memo.content(), List.of(), List.of());
         long latency = System.currentTimeMillis() - startedAt;
         List<ValidFindingDraft> kept = FindingDrafts.sanitize(memo.content(), result.findings(), 10);
 

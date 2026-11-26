@@ -111,4 +111,25 @@ class AnchorTextLocatorTest {
 
         assertThat(located.orElseThrow().start()).isEqualTo(content.lastIndexOf("운영 방식은"));
     }
+
+    @Test
+    @DisplayName("AI가 따옴표 모양을 바꿔 줘도, 뒤 장의 똑같은 문장보다 소제목 아래 문장을 먼저 찾는다")
+    void quoteDifference_prefersSectionOverLaterExactMatch() {
+        String content = "## 대상\n학생은 “동의”한다.\n## 운영\n학생은 \"동의\"한다.\n";
+
+        var located = AnchorTextLocator.locate(content, "대상", "학생은 \"동의\"한다.");
+
+        assertThat(located.orElseThrow().start()).isEqualTo(content.indexOf("학생은 “동의”"));
+        assertThat(located.get().text()).isEqualTo("학생은 “동의”한다.");
+    }
+
+    @Test
+    @DisplayName("소제목 \"운영\"을 찾을 때 \"운영 비용\" 줄이 아니라 줄 전체가 \"운영\"인 곳을 기준으로 한다")
+    void sectionLabelPrefix_prefersWholeLineMatch() {
+        String content = "## 운영 비용\n월 10만 원이 든다.\n## 운영\n월 10만 원이 든다.\n";
+
+        var located = AnchorTextLocator.locate(content, "운영", "월 10만 원이 든다.");
+
+        assertThat(located.orElseThrow().start()).isEqualTo(content.lastIndexOf("월 10만 원이 든다."));
+    }
 }

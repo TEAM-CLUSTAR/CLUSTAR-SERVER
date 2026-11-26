@@ -7,6 +7,7 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.memo.event.MemoTextUpdatedEvent;
 import org.project.domain.review.ai.dto.QuestionAnswers;
+import org.project.domain.review.ai.dto.ResolvedGap;
 import org.project.domain.review.dto.request.ApplyType;
 import org.project.domain.review.dto.response.ApplyResponse;
 import org.project.domain.review.ai.dto.RefineInput;
@@ -483,6 +484,26 @@ class ReviewWriterTest {
             assertThat(input.content()).isEqualTo(CONTENT);
             assertThat(input.title()).isEqualTo("전공책 중고거래 기획서");
             assertThat(input.excludedAnchors()).containsExactly(B, C);
+            assertThat(input.resolvedGaps()).containsExactly(new ResolvedGap("제목 1", A, "선정 기준: 많이 사기 때문이다."));
+        }
+
+        @Test
+        @DisplayName("준비: 이전 버전에서 반영한 빈틈도 '이미 반영한 빈틈'으로 함께 돌려준다")
+        void prepare_includesGapsAppliedInEarlierVersions() {
+            givenVersionTwo();
+            Memo memo = oldReview.getMemo();
+            oldReview.end();
+            Review v3 = reviewRepository.save(Review.start(memo, 3, CONTENT));
+            ReviewFinding appliedInV3 = finding(v3, 1, D);
+            appliedInV3.apply("방식 기준: 시간을 맞추기 어렵다.");
+            findingRepository.saveAll(List.of(appliedInV3, finding(v3, 2, C)));
+
+            RerunInput input = reviewWriter.prepareRerun(userIdOf(findingB), v3.getId());
+
+            assertThat(input.excludedAnchors()).containsExactly(C);
+            assertThat(input.resolvedGaps()).containsExactly(
+                    new ResolvedGap("제목 1", A, "선정 기준: 많이 사기 때문이다."),
+                    new ResolvedGap("제목 1", D, "방식 기준: 시간을 맞추기 어렵다."));
         }
 
         @Test

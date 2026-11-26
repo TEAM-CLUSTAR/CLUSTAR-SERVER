@@ -1,5 +1,7 @@
 package org.project.domain.review.ai;
 
+import org.project.domain.review.ai.dto.ResolvedGap;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -96,8 +98,13 @@ public final class ReviewPrompts {
                 - 넓히기: 답한 내용대로 되면 실제로 어떤 결과나 상황이 생기는지 묻는다.
                 - 부딪히기: 답한 내용이 글의 다른 부분과 어긋나거나, 답에서 빠진 대상이 없는지 묻는다.
 
+                [답이 첫 질문과 동떨어졌을 때]
+                먼저 사용자 답이 첫 질문이 묻는 것에 답했는지 본다.
+                다른 이야기를 했거나("기준"을 물었는데 위치를 답함), 모르겠다고만 했으면 넓히기·부딪히기를 하지 않는다.
+                대신 답한 말을 해요체로 짧게 이어받은 뒤, 첫 질문이 묻는 핵심을 더 쉽고 구체적으로 다시 묻는다.
+
                 [규칙]
-                - 사용자 답에 나온 말을 이어받아 묻는다. 첫 질문을 되풀이하지 않는다.
+                - 사용자 답에 나온 말을 이어받아 묻는다. 답이 첫 질문에 맞게 왔으면 첫 질문을 되풀이하지 않는다.
                 - 한 가지만 묻는 짧은 열린 질문 1개, 해요체, 물음표로 끝낸다.
                 - "~하며", "그리고"처럼 두 가지를 한 번에 묻지 않는다.
                 - 정답, 예시, 선택지, 가능한 이유나 상황의 목록을 넣지 않는다.
@@ -108,6 +115,10 @@ public final class ReviewPrompts {
                 첫 질문: 여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?
                 사용자 답: 음 1~2학년이 기초 전공책을 제일 많이 사서
                 {"question":"그 기준으로 보면, 기준에 맞지 않는 학생은 이 서비스에서 어떤 위치에 있나요?"}
+
+                첫 질문: 가격을 정가의 30~50% 안에서 정하도록 한 기준은 무엇인가요?
+                사용자 답: 사물함은 학생회관 1층에 20칸 있어요
+                {"question":"사물함 위치는 정해졌네요. 그럼 가격 범위를 정가의 30~50%로 정한 이유는 무엇인가요?"}
                 """;
     }
 
@@ -190,13 +201,26 @@ public final class ReviewPrompts {
     }
 
     // excludedAnchors: 다시 검토할 때 아직 반영하지 않은 카드의 문장. 서버가 그대로 들고 가므로 AI는 새 빈틈만 찾는다
-    public static String analysisUser(String title, String content, List<String> excludedAnchors, String outputFormat) {
+    // resolvedGaps: 이미 반영한 빈틈. 넣은 문장으로 해결됐으면 같은 빈틈을 다시 내지 않게 한다
+    public static String analysisUser(String title, String content, List<String> excludedAnchors,
+                                      List<ResolvedGap> resolvedGaps, String outputFormat) {
         String excluded = excludedAnchors.isEmpty() ? "" : """
                 [이미 짚은 문장]
                 아래 문장에는 이미 빈틈 카드가 있다. 이 문장들은 다시 짚지 말고, 그 밖의 새 빈틈만 찾는다.
                 %s
 
                 """.formatted(excludedAnchors.stream().map(anchor -> "- " + anchor).collect(Collectors.joining("\n")));
+
+        String resolved = resolvedGaps.isEmpty() ? "" : """
+                [이미 반영한 빈틈]
+                사용자가 아래 빈틈에 답해 본문에 문장을 넣었다. 넣은 문장이 그 빈틈을 해결했으면 같은 빈틈을 다시 내지 않는다.
+                넣은 문장이 빈틈과 상관없거나 여전히 부족할 때만 다시 낸다. 같은 문장을 짚더라도 다른 빈틈이면 내도 된다.
+                %s
+
+                """.formatted(resolvedGaps.stream()
+                .map(gap -> "- 빈틈: %s / 짚은 문장: %s / 넣은 문장: %s".formatted(
+                        gap.title(), gap.anchorText(), gap.appliedText().replace("\n", " ")))
+                .collect(Collectors.joining("\n")));
 
         return """
                 [문서 제목]
@@ -205,8 +229,8 @@ public final class ReviewPrompts {
                 [본문]
                 %s
 
-                %s[출력 형식]
+                %s%s[출력 형식]
                 %s
-                """.formatted(title, content, excluded, outputFormat);
+                """.formatted(title, content, excluded, resolved, outputFormat);
     }
 }

@@ -30,13 +30,9 @@ public final class AnchorTextLocator {
         return find(content, trimmed, 0);
     }
 
-    // from 위치부터 처음 나오는 문장
+    // from 위치부터 가장 가까운 문장. 띄어쓰기·따옴표 차이를 무시하고 비교한다
+    // (글자까지 같은 문장을 먼저 찾으면, 따옴표만 다른 소제목 아래 문장을 건너뛰고 뒤 장의 문장을 잡는다)
     private static Optional<Located> find(String content, String anchor, int from) {
-        int exact = content.indexOf(anchor, from);
-        if (exact >= 0) {
-            return Optional.of(new Located(anchor, exact));
-        }
-
         Normalized normalizedContent = normalize(content);
         String normalizedAnchor = normalize(anchor).text();
         if (normalizedAnchor.isEmpty()) {
@@ -56,19 +52,36 @@ public final class AnchorTextLocator {
         return Optional.of(new Located(content.substring(start, end), start));
     }
 
-    // 소제목 줄의 위치. 같은 말이 본문 중간에도 나올 수 있어 줄 첫머리(앞에 공백·#만 있는 곳)를 먼저 보고,
-    // 없으면 처음 나오는 곳을 쓴다. 못 찾으면 -1
+    // 소제목 줄의 위치. 우선순위: 줄 전체가 소제목인 곳("## 운영") → 줄 첫머리로 시작하는 곳("## 운영 비용")
+    // → 아무 데나 처음 나오는 곳. 못 찾으면 -1
     private static int sectionStart(String content, String sectionLabel) {
         if (sectionLabel == null || sectionLabel.isBlank()) {
             return -1;
         }
         String label = sectionLabel.trim();
+        int lineHead = -1;
         for (int index = content.indexOf(label); index >= 0; index = content.indexOf(label, index + 1)) {
-            if (isLineHead(content, index)) {
+            if (!isLineHead(content, index)) {
+                continue;
+            }
+            if (isLineEnd(content, index + label.length())) {
                 return index;
             }
+            if (lineHead < 0) {
+                lineHead = index;
+            }
         }
-        return content.indexOf(label);
+        return lineHead >= 0 ? lineHead : content.indexOf(label);
+    }
+
+    // index부터 줄 끝까지 공백뿐인지
+    private static boolean isLineEnd(String content, int index) {
+        for (int i = index; i < content.length() && content.charAt(i) != '\n'; i++) {
+            if (!Character.isWhitespace(content.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isLineHead(String content, int index) {

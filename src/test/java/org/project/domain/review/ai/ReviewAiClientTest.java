@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.project.domain.review.ai.dto.ResolvedGap;
 import org.project.domain.review.ai.dto.AnalysisResult;
 import org.project.domain.review.ai.dto.FollowUpInput;
 import org.project.domain.review.ai.dto.QuestionAnswers;
@@ -70,7 +71,7 @@ class ReviewAiClientTest {
     void analyze_parsesJsonAndSendsDocument() {
         chatModel.respond(VALID_JSON);
 
-        AnalysisResult result = reviewAiClient.analyze(3L, "전공책 중고거래 기획서", "본문 내용", List.of());
+        AnalysisResult result = reviewAiClient.analyze(3L, "전공책 중고거래 기획서", "본문 내용", List.of(), List.of());
 
         assertThat(result.findings()).hasSize(1);
         assertThat(result.findings().get(0).category()).isEqualTo("CRITERIA");
@@ -90,7 +91,7 @@ class ReviewAiClientTest {
     void analyze_readsDocumentGoalWithFindings() {
         chatModel.respond(VALID_JSON.replaceFirst("\\{", "{\"documentGoal\":\"버려지는 전공책을 싸게 다시 쓰게 한다\","));
 
-        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of());
+        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of());
 
         assertThat(result.documentGoal()).isEqualTo("버려지는 전공책을 싸게 다시 쓰게 한다");
         assertThat(result.findings()).hasSize(1);
@@ -102,7 +103,7 @@ class ReviewAiClientTest {
     void analyze_sendsSchemaWithCategoryEnum() {
         chatModel.respond(VALID_JSON);
 
-        reviewAiClient.analyze(3L, "제목", "본문", List.of());
+        reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of());
 
         String schema = ((GoogleGenAiChatOptions) chatModel.lastPrompt().getOptions()).getResponseSchema();
         assertThat(schema).contains("\"enum\":[\"CRITERIA\",\"STAKEHOLDER\",\"EDGE_CASE\"]").doesNotContain("$schema");
@@ -127,7 +128,7 @@ class ReviewAiClientTest {
         chatModel.respond("JSON이 아닌 응답");
         chatModel.respond(VALID_JSON);
 
-        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of());
+        AnalysisResult result = reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of());
 
         assertThat(result.findings()).hasSize(1);
         assertThat(chatModel.callCount()).isEqualTo(2);
@@ -142,7 +143,7 @@ class ReviewAiClientTest {
         chatModel.fail();
         chatModel.fail();
 
-        assertThatThrownBy(() -> reviewAiClient.analyze(3L, "제목", "본문", List.of()))
+        assertThatThrownBy(() -> reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of()))
                 .isInstanceOf(ReviewException.class)
                 .extracting("errorCode")
                 .isEqualTo(ReviewErrorCode.REVIEW_AI_FAILED);
@@ -155,7 +156,7 @@ class ReviewAiClientTest {
     void analyze_sendsAlreadyFoundAnchors() {
         chatModel.respond("{\"findings\":[]}");
 
-        reviewAiClient.analyze(3L, "제목", "본문", List.of("학생회가 사물함 관리를 맡는다."));
+        reviewAiClient.analyze(3L, "제목", "본문", List.of("학생회가 사물함 관리를 맡는다."), List.of());
 
         assertThat(chatModel.lastPrompt().getContents()).contains("[이미 짚은 문장]", "- 학생회가 사물함 관리를 맡는다.");
     }
@@ -165,9 +166,25 @@ class ReviewAiClientTest {
     void analyze_firstReviewHasNoAlreadyFoundSection() {
         chatModel.respond("{\"findings\":[]}");
 
-        reviewAiClient.analyze(3L, "제목", "본문", List.of());
+        reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of());
 
-        assertThat(chatModel.lastPrompt().getContents()).doesNotContain("[이미 짚은 문장]");
+        assertThat(chatModel.lastPrompt().getContents()).doesNotContain("[이미 짚은 문장]", "[이미 반영한 빈틈]");
+    }
+
+    @Test
+    @DisplayName("다시 검토: 이미 반영한 빈틈(제목·짚은 문장·넣은 문장)을 보내, 해결됐으면 같은 빈틈을 다시 내지 않도록 알린다")
+    void analyze_sendsResolvedGaps() {
+        chatModel.respond("{\"findings\":[]}");
+
+        reviewAiClient.analyze(3L, "제목", "본문", List.of(), List.of(new ResolvedGap(
+                "회비 미납 시 처리 방안이 없어요", "회비는 MT 일주일 전까지 총무 계좌로 받는다.", "미납자는 MT에 참가할 수 없다.")));
+
+        assertThat(chatModel.lastPrompt().getContents()).contains(
+                "[이미 반영한 빈틈]",
+                "회비 미납 시 처리 방안이 없어요",
+                "회비는 MT 일주일 전까지 총무 계좌로 받는다.",
+                "미납자는 MT에 참가할 수 없다.",
+                "해결했으면 같은 빈틈을 다시 내지 않는다");
     }
 
     @Test
@@ -183,6 +200,18 @@ class ReviewAiClientTest {
                 "여러 학년 중 1~2학년을 주 사용자로 고른 기준은 무엇인가요?",
                 "음 1~2학년이 기초 전공책을 제일 많이 사서");
         assertThat(((GoogleGenAiChatOptions) prompt.getOptions()).getTemperature()).isEqualTo(0.3);
+    }
+
+    @Test
+    @DisplayName("후속 질문: 답이 첫 질문과 동떨어지면 넓히지 말고 첫 질문의 핵심을 다시 묻도록 알린다")
+    void followUp_tellsToReaskWhenAnswerIsOffTopic() {
+        chatModel.respond("{\"question\":\"그럼 MT는 언제 갈 예정인가요?\"}");
+
+        reviewAiClient.followUp(followUpInput());
+
+        assertThat(chatModel.lastPrompt().getContents()).contains(
+                "[답이 첫 질문과 동떨어졌을 때]",
+                "첫 질문이 묻는 핵심을 더 쉽고 구체적으로 다시 묻는다");
     }
 
     @Test

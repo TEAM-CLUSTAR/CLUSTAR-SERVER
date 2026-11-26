@@ -5,6 +5,7 @@ import org.project.domain.memo.entity.Memo;
 import org.project.domain.memo.repository.MemoRepository;
 import org.project.domain.review.ai.ReviewAiClient;
 import org.project.domain.review.ai.dto.AnalysisResult;
+import org.project.domain.review.ai.dto.ResolvedGap;
 import org.project.domain.review.config.ReviewProperties;
 import org.project.domain.review.dto.response.ActiveReviewResponse;
 import org.project.domain.review.dto.response.EndReviewResponse;
@@ -63,7 +64,7 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_IN_PROGRESS);
         }
 
-        List<ValidFindingDraft> drafts = analyzeAndSanitize(memoId, memo.getTitle(), content, List.of());
+        List<ValidFindingDraft> drafts = analyzeAndSanitize(memoId, memo.getTitle(), content, List.of(), List.of());
 
         try {
             return reviewWriter.saveNewReview(memoId, content, drafts);
@@ -81,7 +82,7 @@ public class ReviewServiceImpl implements ReviewService {
         validateContentLength(input.content());
 
         List<ValidFindingDraft> drafts = analyzeAndSanitize(
-                input.memoId(), input.title(), input.content(), input.excludedAnchors());
+                input.memoId(), input.title(), input.content(), input.excludedAnchors(), input.resolvedGaps());
 
         try {
             return reviewWriter.saveRerun(input.memoId(), reviewId, input.content(), drafts, reviewProperties.getMaxFindings());
@@ -102,8 +103,9 @@ public class ReviewServiceImpl implements ReviewService {
         return e;
     }
 
-    private List<ValidFindingDraft> analyzeAndSanitize(Long memoId, String title, String content, List<String> excludedAnchors) {
-        AnalysisResult analysis = reviewAiClient.analyze(memoId, title, content, excludedAnchors);
+    private List<ValidFindingDraft> analyzeAndSanitize(Long memoId, String title, String content,
+                                                       List<String> excludedAnchors, List<ResolvedGap> resolvedGaps) {
+        AnalysisResult analysis = reviewAiClient.analyze(memoId, title, content, excludedAnchors, resolvedGaps);
         List<ValidFindingDraft> drafts = FindingDrafts.sanitize(
                 content, analysis.findings(), reviewProperties.getMaxFindings());
 
